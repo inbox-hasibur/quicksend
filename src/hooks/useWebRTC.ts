@@ -23,6 +23,7 @@ import {
   ICE_CONNECTION_TIMEOUT_MS,
   FIREWALL_FALLBACK_MESSAGE,
 } from "@/lib/iceConfig";
+import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
 import type { PeerRole, SignalMessage } from "@/types/signaling";
 import type { TransferMode } from "@/types/mode";
 import type {
@@ -257,6 +258,30 @@ export function useWebRTC(mode: TransferMode = "internet") {
           fullText = reassembleChunksToText(receivedChunksRef.current);
         }
 
+        const modeLabel =
+          mode === "internet" ? "Via Internet" : mode === "same-network" ? "Same Wi-Fi" : "Hotspot";
+
+        if (header.type === "file" && header.file) {
+          addTransferHistoryItem({
+            direction: "received",
+            mode: modeLabel,
+            itemType: "file",
+            name: header.file.name,
+            size: header.file.size,
+            status: "completed",
+          });
+        } else if (header.type === "text" && fullText) {
+          addTransferHistoryItem({
+            direction: "received",
+            mode: modeLabel,
+            itemType: "text",
+            name: fullText.length > 30 ? `${fullText.slice(0, 30)}...` : fullText,
+            textSnippet: fullText,
+            size: new Blob([fullText]).size,
+            status: "completed",
+          });
+        }
+
         const isLastInBatch =
           !header.totalFiles ||
           !header.fileIndex ||
@@ -272,7 +297,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         }));
       }
     }
-  }, []);
+  }, [mode]);
 
   // Setup DataChannel listeners
   const setupDataChannel = useCallback(
@@ -619,6 +644,17 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       accumulatedBatchBytes += currentFile.size;
 
+      const modeLabel =
+        mode === "internet" ? "Via Internet" : mode === "same-network" ? "Same Wi-Fi" : "Hotspot";
+      addTransferHistoryItem({
+        direction: "sent",
+        mode: modeLabel,
+        itemType: "file",
+        name: currentFile.name,
+        size: currentFile.size,
+        status: "completed",
+      });
+
       // Small pause between sequential files to allow receiver to flush and trigger download
       if (i < files.length - 1) {
         await new Promise((resolve) => setTimeout(resolve, 80));
@@ -631,7 +667,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       progressPercentage: 100,
       speedBps: 0,
     }));
-  }, []);
+  }, [mode]);
 
   // Text snippet sender
   const sendText = useCallback(async (text: string) => {
@@ -686,13 +722,25 @@ export function useWebRTC(mode: TransferMode = "internet") {
       }));
     }
 
+    const modeLabel =
+      mode === "internet" ? "Via Internet" : mode === "same-network" ? "Same Wi-Fi" : "Hotspot";
+    addTransferHistoryItem({
+      direction: "sent",
+      mode: modeLabel,
+      itemType: "text",
+      name: text.length > 30 ? `${text.slice(0, 30)}...` : text,
+      textSnippet: text,
+      size: blobToSend.size,
+      status: "completed",
+    });
+
     setProgress((prev) => ({
       ...prev,
       status: "completed",
       progressPercentage: 100,
       speedBps: 0,
     }));
-  }, []);
+  }, [mode]);
 
   // Universal payload sender
   const sendPayload = useCallback(

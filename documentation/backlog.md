@@ -147,7 +147,11 @@
 - [x] Build animated QR carousel in `OpticalHandshakeModal.tsx` with ~350ms/700ms speed toggles, play/pause controls, frame progress pills, and live incremental collection counter.
 - [x] Add webcam-free manual code fallback (copy/paste compact `OPTSDP:...` strings) for PCs without cameras.
 - [x] Add 1-click strong password generator in `HotspotAssistantCard.tsx` and offline detection banner in `SameNetworkCard.tsx`.
+- [x] Finalize unified reactive ephemeral session history (`src/hooks/useTransferHistory.ts` via `useSyncExternalStore`) wired consistently across Mode 1, Mode 2, Mode 3, and Mode 4.
+- [x] Add 1-click "Copy Text" snippet action and "Clear History" confirmation in `TransferHistoryModal.tsx`.
+- [x] Polish Mode 4 (`NearbyShareCard.tsx`) with multi-file Dropzone integration and clear jargon-free fallback card when Web Bluetooth is unsupported.
+- [x] Harden Service Worker (`public/sw.js`) to strictly bypass caching for `/api/*` endpoints (`NetworkOnly`) and configure `no-store` API headers in `vercel.json`.
 - [x] **Sprint 4 Testing & Verification Gate:**
-  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, Health endpoint, SHA-256 chunker, DiskStream fallback, and Multi-Frame Optical SDP Collector.
+  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, Health endpoint, SHA-256 chunker, DiskStream fallback, Multi-Frame Optical SDP Collector, and useTransferHistory store.
   - Full end-to-end regression test suite passing across all components, APIs, and utilities.
-  - Verification that `npm test` (85/85 passed across 13 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
+  - Verification that `npm test` (92/92 passed across 14 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.

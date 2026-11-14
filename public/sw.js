@@ -46,6 +46,12 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
+  // Strictly bypass service worker for all API endpoints (/api/*)
+  // This guarantees WebRTC signaling and health polling always hit the live network directly
+  if (url.pathname.startsWith("/api/")) {
+    return;
+  }
+
   // Navigation requests (HTML pages)
   if (request.mode === "navigate") {
     event.respondWith(

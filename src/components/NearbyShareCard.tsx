@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Dropzone } from "@/components/Dropzone";
 import { useNearbyShare } from "@/hooks/useNearbyShare";
+import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
 import { ANDROID_INTENTS } from "@/lib/wifiQr";
 
 type NearbyTab = "quickshare" | "ble" | "guide";
@@ -47,11 +48,37 @@ export function NearbyShareCard() {
       return;
     }
 
-    await shareViaNative({
+    const ok = await shareViaNative({
       files: selectedPayload.files.length > 0 ? selectedPayload.files : undefined,
       text: selectedPayload.text.trim() || undefined,
       title: "QuickSend Beam",
     });
+
+    if (ok) {
+      if (selectedPayload.files.length > 0) {
+        for (const file of selectedPayload.files) {
+          addTransferHistoryItem({
+            direction: "sent",
+            mode: "Nearby / Quick Share",
+            itemType: "file",
+            name: file.name,
+            size: file.size,
+            status: "completed",
+          });
+        }
+      } else if (selectedPayload.text.trim()) {
+        const text = selectedPayload.text.trim();
+        addTransferHistoryItem({
+          direction: "sent",
+          mode: "Nearby / Quick Share",
+          itemType: "text",
+          name: text.length > 30 ? `${text.slice(0, 30)}...` : text,
+          textSnippet: text,
+          size: new Blob([text]).size,
+          status: "completed",
+        });
+      }
+    }
   };
 
   return (
@@ -148,6 +175,15 @@ export function NearbyShareCard() {
             </div>
           </div>
 
+          {!capabilities.hasWebShare && (
+            <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+              <Info className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
+              <p>
+                Native Web Share is not supported in this browser. To send files to nearby devices without restrictions, switch to <strong>Mode 1 (Via Internet)</strong> or <strong>Mode 2 (Same Wi-Fi)</strong>.
+              </p>
+            </div>
+          )}
+
           <div className="space-y-2">
             <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block px-1">
               Select Files or Text to Handoff
@@ -198,7 +234,34 @@ export function NearbyShareCard() {
             </div>
           </div>
 
-          {!bleDevice ? (
+          {!capabilities.hasBluetooth ? (
+            <div className="p-8 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 text-center space-y-4 max-w-md mx-auto">
+              <div className="h-14 w-14 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
+                <AlertCircle className="h-7 w-7" />
+              </div>
+              <div className="space-y-1.5">
+                <h4 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+                  Web Bluetooth Unavailable
+                </h4>
+                <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                  Your current browser (such as iOS Safari or Firefox) restricts Web Bluetooth APIs.
+                </p>
+              </div>
+              <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/70 dark:border-neutral-800 text-left text-xs text-neutral-600 dark:text-neutral-400 space-y-2">
+                <span className="font-semibold text-neutral-900 dark:text-neutral-200 block">
+                  Recommended Alternatives:
+                </span>
+                <ul className="list-disc pl-4 space-y-1 text-[11px]">
+                  <li>
+                    Switch to <strong>Mode 1 (Via Internet)</strong> or <strong>Mode 3 (Wi-Fi Hotspot)</strong> for fast camera QR transfers that work on all browsers.
+                  </li>
+                  <li>
+                    Open QuickSend in <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> on desktop/Android for native Bluetooth peripheral access.
+                  </li>
+                </ul>
+              </div>
+            </div>
+          ) : !bleDevice ? (
             <div className="p-8 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 text-center space-y-4 max-w-md mx-auto">
               <div className="h-14 w-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
                 <Bluetooth className="h-7 w-7" />

@@ -1,6 +1,7 @@
 "use client";
 
-import { X, Clock, ArrowUpRight, ArrowDownLeft, File, FileText, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { X, Clock, ArrowUpRight, ArrowDownLeft, File, FileText, Trash2, Copy, Check } from "lucide-react";
 import type { TransferHistoryItem } from "@/types/transfer";
 import { formatBytes } from "@/lib/chunker";
 import { FileTypeBadge } from "@/components/FileTypeBadge";
@@ -18,7 +19,19 @@ export function TransferHistoryModal({
   history,
   onClear,
 }: TransferHistoryModalProps) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
   if (!isOpen) return null;
+
+  const handleCopy = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // Fallback if clipboard API is unavailable
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
@@ -59,7 +72,7 @@ export function TransferHistoryModal({
               No transfers yet
             </h4>
             <p className="text-xs text-neutral-400 max-w-xs mx-auto">
-              Items you send or receive in this session will appear here for quick reference.
+              Items you send or receive in this session will appear here for quick reference and copying.
             </p>
           </div>
         ) : (
@@ -97,14 +110,39 @@ export function TransferHistoryModal({
                     <div className="flex items-center gap-2 text-[11px] text-neutral-400 font-mono mt-0.5 tabular-nums">
                       <span>{item.direction === "sent" ? "Sent" : "Received"}</span>
                       {item.size ? <span>• {formatBytes(item.size)}</span> : null}
-                      <span>• {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+                      <span>
+                        • {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-neutral-200/70 dark:bg-neutral-700/60 text-neutral-700 dark:text-neutral-300">
-                  {item.mode}
-                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  {item.textSnippet && (
+                    <button
+                      type="button"
+                      onClick={() => handleCopy(item.id, item.textSnippet!)}
+                      className="px-2.5 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-200/60 dark:hover:bg-neutral-750 text-[11px] font-medium text-neutral-600 dark:text-neutral-300 flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Copy text snippet"
+                    >
+                      {copiedId === item.id ? (
+                        <>
+                          <Check className="h-3 w-3 text-emerald-500" />
+                          <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Copied</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="h-3 w-3 text-neutral-400" />
+                          <span>Copy</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-neutral-200/70 dark:bg-neutral-700/60 text-neutral-700 dark:text-neutral-300">
+                    {item.mode}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
