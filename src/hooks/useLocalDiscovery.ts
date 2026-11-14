@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useSyncExternalStore } from "react";
 import {
   getLocalDeviceProfile,
+  getServerDeviceProfile,
+  subscribeToDeviceProfile,
   updateLocalDeviceName,
+  updateLocalAvatar,
+  cycleLocalAvatar,
   type DeviceProfile,
 } from "@/lib/deviceIdentity";
 
@@ -27,7 +31,11 @@ export interface IncomingBeamEvent {
 }
 
 export function useLocalDiscovery(isAutoDiscovering = true) {
-  const [profile, setProfile] = useState<DeviceProfile>(() => getLocalDeviceProfile());
+  const profile: DeviceProfile = useSyncExternalStore(
+    subscribeToDeviceProfile,
+    getLocalDeviceProfile,
+    getServerDeviceProfile
+  );
   const [peers, setPeers] = useState<NearbyPeer[]>([]);
   const [networkId, setNetworkId] = useState<string | null>(null);
   const [incomingBeam, setIncomingBeam] = useState<IncomingBeamEvent | null>(null);
@@ -36,6 +44,11 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
 
   // Announce local device to discovery endpoint
   const announcePresence = useCallback(async () => {
+    // Avoid announcing while running with server fallback mock
+    if (typeof window === "undefined" || profile.id === "srv_mock") {
+      return;
+    }
+
     try {
       const res = await fetch("/api/discover", {
         method: "POST",
@@ -61,6 +74,18 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
           setPeers(data.peers || []);
           if (data.incomingBeam) {
             setIncomingBeam(data.incomingBeam);
+          }
+          // If server reassigned avatar to avoid conflict on this subnet, update local profile
+          if (
+            data.assignedAvatar &&
+            (data.assignedAvatar.avatarEmoji !== profile.avatarEmoji ||
+              data.assignedAvatar.codename !== profile.codename)
+          ) {
+            updateLocalAvatar({
+              emoji: data.assignedAvatar.avatarEmoji,
+              codename: data.assignedAvatar.codename,
+              color: data.assignedAvatar.avatarColor,
+            });
           }
         }
       }
@@ -162,8 +187,11 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
 
   const updateName = (newName: string) => {
     updateLocalDeviceName(newName);
-    setProfile(getLocalDeviceProfile());
   };
+
+  const cycleAvatar = useCallback(() => {
+    cycleLocalAvatar();
+  }, []);
 
   return {
     profile,
@@ -174,6 +202,7 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
     clearIncomingBeam,
     isScanning,
     updateName,
+    cycleAvatar,
     refreshPeers: announcePresence,
   };
 }

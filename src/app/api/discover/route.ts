@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { AVATAR_PRESETS } from "@/lib/deviceIdentity";
 
 export interface DiscoveredPeer {
   id: string;
@@ -115,22 +116,39 @@ export async function POST(request: Request) {
         return NextResponse.json({ success: false, error: "deviceId required" }, { status: 400 });
       }
 
+      // Check existing active peers on this network (excluding the caller)
+      const activePeers = pruneStalePeers(peersMap);
+      const otherPeers = activePeers.filter((p) => p.id !== deviceId);
+
+      // Collect emojis already in use by other peers on this subnet
+      const takenEmojis = new Set(otherPeers.map((p) => p.avatarEmoji).filter(Boolean));
+
+      let assignedEmoji = avatarEmoji || "🦊";
+      let assignedCodename = codename || name || "Curious Fox";
+      let assignedColor = avatarColor || "#F97316";
+
+      // If announcing device's emoji is already taken on this network, reassign to next available preset
+      if (takenEmojis.has(assignedEmoji)) {
+        const available = AVATAR_PRESETS.find((preset) => !takenEmojis.has(preset.emoji));
+        if (available) {
+          assignedEmoji = available.emoji;
+          assignedCodename = available.codename;
+          assignedColor = available.color;
+        }
+      }
+
       peersMap.set(deviceId, {
         id: deviceId,
         name: name || "Anonymous Peer",
-        codename: codename || name || "Device",
-        avatarEmoji: avatarEmoji || "💻",
-        avatarColor: avatarColor || "#6366F1",
+        codename: assignedCodename,
+        avatarEmoji: assignedEmoji,
+        avatarColor: assignedColor,
         os: os || "Device",
         browser: browser || "Browser",
         formFactor: formFactor || "laptop",
         peerId: peerId || deviceId,
         lastSeen: Date.now(),
       });
-
-      const activePeers = pruneStalePeers(peersMap);
-      // Return other peers excluding the caller
-      const otherPeers = activePeers.filter((p) => p.id !== deviceId);
 
       // Check if another peer on this subnet initiated a direct beam to this device
       let incomingBeam: IncomingBeamNotice | undefined = undefined;
@@ -145,6 +163,11 @@ export async function POST(request: Request) {
         success: true,
         networkId: targetNetworkId,
         peers: otherPeers,
+        assignedAvatar: {
+          codename: assignedCodename,
+          avatarEmoji: assignedEmoji,
+          avatarColor: assignedColor,
+        },
         incomingBeam: incomingBeam || null,
       });
     }

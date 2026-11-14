@@ -40,6 +40,7 @@ export function SameNetworkCard() {
     beamToPeer,
     clearIncomingBeam,
     updateName,
+    cycleAvatar,
   } = useLocalDiscovery(true);
 
   const [customNameInput, setCustomNameInput] = useState(profile.name);
@@ -263,20 +264,30 @@ export function SameNetworkCard() {
           <div className="relative z-10 flex flex-col items-center text-center">
             <div className="relative flex items-center justify-center">
               <div className="absolute w-14 h-14 rounded-full bg-[var(--accent)]/15 animate-radar-ping pointer-events-none" />
-              <div
-                className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md text-white border-2 border-white dark:border-neutral-800 text-2xl select-none"
+              <button
+                type="button"
+                onClick={cycleAvatar}
+                title="Tap to change your avatar"
+                className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md text-white border-2 border-white dark:border-neutral-800 text-2xl select-none hover:scale-110 active:scale-95 transition-all cursor-pointer group"
                 style={{ backgroundColor: profile.avatarColor }}
               >
-                {profile.avatarEmoji || "🦊"}
-              </div>
+                <span className="group-hover:rotate-12 transition-transform">{profile.avatarEmoji || "🦊"}</span>
+              </button>
             </div>
             <div className="mt-2">
               <span className="text-xs font-bold text-[var(--text)] block truncate max-w-[140px]">
                 {profile.codename}
               </span>
-              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium block">
                 You ({profile.os} • {profile.browser})
               </span>
+              <button
+                type="button"
+                onClick={cycleAvatar}
+                className="text-[9px] text-[var(--text-muted)] hover:text-[var(--text)] underline cursor-pointer mt-0.5"
+              >
+                Change avatar
+              </button>
             </div>
           </div>
 

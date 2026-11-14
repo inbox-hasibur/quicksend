@@ -123,4 +123,44 @@ describe("Discovery API Route (/api/discover)", () => {
     const clearRes = await POST(clearReq);
     expect(clearRes.status).toBe(200);
   });
+
+  it("should reassign colliding avatars so devices on the same network have distinct icons", async () => {
+    // Client A joins with Curious Fox 🦊
+    const clientAReq = new Request("http://localhost/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.1" },
+      body: JSON.stringify({
+        action: "announce",
+        deviceId: "dev_a",
+        name: "Device A",
+        codename: "Curious Fox",
+        avatarEmoji: "🦊",
+        avatarColor: "#F97316",
+      }),
+    });
+    const resA = await POST(clientAReq);
+    const jsonA = await resA.json();
+    expect(jsonA.success).toBe(true);
+    expect(jsonA.assignedAvatar.avatarEmoji).toBe("🦊");
+
+    // Client B joins with the same Curious Fox 🦊 on the same IP
+    const clientBReq = new Request("http://localhost/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.1" },
+      body: JSON.stringify({
+        action: "announce",
+        deviceId: "dev_b",
+        name: "Device B",
+        codename: "Curious Fox",
+        avatarEmoji: "🦊",
+        avatarColor: "#F97316",
+      }),
+    });
+    const resB = await POST(clientBReq);
+    const jsonB = await resB.json();
+    expect(jsonB.success).toBe(true);
+    // Client B must be assigned a different avatar, not 🦊!
+    expect(jsonB.assignedAvatar.avatarEmoji).not.toBe("🦊");
+    expect(jsonB.peers.some((p: { avatarEmoji: string }) => p.avatarEmoji === "🦊")).toBe(true);
+  });
 });

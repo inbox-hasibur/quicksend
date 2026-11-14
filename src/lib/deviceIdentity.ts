@@ -73,35 +73,64 @@ export function getPlatformInfo(ua = typeof navigator !== "undefined" ? navigato
   return { os, browser, formFactor };
 }
 
+const profileListeners = new Set<() => void>();
+
+export function subscribeToDeviceProfile(callback: () => void) {
+  profileListeners.add(callback);
+  return () => {
+    profileListeners.delete(callback);
+  };
+}
+
+export function notifyProfileListeners() {
+  for (const listener of profileListeners) {
+    listener();
+  }
+}
+
+export function getServerDeviceProfile(): DeviceProfile {
+  return {
+    id: "srv_mock",
+    name: "QuickSend Device",
+    codename: "Curious Fox",
+    avatarEmoji: "🦊",
+    avatarColor: AVATAR_PRESETS[0].color,
+    formFactor: "desktop",
+    os: "Server",
+    browser: "Node",
+  };
+}
+
 export function getLocalDeviceProfile(): DeviceProfile {
   if (typeof window === "undefined") {
-    return {
-      id: "srv_mock",
-      name: "QuickSend Device",
-      codename: "Curious Fox",
-      avatarEmoji: "🦊",
-      avatarColor: AVATAR_PRESETS[0].color,
-      formFactor: "desktop",
-      os: "Server",
-      browser: "Node",
-    };
+    return getServerDeviceProfile();
   }
 
   const { os, browser, formFactor } = getPlatformInfo();
 
-  let storedId = sessionStorage.getItem("quicksend_device_id");
+  let storedId = localStorage.getItem("quicksend_device_id");
   if (!storedId) {
     storedId = `dev_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 7)}`;
-    sessionStorage.setItem("quicksend_device_id", storedId);
+    localStorage.setItem("quicksend_device_id", storedId);
   }
 
-  // Pick deterministic avatar preset based on id
-  let hash = 0;
-  for (let i = 0; i < storedId.length; i++) {
-    hash = (hash << 5) - hash + storedId.charCodeAt(i);
+  // Check if custom or dynamically assigned avatar preset is stored
+  const storedEmoji = localStorage.getItem("quicksend_avatar_emoji");
+  const storedCodename = localStorage.getItem("quicksend_avatar_codename");
+  const storedColor = localStorage.getItem("quicksend_avatar_color");
+
+  let preset: AvatarPreset;
+  if (storedEmoji && storedCodename && storedColor) {
+    preset = { emoji: storedEmoji, codename: storedCodename, color: storedColor };
+  } else {
+    // Pick deterministic avatar preset based on device id
+    let hash = 0;
+    for (let i = 0; i < storedId.length; i++) {
+      hash = (hash << 5) - hash + storedId.charCodeAt(i);
+    }
+    const presetIndex = Math.abs(hash) % AVATAR_PRESETS.length;
+    preset = AVATAR_PRESETS[presetIndex];
   }
-  const presetIndex = Math.abs(hash) % AVATAR_PRESETS.length;
-  const preset = AVATAR_PRESETS[presetIndex];
 
   const storedName = localStorage.getItem("quicksend_device_name");
   const deviceName =
@@ -120,8 +149,31 @@ export function getLocalDeviceProfile(): DeviceProfile {
   };
 }
 
+export function updateLocalAvatar(preset: AvatarPreset): DeviceProfile {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("quicksend_avatar_emoji", preset.emoji);
+    localStorage.setItem("quicksend_avatar_codename", preset.codename);
+    localStorage.setItem("quicksend_avatar_color", preset.color);
+    const storedName = localStorage.getItem("quicksend_device_name");
+    if (!storedName || AVATAR_PRESETS.some((p) => storedName.startsWith(p.codename))) {
+      localStorage.removeItem("quicksend_device_name");
+    }
+    notifyProfileListeners();
+  }
+  return getLocalDeviceProfile();
+}
+
+export function cycleLocalAvatar(): DeviceProfile {
+  if (typeof window === "undefined") return getLocalDeviceProfile();
+  const current = getLocalDeviceProfile();
+  const currentIndex = AVATAR_PRESETS.findIndex((p) => p.emoji === current.avatarEmoji);
+  const nextIndex = (currentIndex + 1) % AVATAR_PRESETS.length;
+  return updateLocalAvatar(AVATAR_PRESETS[nextIndex]);
+}
+
 export function updateLocalDeviceName(newName: string): void {
   if (typeof window !== "undefined" && newName.trim()) {
     localStorage.setItem("quicksend_device_name", newName.trim());
+    notifyProfileListeners();
   }
 }
