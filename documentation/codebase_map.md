@@ -1,6 +1,6 @@
 # Share Anything: Codebase Map & Dependency Graph
 
-> **Last Updated:** Sprint 2 Complete (Core UI & Mode 1 Internet Sharing)  
+> **Last Updated:** Sprint 3 Complete (Mode 2 Same Network & Mode 3 Wi-Fi/Hotspot Offline P2P)  
 > **Target Deployment:** [shareit.vercel.app](https://shareit.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 
@@ -28,7 +28,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS v4 (@tailwindcss/turbopack)"]
-        Vitest["Vitest v5 + happy-dom (21 Passing Tests)"]
+        Vitest["Vitest v5 + happy-dom (30 Passing Tests)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -40,10 +40,13 @@ flowchart TD
     end
 
     subgraph Src_Components["src/components/ (UI & Presentation Components)"]
-        ModeSel["ModeSelector.tsx (4-Mode Grid & Selected Panels)"]
+        ModeSel["ModeSelector.tsx (4-Mode Grid & Active Panels)"]
         NetBadge["NetworkStatusBadge.tsx (Online/Offline Real-Time Pill)"]
         SWReg["ServiceWorkerRegister.tsx (PWA /sw.js Registration)"]
-        InternetCard["InternetSharingCard.tsx (Mode 1 PIN/QR & Send/Receive Controller)"]
+        InternetCard["InternetSharingCard.tsx (Mode 1 Controller: PIN/QR & Send/Receive)"]
+        SameNetCard["SameNetworkCard.tsx (Mode 2 Controller: Local LAN & Optical QR)"]
+        HotspotCard["HotspotAssistantCard.tsx (Mode 3 Controller: Hotspot QR & Wizard)"]
+        OpticalModal["OpticalHandshakeModal.tsx (Camera-to-Camera Optical QR Handshake)"]
         DropzoneComp["Dropzone.tsx (Drag & Drop Files / Text Paste Tabs)"]
         QRDisp["QRCodeDisplay.tsx (SVG QR Generator & 6-Digit PIN Display)"]
         QRModal["QRScannerModal.tsx (Camera Viewport Scanner Dialog)"]
@@ -60,6 +63,8 @@ flowchart TD
         CodeGen["codeGenerator.ts (generateRoomCode, formatRoomCode, normalizeRoomCode)"]
         Chunker["chunker.ts (sliceBlobIntoChunks, reassembly, formatBytes, formatSpeed)"]
         SigClient["signalingClient.ts (SignalingClient: Room & Signal Polling Engine)"]
+        WifiQr["wifiQr.ts (buildWifiQrString, parseWifiQrString, ANDROID_INTENTS)"]
+        OpticalSdp["opticalSdp.ts (encodeOpticalSdp, decodeOpticalSdp, compactSdp)"]
     end
 
     subgraph Src_Types["src/types/ (TypeScript Domain Interfaces)"]
@@ -77,12 +82,34 @@ flowchart TD
     ModeSel --> UseNet
     ModeSel --> ModeAvail
     ModeSel --> InternetCard
+    ModeSel --> SameNetCard
+    ModeSel --> HotspotCard
+
     InternetCard --> UseRTC
     InternetCard --> DropzoneComp
     InternetCard --> QRDisp
     InternetCard --> QRModal
     InternetCard --> TransferMod
     InternetCard --> CodeGen
+
+    SameNetCard --> UseRTC
+    SameNetCard --> DropzoneComp
+    SameNetCard --> OpticalModal
+    SameNetCard --> TransferMod
+    SameNetCard --> OpticalSdp
+
+    HotspotCard --> UseRTC
+    HotspotCard --> DropzoneComp
+    HotspotCard --> OpticalModal
+    HotspotCard --> TransferMod
+    HotspotCard --> WifiQr
+    HotspotCard --> OpticalSdp
+    HotspotCard --> QRGen
+
+    OpticalModal --> QRGen
+    OpticalModal --> QRModal
+    OpticalModal --> OpticalSdp
+
     QRDisp --> QRGen
     QRDisp --> CodeGen
     QRModal --> QRScan
@@ -95,11 +122,6 @@ flowchart TD
     SigClient --> SignalAPI
     SignalAPI --> CodeGen
     SignalAPI --> SignalTypes
-
-    %% Test Suite Wiring
-    SignalAPITests --> SignalAPI
-    SignalAPITests --> Vitest
-    ModeAvail --> ModeTypes
 ```
 
 ---
@@ -110,9 +132,9 @@ flowchart TD
 | :--- | :--- | :--- |
 | `src/app/` | Next.js App Router entry points, layout, metadata, and `/api/signal` room signaling handler. | `next`, `react`, `lucide-react` |
 | `src/app/api/signal/` | Ephemeral serverless WebRTC room signaling and ICE/SDP message queue. | `src/lib/codeGenerator`, `src/types/signaling` |
-| `src/components/` | Presentation & interactive units: 4-mode selector, Internet mode controller, Dropzone, QR display/scanner, and transfer progress modal. | `lucide-react`, `qrcode.react`, `html5-qrcode`, `src/hooks/` |
+| `src/components/` | Presentation & interactive units: 4-mode selector, Internet mode, Same-Network mode, Hotspot assistant, Optical Handshake modal, Dropzone, QR display/scanner, and transfer progress modal. | `lucide-react`, `qrcode.react`, `html5-qrcode`, `src/hooks/` |
 | `src/hooks/` | Stateful React lifecycle hooks managing network connectivity (`useNetworkStatus`) and WebRTC P2P streams (`useWebRTC`). | `react`, `src/lib/` |
-| `src/lib/` | Pure TypeScript domain functions: binary packet chunking, room code generators, signaling client, and mode availability evaluators. | `src/types/`, `vitest` |
+| `src/lib/` | Pure TypeScript domain functions: binary packet chunking, room code generators, Wi-Fi pairing QR strings, optical SDP compression, and mode availability evaluators. | `src/types/`, `vitest` |
 | `src/types/` | Domain TypeScript interfaces: transfer headers, progress state, signaling messages, and mode contracts. | TypeScript |
 | `public/` | Static SVG icons, PWA Service Worker (`sw.js`), and public web assets. | Browser CacheStorage |
 | `documentation/` | Living project governance, sprint roadmaps, architecture specifications, and codebase maps. | Markdown Docs |
@@ -126,19 +148,29 @@ flowchart TD
 #### `src/app/page.tsx`
 - **Purpose:** Primary landing hub for "Share Anything". Wraps `<ModeSelector />` in `<Suspense>` so dynamic search params (`?room=123456`) hydrate cleanly while maintaining static prerendering.
 - **Exports:** `default Home(): JSX.Element`
-- **Imports:** `Suspense`, `Zap`, `ShieldCheck`, `QrCode`, `Lock`, `ModeSelector`, `NetworkStatusBadge`.
 
 #### `src/app/api/signal/route.ts`
 - **Purpose:** Next.js Route Handler (`GET`, `POST`) for ephemeral room coordination, SDP offer/answer exchange, and ICE candidate delivery. Automatically cleans up expired rooms (>15 mins).
 - **Exports:** `GET(request: Request)`, `POST(request: Request)`
-- **Actions Handled:** `create-room`, `join-room`, `send-signal`, `poll-signals`, `leave-room`.
 
 #### `src/app/api/signal/__tests__/route.test.ts`
-- **Purpose:** Vitest integration test suite verifying room creation, room query by code, peer joining, signaling delivery, and cleanup.
+- **Purpose:** Integration test suite verifying room creation, room query by code, peer joining, signaling delivery, and cleanup.
 
 ---
 
 ### 3.2 UI Components (`src/components/`)
+
+#### `src/components/SameNetworkCard.tsx`
+- **Purpose:** Mode 2 Controller (Same Network Wi-Fi). Prioritizes internal host ICE candidates across the local router subnet and supports Camera-to-Camera Optical QR fallback when the local network has no internet.
+- **Exports:** `SameNetworkCard(): JSX.Element`
+
+#### `src/components/HotspotAssistantCard.tsx`
+- **Purpose:** Mode 3 Controller (Wi-Fi + Hotspot Interface). Guided wizard for mobile/laptop AP activation, Android settings shortcuts (`TETHER_SETTINGS`), standardized `WIFI:T:WPA;S:...` pairing QR code generation, and offline optical WebRTC handshake.
+- **Exports:** `HotspotAssistantCard(): JSX.Element`
+
+#### `src/components/OpticalHandshakeModal.tsx`
+- **Purpose:** Visual modal for 100% zero-internet optical WebRTC signaling. Displays compressed Offer/Answer QR codes and launches the camera scanner to exchange SDP descriptions directly across device screens.
+- **Exports:** `OpticalHandshakeModal({ isOpen, role, localPayloadQr, onOfferScanned, onAnswerScanned, onClose }: OpticalHandshakeModalProps): JSX.Element | null`
 
 #### `src/components/InternetSharingCard.tsx`
 - **Purpose:** Mode 1 Interactive Controller. Manages Format (`6-Digit PIN` or `QR Code`) and Role (`Send` or `Receive`). Coordinates WebRTC session initiation, dropzone payload selection, peer connection status, and transfer modal trigger.
@@ -190,6 +222,14 @@ flowchart TD
 
 ### 3.4 Protocol & Domain Libraries (`src/lib/`)
 
+#### `src/lib/wifiQr.ts`
+- **Purpose:** Standardized Wi-Fi configuration string generator (`WIFI:T:WPA;S:...`) and parser recognized by iOS/Android camera apps, with Android intent deep-links.
+- **Exports:** `buildWifiQrString`, `parseWifiQrString`, `ANDROID_INTENTS`.
+
+#### `src/lib/opticalSdp.ts`
+- **Purpose:** WebRTC SDP compressor, host candidate filter, and base64 encoder/decoder for camera-to-camera optical signaling (`OPTSDP:...`).
+- **Exports:** `compactSdp`, `encodeOpticalSdp`, `decodeOpticalSdp`, `isOpticalSdp`.
+
 #### `src/lib/codeGenerator.ts`
 - **Purpose:** Cryptographically secure 6-digit room PIN generation, formatting (`834291` -> `834-291`), normalization, and validation.
 - **Exports:** `generateRoomCode`, `formatRoomCode`, `normalizeRoomCode`, `isValidRoomCode`.
@@ -230,17 +270,12 @@ flowchart TD
 
 ---
 
-## 4. Planned Module Topology for Sprints 3 & 4
+## 4. Planned Module Topology for Sprint 4
 
 ```
 src/
-├── lib/
-│   ├── wifiQr.ts            # [Sprint 3] WIFI:T:WPA;S:... generator & intent URLs
-│   ├── opticalSdp.ts        # [Sprint 3] Compressed chunked QR SDP offer/answer encoder
-│   └── bluetooth.ts         # [Sprint 4] GATT service UUIDs, characteristic helpers
 ├── hooks/
 │   └── useNearbyShare.ts    # [Sprint 4] navigator.share & Web-BLE GATT client hook
 └── components/
-    ├── HotspotAssistant.tsx # [Sprint 3] Hotspot setup wizard & WIFI QR
     └── NearbyShareModal.tsx # [Sprint 4] Native Share Sheet & BLE peripheral manager
 ```

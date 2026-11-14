@@ -249,11 +249,14 @@ share-anything/
     ├── components/
     │   ├── .gitkeep
     │   ├── Dropzone.tsx
+    │   ├── HotspotAssistantCard.tsx
     │   ├── InternetSharingCard.tsx
     │   ├── ModeSelector.tsx
     │   ├── NetworkStatusBadge.tsx
+    │   ├── OpticalHandshakeModal.tsx
     │   ├── QRCodeDisplay.tsx
     │   ├── QRScannerModal.tsx
+    │   ├── SameNetworkCard.tsx
     │   ├── ServiceWorkerRegister.tsx
     │   └── TransferModal.tsx
     ├── hooks/
@@ -264,12 +267,16 @@ share-anything/
     │   ├── __tests__/
     │   │   ├── chunker.test.ts
     │   │   ├── codeGenerator.test.ts
-    │   │   └── modeAvailability.test.ts
+    │   │   ├── modeAvailability.test.ts
+    │   │   ├── opticalSdp.test.ts
+    │   │   └── wifiQr.test.ts
     │   ├── .gitkeep
     │   ├── chunker.ts
     │   ├── codeGenerator.ts
     │   ├── modeAvailability.ts
-    │   └── signalingClient.ts
+    │   ├── opticalSdp.ts
+    │   ├── signalingClient.ts
+    │   └── wifiQr.ts
     └── types/
         ├── .gitkeep
         ├── mode.ts

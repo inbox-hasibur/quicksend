@@ -7,17 +7,17 @@ import {
   Wifi,
   Smartphone,
   Bluetooth,
-  CheckCircle2,
   AlertTriangle,
   ArrowRight,
   Sparkles,
   X,
-  Radio,
 } from "lucide-react";
 import type { TransferMode, ModeStatus } from "@/types/mode";
 import { useBrowserCapabilities } from "@/hooks/useNetworkStatus";
 import { getAllModesStatus } from "@/lib/modeAvailability";
 import { InternetSharingCard } from "@/components/InternetSharingCard";
+import { SameNetworkCard } from "@/components/SameNetworkCard";
+import { HotspotAssistantCard } from "@/components/HotspotAssistantCard";
 
 export function ModeSelector() {
   const searchParams = useSearchParams();
@@ -219,45 +219,9 @@ export function ModeSelector() {
             <InternetSharingCard initialRoomCode={initialRoomCode} />
           )}
 
-          {selectedMode === "same-network" && (
-            <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950/50 text-sm space-y-2">
-              <div className="flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 className="h-4 w-4" />
-                <span>LAN Direct Peer Mode</span>
-              </div>
-              <p className="text-xs text-neutral-500">
-                Data travels directly across your local router subnet via internal host candidates. In offline environments, camera-to-camera optical QR signaling coordinates the connection.
-              </p>
-              <div className="pt-2 flex gap-2">
-                <button className="py-2 px-4 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors">
-                  Start LAN Broadcast (Send)
-                </button>
-                <button className="py-2 px-4 text-xs font-semibold rounded-lg border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
-                  Listen for Peers (Receive)
-                </button>
-              </div>
-            </div>
-          )}
+          {selectedMode === "same-network" && <SameNetworkCard />}
 
-          {selectedMode === "hotspot" && (
-            <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950/50 text-sm space-y-2">
-              <div className="flex items-center gap-2 font-semibold text-amber-600 dark:text-amber-400">
-                <Radio className="h-4 w-4" />
-                <span>Offline Hotspot Interface</span>
-              </div>
-              <p className="text-xs text-neutral-500">
-                Generates a standardized Wi-Fi pairing QR code (`WIFI:T:WPA;S:...`) readable by phone cameras. Handshake executes optically without requiring external internet.
-              </p>
-              <div className="pt-2 flex gap-2">
-                <button className="py-2 px-4 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 text-white transition-colors">
-                  Configure Hotspot (Send)
-                </button>
-                <button className="py-2 px-4 text-xs font-semibold rounded-lg border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors">
-                  Join Hotspot &amp; Receive
-                </button>
-              </div>
-            </div>
-          )}
+          {selectedMode === "hotspot" && <HotspotAssistantCard />}
 
           {selectedMode === "bluetooth" && (
             <div className="p-4 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-950/50 text-sm space-y-2">

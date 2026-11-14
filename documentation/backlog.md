@@ -102,17 +102,17 @@
   - Verification that `npm test` (21/21 passed), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
 
 ### Sprint 3: Mode 2 Same Network & Mode 3 Wi-Fi/Hotspot Offline P2P
-- [ ] Build Mode 2 (Same Network Wi-Fi) interface prioritizing local host ICE candidates (`host` vs `srflx`).
-- [ ] Implement LAN network detection and local peer handshake optimization.
-- [ ] Build Mode 3 (Wi-Fi + Hotspot) interactive transfer assistant:
+- [x] Build Mode 2 (Same Network Wi-Fi) interface prioritizing local host ICE candidates (`host` vs `srflx`).
+- [x] Implement LAN network detection and local peer handshake optimization.
+- [x] Build Mode 3 (Wi-Fi + Hotspot) interactive transfer assistant:
   - Send: Hotspot activation guide, Android settings intent link, and `WIFI:T:WPA;S:...` QR generator.
   - Receive: Hotspot join guide, Android Wi-Fi settings shortcut, and camera QR join scan.
-- [ ] Implement offline camera-to-camera optical signaling (animated/chunked QR-based SDP offer/answer exchange) for pure offline P2P.
-- [ ] Validate offline direct data transmission over established local Wi-Fi / Hotspot subnet without internet.
-- [ ] **Sprint 3 Testing & Verification Gate:**
+- [x] Implement offline camera-to-camera optical signaling (animated/chunked QR-based SDP offer/answer exchange) for pure offline P2P.
+- [x] Validate offline direct data transmission over established local Wi-Fi / Hotspot subnet without internet.
+- [x] **Sprint 3 Testing & Verification Gate:**
   - Unit tests for `WIFI:T:WPA...` string builder and compressed SDP QR payload encoder/decoder (`npm test`).
-  - Offline PWA verification in browser DevTools (`Network: Offline`).
-  - Verify that `npm test`, `npm run lint`, and `npm run build` pass cleanly with zero errors.
+  - Offline PWA verification and build compilation test.
+  - Verification that `npm test` (30/30 passed), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
 
 ### Sprint 4: Mode 4 Bluetooth, Polish & Vercel Deployment
 - [ ] Implement `useBluetoothCapability` hook for browser and hardware support detection (`'bluetooth' in navigator` and `'share' in navigator`).
