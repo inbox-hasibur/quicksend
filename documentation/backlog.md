@@ -9,13 +9,11 @@
 
 ### 1. Zero-Login Core Interface & 4-Mode Home Hub
 - **Zero-Login Experience:** No accounts, passwords, email verifications, or authentication barriers.
-- **Upfront 4-Mode Selection:** Immediately upon opening the app, users choose between:
-  1. *Share via Internet* (Remote/Relay)
-  2. *Share via Same Network* (LAN Wi-Fi)
-  3. *Share via Wi-Fi + Hotspot* (Offline Transfer Interface)
-  4. *Share via Bluetooth* (Nearby/WebShare/BLE)
+- **Compact 4-Mode Option Tiles:** Clean, uncluttered option tiles (`rounded-3xl` with squircle icons and arrow indicators) replacing bulky subscription-like cards.
+- **Dedicated Step Workspace Navigation:** Tapping any mode smoothly transitions into a focused workspace view with an "← All Modes" back pill.
+- **Segmented Control Pill Styling:** Modern segmented pill toggles (`rounded-full` controls for `Send | Receive`, `Files | Text`, and pairing strategies) inspired by modern mobile apps.
 - **Adaptive Responsive Design:** Mobile-first layout optimized for smartphones, tablets, lab desktop monitors, and widescreen displays.
-- **Dark / Light Theme Support:** Automatically respects OS color scheme with manual override toggle.
+- **Dark / Light Theme Support:** Soft, warm neutral tones (`#F8F9FB` light, `#0B0C10` dark) with gentle neumorphic-style shadows.
 - **Device & Connection Status Pill:** Real-time indicator displaying network state (Online / Offline / Local Only) and active device profile.
 
 ### 2. Mode 1: Internet Sharing (PIN, Mobile Number, Custom Keyword & QR)

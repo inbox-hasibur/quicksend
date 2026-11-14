@@ -8,10 +8,10 @@ export function NetworkStatusBadge() {
 
   return (
     <div
-      className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs backdrop-blur-md transition-colors ${
+      className={`inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-xs font-medium shadow-xs transition-all ${
         isOnline
-          ? "border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/80 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300"
-          : "border-amber-200 dark:border-amber-800/60 bg-amber-50/80 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300"
+          ? "bg-white/80 dark:bg-neutral-800/80 border border-neutral-200/60 dark:border-neutral-700/60 text-neutral-700 dark:text-neutral-200 backdrop-blur-md"
+          : "bg-amber-50 dark:bg-amber-950/50 border border-amber-200/70 dark:border-amber-800/60 text-amber-800 dark:text-amber-300"
       }`}
     >
       <span className="relative flex h-2 w-2">
@@ -24,13 +24,11 @@ export function NetworkStatusBadge() {
           }`}
         />
       </span>
-      <span className="font-medium">
-        {isOnline ? "Online (All Modes)" : "Offline (PWA Mode)"}
-      </span>
+      <span>{isOnline ? "Online" : "Offline (PWA)"}</span>
       {isOnline ? (
-        <Wifi className="h-3 w-3 opacity-70" />
+        <Wifi className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
       ) : (
-        <WifiOff className="h-3 w-3 opacity-70" />
+        <WifiOff className="h-3 w-3 text-amber-600 dark:text-amber-400" />
       )}
     </div>
   );

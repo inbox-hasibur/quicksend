@@ -68,8 +68,8 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
       if (!isValidRoomCode(clean)) {
         setErrorMsg(
           keyStrategy === "phone"
-            ? "Please enter a valid mobile number (at least 6 digits)."
-            : "Please enter a valid keyword between 4 and 20 characters (e.g. HR998877)."
+            ? "Please enter a valid mobile number (e.g. 01712345678)."
+            : "Please enter a valid keyword (4–20 characters, e.g. HR998877)."
         );
         return;
       }
@@ -104,7 +104,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
   const handleStartReceiver = async (codeToUse?: string) => {
     const code = normalizeRoomCode(codeToUse || inputCode);
     if (!isValidRoomCode(code)) {
-      setErrorMsg("Please enter a valid room PIN, Mobile Number, or Keyword (4–20 characters).");
+      setErrorMsg("Please enter a valid room PIN, Mobile Number, or Keyword.");
       return;
     }
 
@@ -113,7 +113,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
       setErrorMsg(null);
       await startReceiver(code);
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to join room. Verify the key and try again.");
+      setErrorMsg(err instanceof Error ? err.message : "Failed to join room. Verify key & retry.");
     } finally {
       setIsConnecting(false);
     }
@@ -131,40 +131,44 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
 
   return (
     <div className="space-y-6">
-      {/* 1. Header & Role Switcher */}
+      {/* 1. ROLE SWITCHER (Segmented Pill Style inspired by demo images) */}
       {!roomCode && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
           <div>
-            <h4 className="font-semibold text-sm text-neutral-900 dark:text-neutral-100">
-              Share via Internet (Remote P2P)
-            </h4>
-            <p className="text-xs text-neutral-400 font-mono">End-to-End Encrypted WebRTC Relay</p>
+            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+              {role === "send" ? "Send Files or Text" : "Receive Incoming Beam"}
+            </h3>
+            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+              {role === "send"
+                ? "Choose your pairing key method and drop files"
+                : "Enter the sender's PIN, mobile number, or scan QR"}
+            </p>
           </div>
 
-          {/* Role Picker (Send vs Receive) */}
-          <div className="flex rounded-xl bg-neutral-100 dark:bg-neutral-800 p-1 text-xs font-semibold">
+          {/* Segmented Pill Selector (Enrolled / Active style) */}
+          <div className="inline-flex items-center p-1 rounded-full bg-neutral-100 dark:bg-neutral-800/80">
             <button
               type="button"
               onClick={() => setRole("send")}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                 role === "send"
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+                  ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
+                  : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
               }`}
             >
-              <Send className="h-3.5 w-3.5" />
+              <Send className="h-3.5 w-3.5 text-indigo-500" />
               <span>Send</span>
             </button>
             <button
               type="button"
               onClick={() => setRole("receive")}
-              className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg transition-all ${
+              className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
                 role === "receive"
-                  ? "bg-violet-600 text-white shadow-sm"
-                  : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
+                  ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
+                  : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
               }`}
             >
-              <Download className="h-3.5 w-3.5" />
+              <Download className="h-3.5 w-3.5 text-emerald-500" />
               <span>Receive</span>
             </button>
           </div>
@@ -173,111 +177,124 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
 
       {/* Error Banner */}
       {errorMsg && (
-        <div className="flex items-start gap-2.5 p-3 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
+        <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* 2. Sender Mode View */}
+      {/* 2. SENDER VIEW */}
       {role === "send" && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           {!roomCode ? (
             <div className="space-y-5">
-              {/* Flexible Pairing Options Selector */}
-              <div className="space-y-2">
-                <span className="text-xs font-medium text-neutral-500 uppercase tracking-wider block">
-                  Choose Pairing Key Method:
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-medium">
+              {/* Key Strategy Segmented Pills */}
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                    Pairing Method
+                  </span>
+                  <span className="text-[11px] text-neutral-400">
+                    {keyStrategy === "phone"
+                      ? "Use your phone number"
+                      : keyStrategy === "keyword"
+                      ? "Use custom secret key"
+                      : keyStrategy === "qr"
+                      ? "Scan dynamic QR code"
+                      : "Instant 6-digit random PIN"}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5 p-1 rounded-2xl bg-neutral-100/80 dark:bg-neutral-850">
                   <button
                     type="button"
                     onClick={() => setKeyStrategy("auto")}
-                    className={`flex items-center justify-center gap-1.5 p-2.5 rounded-xl border transition-all ${
+                    className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all cursor-pointer ${
                       keyStrategy === "auto"
-                        ? "border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold"
-                        : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-600 dark:text-neutral-400"
+                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-semibold"
+                        : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
                     }`}
                   >
-                    <KeyRound className="h-4 w-4 text-indigo-500" />
+                    <KeyRound className="h-3.5 w-3.5 text-indigo-500" />
                     <span>Auto PIN</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setKeyStrategy("phone")}
-                    className={`flex items-center justify-center gap-1.5 p-2.5 rounded-xl border transition-all ${
+                    className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all cursor-pointer ${
                       keyStrategy === "phone"
-                        ? "border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold"
-                        : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-600 dark:text-neutral-400"
+                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-semibold"
+                        : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
                     }`}
                   >
-                    <Phone className="h-4 w-4 text-emerald-500" />
-                    <span>Mobile Number</span>
+                    <Phone className="h-3.5 w-3.5 text-emerald-500" />
+                    <span>Mobile No.</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setKeyStrategy("keyword")}
-                    className={`flex items-center justify-center gap-1.5 p-2.5 rounded-xl border transition-all ${
+                    className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all cursor-pointer ${
                       keyStrategy === "keyword"
-                        ? "border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold"
-                        : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-600 dark:text-neutral-400"
+                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-semibold"
+                        : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
                     }`}
                   >
-                    <Sparkles className="h-4 w-4 text-amber-500" />
-                    <span>Custom Keyword</span>
+                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+                    <span>Keyword</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setKeyStrategy("qr")}
-                    className={`flex items-center justify-center gap-1.5 p-2.5 rounded-xl border transition-all ${
+                    className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all cursor-pointer ${
                       keyStrategy === "qr"
-                        ? "border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 font-semibold"
-                        : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 text-neutral-600 dark:text-neutral-400"
+                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-semibold"
+                        : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
                     }`}
                   >
-                    <QrCode className="h-4 w-4 text-violet-500" />
+                    <QrCode className="h-3.5 w-3.5 text-violet-500" />
                     <span>QR Code</span>
                   </button>
                 </div>
 
-                {/* Sub-inputs for Phone or Keyword */}
+                {/* Sub-input for Mobile Number */}
                 {keyStrategy === "phone" && (
-                  <div className="p-3.5 rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-950/20 space-y-1.5 animate-in fade-in">
+                  <div className="p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 space-y-2 animate-in fade-in">
                     <label className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 flex items-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5" />
-                      <span>Enter Your Mobile Number</span>
+                      <Phone className="h-3.5 w-3.5 text-emerald-600" />
+                      <span>Sender Mobile Number</span>
                     </label>
                     <input
                       type="text"
                       value={customSenderKey}
                       onChange={(e) => setCustomSenderKey(e.target.value)}
                       placeholder="e.g. 01712345678"
-                      className="w-full p-2.5 text-xs font-mono rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-850 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full p-3 text-sm font-mono rounded-xl border border-emerald-200 dark:border-emerald-800 bg-white dark:bg-neutral-850 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400"
                     />
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                      Use a mobile number you already know by heart so you can easily type it on the receiver device.
+                      Use a phone number you already know by heart so you can easily type it on the receiving device.
                     </p>
                   </div>
                 )}
 
+                {/* Sub-input for Keyword */}
                 {keyStrategy === "keyword" && (
-                  <div className="p-3.5 rounded-xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/40 dark:bg-amber-950/20 space-y-1.5 animate-in fade-in">
+                  <div className="p-4 rounded-2xl bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/60 dark:border-amber-800/40 space-y-2 animate-in fade-in">
                     <label className="text-xs font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5" />
-                      <span>Enter a Memorable Secret Keyword</span>
+                      <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                      <span>Custom Secret Keyword</span>
                     </label>
                     <input
                       type="text"
                       value={customSenderKey}
                       onChange={(e) => setCustomSenderKey(e.target.value)}
                       placeholder="e.g. HR998877 or LAB2026"
-                      className="w-full p-2.5 text-xs font-mono uppercase font-bold rounded-lg border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-850 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full p-3 text-sm font-mono uppercase font-bold rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-neutral-850 focus:outline-none focus:ring-2 focus:ring-amber-500 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400"
                     />
                     <p className="text-[11px] text-neutral-500 dark:text-neutral-400">
-                      Choose any unique phrase or keyword. Both you and the receiver will use this exact key to connect.
+                      Type any secret code word. You and the receiver will use this exact key to connect.
                     </p>
                   </div>
                 )}
@@ -286,16 +303,17 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               {/* Payload Dropzone */}
               <Dropzone onSelectionChange={setSelectedPayload} />
 
+              {/* Primary Action Button (Pill style with high contrast) */}
               <button
                 type="button"
                 onClick={handleStartSender}
                 disabled={isConnecting}
-                className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="w-full py-4 px-6 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isConnecting ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Creating Ephemeral Session...</span>
+                    <span>Starting Session...</span>
                   </>
                 ) : (
                   <>
@@ -303,8 +321,8 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                       {keyStrategy === "phone"
                         ? "Beam with Mobile Number"
                         : keyStrategy === "keyword"
-                        ? "Beam with Custom Keyword"
-                        : "Generate Key & Beam"}
+                        ? "Beam with Keyword"
+                        : "Start Session & Beam"}
                     </span>
                     <ArrowRight className="h-4 w-4" />
                   </>
@@ -312,12 +330,12 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               </button>
             </div>
           ) : (
-            <div className="space-y-6 flex flex-col items-center">
-              {/* Active Session Display */}
+            /* Active Sender Session Display */
+            <div className="space-y-6 flex flex-col items-center py-2">
               <QRCodeDisplay code={roomCode} />
 
-              {/* Peer Status */}
-              <div className="flex items-center gap-2 p-3 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-mono text-neutral-600 dark:text-neutral-300">
+              {/* Peer Status Pill */}
+              <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-mono text-neutral-700 dark:text-neutral-200 shadow-xs">
                 <span className="relative flex h-2 w-2">
                   <span
                     className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -333,62 +351,77 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                 <span>
                   {isConnected
                     ? "Peer Connected! Streaming payload..."
-                    : `Waiting for receiver to enter "${formatRoomCode(roomCode)}" or scan QR...`}
+                    : `Waiting for receiver: "${formatRoomCode(roomCode)}"`}
                 </span>
               </div>
 
               <button
                 type="button"
                 onClick={handleReset}
-                className="text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 underline"
+                className="text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 underline cursor-pointer"
               >
-                Cancel Session
+                Cancel &amp; Close Session
               </button>
             </div>
           )}
         </div>
       )}
 
-      {/* 3. Receiver Mode View */}
+      {/* 3. RECEIVER VIEW */}
       {role === "receive" && (
         <div className="space-y-5">
           {!roomCode ? (
-            <div className="space-y-4">
-              <div className="p-4 sm:p-5 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50 space-y-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-neutral-800 dark:text-neutral-200">
-                    <KeyRound className="h-4 w-4 text-violet-500" />
-                    <span>Enter Pairing Key (PIN, Mobile Number, or Keyword)</span>
-                  </div>
-                  <p className="text-[11px] text-neutral-400 leading-relaxed">
-                    Type the 6-digit PIN, the sender&apos;s mobile number (e.g. 017xxxxxxxx), or their custom keyword (e.g. HR998877).
+            <div className="space-y-5 max-w-md mx-auto">
+              <div className="p-6 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 text-center space-y-4">
+                <div className="h-12 w-12 mx-auto rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <KeyRound className="h-6 w-6" />
+                </div>
+
+                <div>
+                  <h4 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
+                    Enter Pairing Key
+                  </h4>
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                    Enter the 6-digit PIN, sender&apos;s phone number, or secret keyword
                   </p>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="space-y-3">
                   <input
                     type="text"
                     maxLength={20}
                     value={inputCode}
                     onChange={(e) => setInputCode(e.target.value)}
-                    placeholder="e.g. 834-291, 01712345678, or HR998877"
-                    className="flex-1 p-3 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-center font-mono font-bold text-base sm:text-lg tracking-wider focus:outline-none focus:ring-2 focus:ring-violet-500 placeholder:font-normal placeholder:tracking-normal placeholder:text-neutral-400"
+                    placeholder="e.g. 834-291 or 01712345678"
+                    className="w-full py-3.5 px-4 rounded-2xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-center font-mono font-bold text-base tracking-wider focus:outline-none focus:ring-2 focus:ring-indigo-500 placeholder:font-normal placeholder:tracking-normal placeholder:text-neutral-400"
                   />
+
                   <button
                     type="button"
                     onClick={() => handleStartReceiver()}
                     disabled={isConnecting || !isValidRoomCode(inputCode)}
-                    className="px-5 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs transition-colors disabled:opacity-40"
+                    className="w-full py-3.5 px-6 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-sm transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2"
                   >
-                    {isConnecting ? <RefreshCw className="h-4 w-4 animate-spin" /> : "Connect"}
+                    {isConnecting ? (
+                      <>
+                        <RefreshCw className="h-4 w-4 animate-spin" />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Connect to Session</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
 
+              {/* Camera Scanner Divider & Button */}
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-neutral-200 dark:border-neutral-800" />
-                <span className="flex-shrink mx-4 text-neutral-400 text-xs uppercase font-mono">
-                  Or Scan Camera QR
+                <span className="flex-shrink mx-4 text-neutral-400 text-xs font-mono">
+                  OR
                 </span>
                 <div className="flex-grow border-t border-neutral-200 dark:border-neutral-800" />
               </div>
@@ -396,22 +429,26 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               <button
                 type="button"
                 onClick={() => setIsScannerOpen(true)}
-                className="w-full py-3 px-4 rounded-xl border-2 border-dashed border-neutral-300 dark:border-neutral-700 hover:border-violet-500 hover:bg-violet-50/20 text-neutral-700 dark:text-neutral-200 font-medium text-xs flex items-center justify-center gap-2 transition-all"
+                className="w-full py-3 px-4 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
               >
-                <Camera className="h-4 w-4 text-violet-500" />
-                <span>Open Camera QR Scanner</span>
+                <Camera className="h-4 w-4 text-indigo-500" />
+                <span>Scan Camera QR Code</span>
               </button>
             </div>
           ) : (
-            <div className="space-y-4 text-center">
-              <div className="p-6 rounded-2xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-900/50 flex flex-col items-center gap-3">
-                <Users className="h-8 w-8 text-violet-500 animate-pulse" />
+            <div className="space-y-4 text-center max-w-md mx-auto py-4">
+              <div className="p-8 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 flex flex-col items-center gap-3.5">
+                <div className="h-14 w-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <Users className="h-7 w-7 animate-pulse" />
+                </div>
                 <div>
-                  <h4 className="font-semibold text-sm">
-                    Connecting to Session: &ldquo;{formatRoomCode(roomCode)}&rdquo;
+                  <h4 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+                    Connecting to &ldquo;{formatRoomCode(roomCode)}&rdquo;
                   </h4>
-                  <p className="text-xs text-neutral-400 mt-0.5">
-                    {isConnected ? "Connected to sender! Awaiting payload..." : "Exchanging WebRTC signaling..."}
+                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                    {isConnected
+                      ? "Connected to sender! Awaiting payload..."
+                      : "Exchanging WebRTC signaling..."}
                   </p>
                 </div>
               </div>
@@ -419,9 +456,9 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               <button
                 type="button"
                 onClick={handleReset}
-                className="text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 underline"
+                className="text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 underline cursor-pointer"
               >
-                Disconnect
+                Disconnect &amp; Leave
               </button>
             </div>
           )}

@@ -197,7 +197,7 @@ flowchart TD
 - **Exports:** `TransferModal({ progress, onAccept, onReject, onClose }: TransferModalProps): JSX.Element | null`
 
 #### `src/components/ModeSelector.tsx`
-- **Purpose:** Client component rendering the 4 upfront transfer modes grid, sub-option badges, auto grey-out state for internet-dependent modes when offline, and interactive mode panels.
+- **Purpose:** Client component rendering the 4 compact, rounded option tiles, auto grey-out state when offline, and focused dedicated mode workspace transitions with a top "All Modes" back pill navigation.
 - **Exports:** `ModeSelector(): JSX.Element`
 
 #### `src/components/NetworkStatusBadge.tsx`

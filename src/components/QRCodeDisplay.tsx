@@ -40,63 +40,63 @@ export function QRCodeDisplay({ code, url }: QRCodeDisplayProps) {
   return (
     <div className="flex flex-col items-center text-center space-y-4">
       {/* High contrast QR Container for reliable scanning */}
-      <div className="p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
+      <div className="p-5 bg-white rounded-3xl shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-neutral-250">
         <QRCodeSVG
           value={displayUrl}
-          size={190}
+          size={180}
           level="M"
           includeMargin={false}
-          className="rounded-lg"
+          className="rounded-xl"
         />
       </div>
 
       {/* Room Key Display */}
       <div className="space-y-1 max-w-sm">
-        <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
+        <span className="text-[11px] font-semibold text-neutral-400 uppercase tracking-wider block">
           {code.length === 6
-            ? "Room PIN Code"
+            ? "Session PIN Code"
             : /^\d{9,15}$/.test(code)
             ? "Mobile Pairing Number"
-            : "Custom Room Keyword"}
+            : "Secret Room Keyword"}
         </span>
-        <div className="flex items-center justify-center gap-2">
-          <span className="font-mono text-2xl sm:text-3xl font-extrabold tracking-wider text-indigo-600 dark:text-indigo-400 break-all px-2">
+        <div className="inline-flex items-center justify-center gap-2 p-1.5 px-4 rounded-2xl bg-neutral-100 dark:bg-neutral-800">
+          <span className="font-mono text-2xl sm:text-3xl font-extrabold tracking-wider text-neutral-900 dark:text-neutral-100 break-all">
             {formatRoomCode(code)}
           </span>
           <button
             type="button"
             onClick={handleCopyCode}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-            title="Copy PIN"
+            className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-800 dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+            title="Copy Key"
           >
             {copiedCode ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
           </button>
         </div>
       </div>
 
-      {/* Quick Actions */}
-      <div className="flex items-center gap-2 text-xs">
+      {/* Quick Actions (Pill button) */}
+      <div className="flex items-center gap-2 text-xs pt-1">
         <button
           type="button"
           onClick={handleCopyUrl}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/60 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-medium transition-colors"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-800 hover:bg-neutral-50 dark:hover:bg-neutral-750 font-semibold text-neutral-700 dark:text-neutral-200 transition-all shadow-2xs cursor-pointer"
         >
           {copiedUrl ? (
             <>
               <Check className="h-3.5 w-3.5 text-emerald-500" />
-              <span>Link Copied</span>
+              <span>Direct Link Copied</span>
             </>
           ) : (
             <>
-              <ExternalLink className="h-3.5 w-3.5" />
-              <span>Copy Direct Link</span>
+              <ExternalLink className="h-3.5 w-3.5 text-indigo-500" />
+              <span>Copy Direct URL</span>
             </>
           )}
         </button>
       </div>
 
       <p className="text-xs text-neutral-400 max-w-xs leading-relaxed">
-        Scan this QR code with any smartphone camera, or enter the 6-digit PIN on the receiving device.
+        Point phone camera at this QR code, or type the code on the receiving device.
       </p>
     </div>
   );

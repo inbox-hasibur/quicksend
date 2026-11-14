@@ -54,30 +54,30 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
 
   return (
     <div className="w-full space-y-4">
-      {/* Tabs: Files vs Text */}
-      <div className="flex rounded-xl bg-neutral-100 dark:bg-neutral-800 p-1 text-xs font-medium">
+      {/* Tabs: Files vs Text (Segmented Pill Style) */}
+      <div className="inline-flex rounded-full bg-neutral-100 dark:bg-neutral-850 p-1 text-xs font-semibold">
         <button
           type="button"
           onClick={() => setActiveTab("files")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all ${
+          className={`flex items-center gap-2 px-5 py-2 rounded-full transition-all cursor-pointer ${
             activeTab === "files"
-              ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+              ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-xs"
               : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
           }`}
         >
-          <UploadCloud className="h-4 w-4" />
+          <UploadCloud className="h-4 w-4 text-indigo-500" />
           <span>Files {files.length > 0 && `(${files.length})`}</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab("text")}
-          className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg transition-all ${
+          className={`flex items-center gap-2 px-5 py-2 rounded-full transition-all cursor-pointer ${
             activeTab === "text"
-              ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-sm"
+              ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-xs"
               : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
           }`}
         >
-          <FileText className="h-4 w-4" />
+          <FileText className="h-4 w-4 text-amber-500" />
           <span>Text / Link {text.trim() && "(Ready)"}</span>
         </button>
       </div>
@@ -90,10 +90,10 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
             onDragLeave={onDragLeave}
             onDrop={onDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+            className={`border-2 border-dashed rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
               isDragging
-                ? "border-indigo-500 bg-indigo-50/60 dark:bg-indigo-950/30 scale-[0.99]"
-                : "border-neutral-300 dark:border-neutral-700 hover:border-neutral-400 dark:hover:border-neutral-600 bg-neutral-50/40 dark:bg-neutral-900/40"
+                ? "border-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/20 scale-[0.99]"
+                : "border-neutral-200 dark:border-neutral-800 hover:border-neutral-300 dark:hover:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-900/40"
             }`}
           >
             <input
@@ -105,14 +105,14 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
                 if (e.target.files) handleFilesAdded(e.target.files);
               }}
             />
-            <div className="p-3.5 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 mb-3 shadow-inner">
+            <div className="h-12 w-12 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400 mb-3">
               <UploadCloud className="h-6 w-6" />
             </div>
-            <p className="text-sm font-semibold text-neutral-800 dark:text-neutral-200">
+            <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200">
               Drag &amp; drop files here, or <span className="text-indigo-600 dark:text-indigo-400">browse</span>
             </p>
             <p className="text-xs text-neutral-400 mt-1">
-              Supports any file format (documents, images, zip, code) up to gigabytes
+              Any file type (documents, photos, videos, archives) up to gigabytes
             </p>
           </div>
 
@@ -120,18 +120,18 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
           {files.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-xs text-neutral-500 font-mono px-1">
-                <span>Selected Files ({files.length})</span>
+                <span>Selected ({files.length})</span>
                 <span>Total: {formatBytes(totalSize)}</span>
               </div>
               <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
                 {files.map((file, i) => (
                   <div
                     key={`${file.name}-${i}`}
-                    className="flex items-center justify-between p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-800/80 text-xs"
+                    className="flex items-center justify-between p-3 rounded-2xl border border-neutral-200/80 dark:border-neutral-800 bg-white dark:bg-neutral-850 text-xs shadow-2xs"
                   >
                     <div className="flex items-center gap-2.5 min-w-0 pr-2">
                       <File className="h-4 w-4 shrink-0 text-indigo-500" />
-                      <span className="truncate font-medium text-neutral-800 dark:text-neutral-200">
+                      <span className="truncate font-semibold text-neutral-800 dark:text-neutral-200">
                         {file.name}
                       </span>
                       <span className="shrink-0 text-neutral-400 font-mono text-[11px]">
@@ -144,7 +144,7 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
                         e.stopPropagation();
                         handleRemoveFile(i);
                       }}
-                      className="p-1 rounded-md text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors"
+                      className="p-1 rounded-full text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
                       title="Remove file"
                     >
                       <X className="h-3.5 w-3.5" />
@@ -160,13 +160,13 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
           <textarea
             value={text}
             onChange={handleTextChange}
-            placeholder="Paste text snippets, notes, terminal outputs, or long URLs to beam to peer..."
+            placeholder="Paste text snippets, code, terminal logs, or links to beam instantly..."
             rows={5}
-            className="w-full p-4 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono resize-none placeholder:text-neutral-400"
+            className="w-full p-4 rounded-2xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 font-mono resize-none placeholder:text-neutral-400 text-neutral-900 dark:text-neutral-100"
           />
-          <div className="flex items-center justify-between text-xs text-neutral-400 px-1">
-            <span>Instant clipboard sharing</span>
-            <span>{text.length} characters</span>
+          <div className="flex items-center justify-between text-xs text-neutral-400 px-1 font-mono">
+            <span>Instant clipboard beam</span>
+            <span>{text.length} chars</span>
           </div>
         </div>
       )}
