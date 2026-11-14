@@ -54,6 +54,7 @@ flowchart TD
         QRModal["QRScannerModal.tsx (Camera Viewport Scanner Dialog)"]
         TransferMod["TransferModal.tsx (Incoming Prompt, Speed, Progress Bar)"]
         HistoryMod["TransferHistoryModal.tsx (Ephemeral Session Transfer Drawer)"]
+        SegControl["SegmentedControl.tsx (Glass Track & Keyboard Navigation)"]
     end
 
     subgraph Src_Hooks["src/hooks/ (Custom React Hooks)"]
@@ -207,6 +208,10 @@ flowchart TD
 #### `src/components/ModeSelector.tsx`
 - **Purpose:** Client component rendering the 4 compact, rounded option tiles, auto grey-out state when offline, and focused dedicated mode workspace transitions with a top "All Modes" back pill navigation.
 - **Exports:** `ModeSelector(): JSX.Element`
+
+#### `src/components/SegmentedControl.tsx`
+- **Purpose:** Reusable segmented option switch with a soft glass pill track (`.pill`), `.pill-active` highlight, `role="tablist"` accessibility, and keyboard arrow key navigation.
+- **Exports:** `SegmentedControl({ options, value, onChange, ariaLabel }: SegmentedControlProps): JSX.Element`
 
 #### `src/components/NetworkStatusBadge.tsx`
 - **Purpose:** Live connection status pill reflecting online/offline state.

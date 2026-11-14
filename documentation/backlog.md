@@ -128,7 +128,8 @@
 - [x] Prepare final production deployment configuration for Vercel (`vercel.json` with CSP, PWA cache policies, clean URLs).
 - [x] Rename project identity, package, PWA manifest, service worker cache, and documentation from Share Anything to QuickSend (`quicksend.vercel.app`).
 - [x] Add soft glass design system tokens and utility classes (`.glass-card`, `.pill`, `.pill-active`) in `src/app/globals.css`.
+- [x] Create reusable `SegmentedControl` component with glass track and keyboard arrow navigation (`src/components/SegmentedControl.tsx`).
 - [x] **Sprint 4 Testing & Verification Gate:**
-  - Unit tests for Bluetooth/WebShare capability detection hooks (`src/lib/__tests__/nearbyShare.test.ts`).
+  - Unit tests for Bluetooth/WebShare capability detection hooks and SegmentedControl (`src/components/__tests__/SegmentedControl.test.tsx`).
   - Full end-to-end regression test suite passing across all components and utilities.
-  - Verification that `npm test` (37/37 passed), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
+  - Verification that `npm test` (40/40 passed), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
