@@ -56,22 +56,22 @@ export function ModeSelector() {
         return {
           displayName: "Wi-Fi Hotspot",
           icon: <Smartphone className="h-5 w-5" />,
-          tag: "Offline PWA",
-          summary: "Zero-internet transfer using phone hotspot and camera-to-camera optical QR.",
+          tag: "Direct AP",
+          summary: "Connect devices directly via mobile hotspot or Wi-Fi access point without internet.",
         };
       case "bluetooth":
         return {
-          displayName: "Nearby & Bluetooth",
+          displayName: "Bluetooth",
           icon: <Bluetooth className="h-5 w-5" />,
-          tag: "Proximity",
-          summary: "Quick Share, AirDrop, and Web-BLE hardware client for adjacent devices.",
+          tag: "Wireless",
+          summary: "Quick Share, AirDrop, and Bluetooth transfer for nearby devices.",
         };
       case "camera":
         return {
-          displayName: "Via Camera",
+          displayName: "Via Camera Scan",
           icon: <Camera className="h-5 w-5" />,
           tag: "Air-Gapped",
-          summary: "Zero-network transfer. Stream files as animated QR codes scanned by opposite camera.",
+          summary: "Stream files as animated QR codes scanned by the other device's camera.",
         };
     }
   };

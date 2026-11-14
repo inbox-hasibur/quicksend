@@ -79,9 +79,9 @@ export function getModeStatus(mode: TransferMode, capabilities: BrowserCapabilit
 
       return {
         mode: "bluetooth",
-        name: "Share via Bluetooth",
-        tagline: "Nearby Proximity Transfer",
-        description: "Quick Share, AirDrop, and Web-BLE GATT client interface for nearby devices.",
+        name: "Bluetooth",
+        tagline: "Bluetooth & Quick Share",
+        description: "Quick Share, AirDrop, and Bluetooth transfer for nearby devices.",
         isAvailable,
         disabledReason: isAvailable
           ? undefined
@@ -93,7 +93,7 @@ export function getModeStatus(mode: TransferMode, capabilities: BrowserCapabilit
     case "camera": {
       return {
         mode: "camera",
-        name: "Share via Camera",
+        name: "Via Camera Scan",
         tagline: "Air-Gapped Optical Stream",
         description: "Zero network transfer. Stream files as animated QR codes scanned by opposite device camera.",
         isAvailable: true,

@@ -179,7 +179,7 @@ export function SameNetworkCard() {
             </span>
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Automatic zero-config local discovery. Tap any discovered device on the radar to beam files directly over Wi-Fi.
+            Automatic local discovery. Tap any discovered device on the radar to send files directly over Wi-Fi.
           </p>
         </div>
 
@@ -252,7 +252,7 @@ export function SameNetworkCard() {
             onClick={() => handleSendToPeer(targetPeer)}
             className="w-full py-3 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
           >
-            <span>Beam to {targetPeer.avatarEmoji} {targetPeer.codename || targetPeer.name}</span>
+            <span>Send to {targetPeer.avatarEmoji} {targetPeer.codename || targetPeer.name}</span>
             <Send className="w-4 h-4" />
           </button>
         )}
@@ -355,7 +355,7 @@ export function SameNetworkCard() {
                       </div>
                       <div className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold mt-0.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Tap to Beam
+                        Tap to Send
                       </div>
                     </div>
                     <Send className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity ml-1" />

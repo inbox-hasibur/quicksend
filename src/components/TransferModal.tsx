@@ -68,21 +68,21 @@ export function TransferModal({
   const getTitle = () => {
     switch (progress.status) {
       case "waiting-acceptance":
-        return "Incoming Transfer Beam";
+        return "Incoming Transfer";
       case "transferring":
         return progress.totalFiles && progress.totalFiles > 1
-          ? `Beaming File ${progress.fileIndex || 1} of ${progress.totalFiles}...`
-          : "Beaming In Progress...";
+          ? `Sending File ${progress.fileIndex || 1} of ${progress.totalFiles}...`
+          : "Transferring...";
       case "completed":
         return progress.totalFiles && progress.totalFiles > 1
-          ? `Batch Transfer Complete (${progress.totalFiles} Files)`
+          ? `Transfer Complete (${progress.totalFiles} Files)`
           : "Transfer Complete!";
       case "rejected":
         return "Transfer Declined";
       case "error":
         return "Transfer Error";
       default:
-        return "QuickSend P2P";
+        return "QuickSend";
     }
   };
 
@@ -164,8 +164,8 @@ export function TransferModal({
             <div className="space-y-3 pt-2">
               <p className="text-xs text-neutral-500 text-center">
                 {progress.totalFiles && progress.totalFiles > 1
-                  ? `A connected peer wants to beam a batch of ${progress.totalFiles} files directly to your device.`
-                  : `A connected peer wants to beam this ${progress.itemType} directly to your device.`}
+                  ? `A connected device wants to send a batch of ${progress.totalFiles} files to your device.`
+                  : `A connected device wants to send this ${progress.itemType} to your device.`}
               </p>
               <div className="flex gap-2.5">
                 <button
@@ -234,15 +234,15 @@ export function TransferModal({
                 <div className="flex-1">
                   <span>
                     {progress.totalFiles && progress.totalFiles > 1
-                      ? `All ${progress.totalFiles} files successfully beamed and saved to your downloads!`
+                      ? `All ${progress.totalFiles} files received and saved to downloads!`
                       : progress.itemType === "file"
-                        ? "File successfully beamed and saved to your downloads!"
+                        ? "File received and saved to downloads!"
                         : "Text snippet received successfully!"}
                   </span>
                   {progress.isVerified && (
                     <p className="mt-1 font-mono text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
                       <ShieldCheck className="h-3.5 w-3.5" />
-                      SHA-256 Bit-Perfect Integrity Verified ✓
+                      Integrity Verified ✓
                     </p>
                   )}
                 </div>

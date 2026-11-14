@@ -11,13 +11,10 @@ export function AppHeader() {
         <div className="h-8 w-8 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-2xs flex items-center justify-center shrink-0">
           <Zap className="h-4 w-4 fill-current" />
         </div>
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-center">
           <h1 className="font-extrabold text-base sm:text-lg text-[var(--text)] tracking-tight leading-tight">
             QuickSend
           </h1>
-          <span className="hidden sm:inline text-[11px] text-[var(--text-muted)] font-mono">
-            p2p beam
-          </span>
         </div>
       </div>
 

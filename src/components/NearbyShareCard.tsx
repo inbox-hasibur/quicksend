@@ -88,10 +88,10 @@ export function NearbyShareCard() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
         <div>
           <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
-            Nearby &amp; Bluetooth Proximity
+            Bluetooth &amp; Quick Share
           </h3>
           <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
-            Native OS Quick Share, AirDrop &amp; Web-BLE hardware client
+            Native OS Bluetooth, AirDrop &amp; Quick Share
           </p>
         </div>
 

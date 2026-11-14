@@ -239,7 +239,7 @@ export function CameraStreamCard() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-[var(--border-hairline)]">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-bold text-base text-[var(--text)]">Via Camera (Optical Stream)</h3>
+            <h3 className="font-bold text-base text-[var(--text)]">Via Camera Scan</h3>
             <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
               100% Offline
             </span>

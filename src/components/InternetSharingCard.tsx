@@ -158,7 +158,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
           <div>
             <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
-              {role === "send" ? "Send Files or Text" : "Receive Incoming Beam"}
+              {role === "send" ? "Send Files or Text" : "Receive Files"}
             </h3>
             <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
               {role === "send"
@@ -277,16 +277,16 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                 {isConnecting ? (
                   <>
                     <RefreshCw className="h-4 w-4 animate-spin" />
-                    <span>Starting Session...</span>
+                    <span>Connecting...</span>
                   </>
                 ) : (
                   <>
                     <span>
                       {keyStrategy === "phone"
-                        ? "Beam with Mobile Number"
+                        ? "Share with Mobile Number"
                         : keyStrategy === "keyword"
-                        ? "Beam with Keyword"
-                        : "Start Session & Beam"}
+                        ? "Share with Keyword"
+                        : "Send Files"}
                     </span>
                     <ArrowRight className="h-4 w-4" />
                   </>
