@@ -228,6 +228,8 @@ quicksend/
 │   ├── backlog.md
 │   └── codebase_map.md
 ├── public/
+│   ├── favicon.ico
+│   ├── icon.svg
 │   ├── file.svg
 │   ├── globe.svg
 │   ├── next.svg
@@ -251,6 +253,7 @@ quicksend/
     │   │       └── route.ts
     │   ├── favicon.ico
     │   ├── globals.css
+    │   ├── icon.svg
     │   ├── layout.tsx
     │   ├── manifest.ts
     │   └── page.tsx
@@ -258,8 +261,7 @@ quicksend/
     │   ├── __tests__/
     │   │   ├── FileTypeBadge.test.tsx
     │   │   ├── SegmentedControl.test.tsx
-    │   │   ├── SpeedIndicator.test.tsx
-    │   │   └── TransferModal.test.tsx
+    │   │   └── SpeedIndicator.test.tsx
     │   ├── AppHeader.tsx
     │   ├── CameraStreamCard.tsx
     │   ├── Dropzone.tsx

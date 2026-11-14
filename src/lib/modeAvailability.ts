@@ -108,6 +108,6 @@ export function getModeStatus(mode: TransferMode, capabilities: BrowserCapabilit
  * Returns availability status for all transfer modes in display order.
  */
 export function getAllModesStatus(capabilities: BrowserCapabilities): ModeStatus[] {
-  const modes: TransferMode[] = ["internet", "same-network", "camera", "hotspot", "bluetooth"];
+  const modes: TransferMode[] = ["internet", "same-network", "hotspot", "bluetooth", "camera"];
   return modes.map((mode) => getModeStatus(mode, capabilities));
 }

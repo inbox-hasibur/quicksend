@@ -186,4 +186,6 @@
 - [x] Fix DataChannel error crash during transfer: prevent `dc.onerror` from overriding completed transfers or active PeerJS transports, and safely strip listeners before tearing down competing raw RTCPeerConnection.
 - [x] Remove defunct `openrelay.metered.ca` from `iceConfig.ts` which resolved to non-routable black-hole IP `192.0.2.1`, eliminating 30-second ICE candidate stalls and timeout crashes.
 - [x] Enhance `normalizeRoomCode` in `codeGenerator.ts`: automatically parse and extract room query parameter (`?room=123456`, `?code=`, `?pin=`) from full or relative URLs, fixing in-app QR camera scans.
-- [x] **Sprint 7 Verification:** 127/127 unit tests passing across 21 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.
+- [x] Reorder channel tiles: move "Via Camera Scan" to the 5th and final position after Bluetooth (`["internet", "same-network", "hotspot", "bluetooth", "camera"]`).
+- [x] Redesign brand favicon and web app icon: generate custom lightning bolt squircle icon matching AppHeader logo in SVG (`src/app/icon.svg`, `public/icon.svg`) with dark/light mode responsiveness and 32x32 ICO format (`src/app/favicon.ico`, `public/favicon.ico`).
+- [x] **Sprint 8 Verification:** 127/127 unit tests passing across 21 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.

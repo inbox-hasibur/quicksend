@@ -119,9 +119,9 @@ describe("modeAvailability logic", () => {
       expect(allStatuses.map((s) => s.mode)).toEqual([
         "internet",
         "same-network",
-        "camera",
         "hotspot",
         "bluetooth",
+        "camera",
       ]);
     });
   });
