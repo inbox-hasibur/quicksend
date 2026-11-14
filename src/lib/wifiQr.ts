@@ -7,11 +7,12 @@ export interface WifiCredentials {
   hidden?: boolean;
 }
 
-// Android Intent deep-links to launch OS Wi-Fi and Tethering settings directly
+// Android Intent deep-links to launch OS Wi-Fi, Tethering, and Bluetooth settings directly
 export const ANDROID_INTENTS = {
   WIFI_SETTINGS: "intent:#Intent;action=android.settings.WIFI_SETTINGS;end",
   WIRELESS_SETTINGS: "intent:#Intent;action=android.settings.WIRELESS_SETTINGS;end",
   TETHER_SETTINGS: "intent:#Intent;action=android.settings.TETHER_SETTINGS;end",
+  BLUETOOTH_SETTINGS: "intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end",
 } as const;
 
 /**

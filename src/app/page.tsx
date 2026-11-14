@@ -1,22 +1,13 @@
 import { Suspense } from "react";
-import { Zap, ShieldCheck, QrCode, Lock } from "lucide-react";
+import { QrCode, Lock, Zap, ShieldCheck } from "lucide-react";
 import { ModeSelector } from "@/components/ModeSelector";
-import { NetworkStatusBadge } from "@/components/NetworkStatusBadge";
+import { AppHeader } from "@/components/AppHeader";
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-4 sm:p-8 md:p-12 text-neutral-900 dark:text-neutral-100">
-      {/* Top Header */}
-      <header className="z-10 w-full max-w-4xl flex items-center justify-between font-mono text-sm mb-6 sm:mb-10">
-        <div className="flex items-center gap-2.5 font-bold tracking-tight text-base sm:text-lg">
-          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm">
-            <Zap className="h-4 w-4 fill-current" />
-          </div>
-          <span className="font-sans font-extrabold tracking-tight">Share Anything</span>
-        </div>
-
-        <NetworkStatusBadge />
-      </header>
+      {/* Top Header with Logo, History & Status */}
+      <AppHeader />
 
       {/* Main Hub Content */}
       <div className="w-full max-w-4xl flex flex-col items-center flex-1 justify-center">

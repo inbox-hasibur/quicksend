@@ -44,3 +44,15 @@ export interface TransferProgressState {
   speedBps: number;
   errorMessage?: string;
 }
+
+export interface TransferHistoryItem {
+  id: string;
+  timestamp: number;
+  direction: "sent" | "received";
+  mode: string;
+  itemType: TransferItemType;
+  name: string;
+  size?: number;
+  textSnippet?: string;
+  status: "completed" | "failed";
+}

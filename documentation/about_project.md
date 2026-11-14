@@ -225,6 +225,7 @@ share-anything/
 ├── package.json
 ├── README.md
 ├── tsconfig.json
+├── vercel.json
 ├── vitest.config.mts
 ├── documentation/
 │   ├── .gitkeep
@@ -252,26 +253,32 @@ share-anything/
     │   └── page.tsx
     ├── components/
     │   ├── .gitkeep
+    │   ├── AppHeader.tsx
     │   ├── Dropzone.tsx
     │   ├── HotspotAssistantCard.tsx
     │   ├── InternetSharingCard.tsx
     │   ├── ModeSelector.tsx
+    │   ├── NearbyShareCard.tsx
     │   ├── NetworkStatusBadge.tsx
     │   ├── OpticalHandshakeModal.tsx
     │   ├── QRCodeDisplay.tsx
     │   ├── QRScannerModal.tsx
     │   ├── SameNetworkCard.tsx
     │   ├── ServiceWorkerRegister.tsx
+    │   ├── TransferHistoryModal.tsx
     │   └── TransferModal.tsx
     ├── hooks/
     │   ├── .gitkeep
+    │   ├── useNearbyShare.ts
     │   ├── useNetworkStatus.ts
+    │   ├── useTransferHistory.ts
     │   └── useWebRTC.ts
     ├── lib/
     │   ├── __tests__/
     │   │   ├── chunker.test.ts
     │   │   ├── codeGenerator.test.ts
     │   │   ├── modeAvailability.test.ts
+    │   │   ├── nearbyShare.test.ts
     │   │   ├── opticalSdp.test.ts
     │   │   └── wifiQr.test.ts
     │   ├── .gitkeep

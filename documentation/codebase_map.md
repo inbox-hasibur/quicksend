@@ -1,6 +1,6 @@
 # Share Anything: Codebase Map & Dependency Graph
 
-> **Last Updated:** Sprint 3 Complete (Mode 2 Same Network & Mode 3 Wi-Fi/Hotspot Offline P2P)  
+> **Last Updated:** Sprint 4 Complete (Mode 4 Bluetooth, Polish, History & Vercel Deployment)  
 > **Target Deployment:** [shareit.vercel.app](https://shareit.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 
@@ -28,7 +28,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS v4 (@tailwindcss/turbopack)"]
-        Vitest["Vitest v5 + happy-dom (30 Passing Tests)"]
+        Vitest["Vitest v5 + happy-dom (37 Passing Tests)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -40,22 +40,27 @@ flowchart TD
     end
 
     subgraph Src_Components["src/components/ (UI & Presentation Components)"]
+        AppHdr["AppHeader.tsx (Logo, Session History Pill, Status Badge)"]
         ModeSel["ModeSelector.tsx (4-Mode Grid & Active Panels)"]
         NetBadge["NetworkStatusBadge.tsx (Online/Offline Real-Time Pill)"]
         SWReg["ServiceWorkerRegister.tsx (PWA /sw.js Registration)"]
         InternetCard["InternetSharingCard.tsx (Mode 1 Controller: PIN/QR & Send/Receive)"]
         SameNetCard["SameNetworkCard.tsx (Mode 2 Controller: Local LAN & Optical QR)"]
         HotspotCard["HotspotAssistantCard.tsx (Mode 3 Controller: Hotspot QR & Wizard)"]
+        NearbyCard["NearbyShareCard.tsx (Mode 4 Controller: Quick Share & BLE Client)"]
         OpticalModal["OpticalHandshakeModal.tsx (Camera-to-Camera Optical QR Handshake)"]
         DropzoneComp["Dropzone.tsx (Drag & Drop Files / Text Paste Tabs)"]
         QRDisp["QRCodeDisplay.tsx (SVG QR Generator & 6-Digit PIN Display)"]
         QRModal["QRScannerModal.tsx (Camera Viewport Scanner Dialog)"]
         TransferMod["TransferModal.tsx (Incoming Prompt, Speed, Progress Bar)"]
+        HistoryMod["TransferHistoryModal.tsx (Ephemeral Session Transfer Drawer)"]
     end
 
     subgraph Src_Hooks["src/hooks/ (Custom React Hooks)"]
         UseNet["useNetworkStatus.ts (useNetworkStatus, useBrowserCapabilities)"]
         UseRTC["useWebRTC.ts (useWebRTC: Peer Connection & Stream Controller)"]
+        UseNearby["useNearbyShare.ts (useNearbyShare: Web Share & Web-BLE Client)"]
+        UseHist["useTransferHistory.ts (useTransferHistory: Ephemeral Session Storage)"]
     end
 
     subgraph Src_Lib["src/lib/ (Protocols, Pure Logic & Utilities)"]
@@ -267,15 +272,10 @@ flowchart TD
 | `vitest.config.mts` | Vitest configuration file. | `happy-dom` environment, `@/*` import alias mapping. |
 | `next.config.ts` | Next.js configuration. | Turbopack CSS loaders, `cacheComponents: true`, `partialPrefetching: true`. |
 | `eslint.config.mjs` | Flat ESLint configuration. | Core Web Vitals + TypeScript rules. |
+| `vercel.json` | Production deployment configuration for Vercel. | Next.js framework preset, security CSP headers, and PWA cache-control headers. |
 
 ---
 
-## 4. Planned Module Topology for Sprint 4
-
-```
-src/
-├── hooks/
-│   └── useNearbyShare.ts    # [Sprint 4] navigator.share & Web-BLE GATT client hook
-└── components/
-    └── NearbyShareModal.tsx # [Sprint 4] Native Share Sheet & BLE peripheral manager
+## 4. Sprint Status: All Sprints Completed
+All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) are fully implemented, verified with 37 passing unit tests, and production build ready.
 ```

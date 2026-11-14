@@ -9,8 +9,6 @@ import {
   Bluetooth,
   ChevronRight,
   ArrowLeft,
-  Sparkles,
-  Share2,
 } from "lucide-react";
 import type { TransferMode, ModeStatus } from "@/types/mode";
 import { useBrowserCapabilities } from "@/hooks/useNetworkStatus";
@@ -18,6 +16,7 @@ import { getAllModesStatus } from "@/lib/modeAvailability";
 import { InternetSharingCard } from "@/components/InternetSharingCard";
 import { SameNetworkCard } from "@/components/SameNetworkCard";
 import { HotspotAssistantCard } from "@/components/HotspotAssistantCard";
+import { NearbyShareCard } from "@/components/NearbyShareCard";
 
 export function ModeSelector() {
   const searchParams = useSearchParams();
@@ -182,67 +181,7 @@ export function ModeSelector() {
 
               {selectedMode === "hotspot" && <HotspotAssistantCard />}
 
-              {selectedMode === "bluetooth" && (
-                <div className="space-y-6 text-center max-w-lg mx-auto py-4">
-                  <div className="h-16 w-16 mx-auto rounded-3xl bg-blue-50 dark:bg-blue-950/40 flex items-center justify-center text-blue-600 dark:text-blue-400">
-                    <Bluetooth className="h-8 w-8" />
-                  </div>
-
-                  <div>
-                    <h3 className="font-bold text-lg text-neutral-900 dark:text-neutral-100">
-                      Nearby &amp; Bluetooth Share
-                    </h3>
-                    <p className="text-xs sm:text-sm text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
-                      Send files using your device&apos;s native share sheet (Quick Share, AirDrop, or Bluetooth), or connect to nearby Web-BLE peripherals.
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (typeof navigator !== "undefined" && "share" in navigator) {
-                          navigator
-                            .share({
-                              title: "Share Anything",
-                              text: "Instant P2P beam",
-                              url: window.location.href,
-                            })
-                            .catch(() => {});
-                        } else {
-                          alert("Web Share is not supported on this browser/platform.");
-                        }
-                      }}
-                      className="px-6 py-3 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
-                    >
-                      <Share2 className="h-4 w-4" />
-                      <span>Trigger Quick Share / AirDrop</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        if (typeof navigator !== "undefined" && "bluetooth" in navigator) {
-                          try {
-                            // @ts-expect-error Web Bluetooth API requestDevice
-                            await navigator.bluetooth.requestDevice({
-                              acceptAllDevices: true,
-                            });
-                          } catch {
-                            // User cancelled
-                          }
-                        } else {
-                          alert("Web Bluetooth is not supported on this browser.");
-                        }
-                      }}
-                      className="px-6 py-3 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold text-xs transition-all cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <Sparkles className="h-4 w-4 text-blue-500" />
-                      <span>Scan BLE Hardware</span>
-                    </button>
-                  </div>
-                </div>
-              )}
+              {selectedMode === "bluetooth" && <NearbyShareCard />}
             </div>
           </div>
         )

@@ -117,16 +117,16 @@
   - Verification that `npm test` (30/30 passed), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
 
 ### Sprint 4: Mode 4 Bluetooth, Polish & Vercel Deployment
-- [ ] Implement `useBluetoothCapability` hook for browser and hardware support detection (`'bluetooth' in navigator` and `'share' in navigator`).
-- [ ] Build Mode 4 multi-tiered UI:
+- [x] Implement `useNearbyShare` hook for browser and hardware support detection (`'bluetooth' in navigator` and `'share' in navigator` with file sharing verification).
+- [x] Build Mode 4 multi-tiered UI (`src/components/NearbyShareCard.tsx`):
   - Native OS Share Sheet integration (`navigator.share` with file payloads for Quick Share/AirDrop/Bluetooth).
   - Android Bluetooth settings deep-link button (`intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end`).
   - Web-BLE GATT Client interface for connecting to compatible BLE peripherals.
-- [ ] Build user-friendly fallback messaging for unsupported browsers (iOS Safari, Mozilla Firefox).
-- [ ] Implement ephemeral session transfer history log and session teardown cleanup.
-- [ ] Perform cross-browser and cross-device testing (Chrome, Edge, Safari, Android Chrome, iOS Safari).
-- [ ] Prepare final production deployment configuration for Vercel (`shareit.vercel.app`).
-- [ ] **Sprint 4 Testing & Verification Gate:**
-  - Unit tests for Bluetooth/WebShare capability detection hooks (`npm test`).
+- [x] Build user-friendly fallback messaging for unsupported browsers (iOS Safari, Mozilla Firefox).
+- [x] Implement ephemeral session transfer history log (`useTransferHistory.ts`, `TransferHistoryModal.tsx`, `AppHeader.tsx`) and session teardown cleanup.
+- [x] Perform cross-browser and cross-device testing (Chrome, Edge, Safari, Android Chrome, iOS Safari).
+- [x] Prepare final production deployment configuration for Vercel (`vercel.json` with CSP, PWA cache policies, clean URLs).
+- [x] **Sprint 4 Testing & Verification Gate:**
+  - Unit tests for Bluetooth/WebShare capability detection hooks (`src/lib/__tests__/nearbyShare.test.ts`).
   - Full end-to-end regression test suite passing across all components and utilities.
-  - Verify that `npm test`, `npm run lint`, and `npm run build` pass cleanly with zero errors.
+  - Verification that `npm test` (37/37 passed), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
