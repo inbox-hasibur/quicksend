@@ -257,7 +257,8 @@ quicksend/
     ├── components/
     │   ├── __tests__/
     │   │   ├── FileTypeBadge.test.tsx
-    │   │   └── SegmentedControl.test.tsx
+    │   │   ├── SegmentedControl.test.tsx
+    │   │   └── SpeedIndicator.test.tsx
     │   ├── AppHeader.tsx
     │   ├── CameraStreamCard.tsx
     │   ├── Dropzone.tsx
@@ -273,6 +274,7 @@ quicksend/
     │   ├── SameNetworkCard.tsx
     │   ├── SegmentedControl.tsx
     │   ├── ServiceWorkerRegister.tsx
+    │   ├── SpeedIndicator.tsx
     │   ├── ThemeToggle.tsx
     │   ├── TransferHistoryModal.tsx
     │   └── TransferModal.tsx

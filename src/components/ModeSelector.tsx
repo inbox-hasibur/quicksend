@@ -19,39 +19,7 @@ import { SameNetworkCard } from "@/components/SameNetworkCard";
 import { HotspotAssistantCard } from "@/components/HotspotAssistantCard";
 import { NearbyShareCard } from "@/components/NearbyShareCard";
 import { CameraStreamCard } from "@/components/CameraStreamCard";
-
-function SpeedRatingIndicator({ filled, total = 5 }: { filled: number; total?: number }) {
-  const heights = ["35%", "50%", "68%", "84%", "100%"];
-  return (
-    <div
-      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--surface)] border border-[var(--border-hairline)] shadow-2xs select-none"
-      title={`Transfer Speed: ${filled}/${total}`}
-    >
-      <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)]">
-        Speed
-      </span>
-      <div className="flex items-end gap-[3px] h-3.5" aria-hidden="true">
-        {Array.from({ length: total }, (_, i) => {
-          const isFilled = i < filled;
-          return (
-            <div
-              key={i}
-              style={{ height: heights[i] }}
-              className={`w-[3.5px] rounded-xs transition-all ${
-                isFilled
-                  ? "bg-emerald-500 dark:bg-emerald-400 shadow-2xs"
-                  : "bg-neutral-300 dark:bg-neutral-700 border border-neutral-400/40 dark:border-neutral-600/40"
-              }`}
-            />
-          );
-        })}
-      </div>
-      <span className="font-mono text-[10px] font-bold text-[var(--text)]">
-        {filled}/{total}
-      </span>
-    </div>
-  );
-}
+import { SpeedIndicator } from "@/components/SpeedIndicator";
 
 export function ModeSelector() {
   const searchParams = useSearchParams();
@@ -154,11 +122,10 @@ export function ModeSelector() {
                       handleSelectMode(item.mode);
                     }
                   }}
-                  className={`group p-5 sm:p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] transition-all flex flex-col justify-between text-left ${
-                    isDisabled
-                      ? "opacity-55 cursor-not-allowed"
-                      : "cursor-pointer hover:bg-[#ECEEF2] dark:hover:bg-[#212534] hover:border-neutral-300 dark:hover:border-neutral-700 hover:shadow-xs active:scale-[0.99]"
-                  }`}
+                  className={`group p-5 sm:p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] transition-all flex flex-col justify-between text-left ${isDisabled
+                    ? "opacity-55 cursor-not-allowed"
+                    : "cursor-pointer hover:bg-[#ECEEF2] dark:hover:bg-[#212534] hover:border-neutral-300 dark:hover:border-neutral-700 hover:shadow-xs active:scale-[0.99]"
+                    }`}
                 >
                   <div>
                     {/* Top Row: Squircle Icon + Status Pill */}
@@ -168,11 +135,10 @@ export function ModeSelector() {
                       </div>
 
                       <span
-                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${
-                          isDisabled
-                            ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200/70"
-                            : "bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border-neutral-200/80 dark:border-neutral-700/80"
-                        }`}
+                        className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border ${isDisabled
+                          ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200/70"
+                          : "bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border-neutral-200/80 dark:border-neutral-700/80"
+                          }`}
                       >
                         {isDisabled ? "Needs Internet" : theme.tag}
                       </span>
@@ -183,7 +149,7 @@ export function ModeSelector() {
                       <h3 className="font-bold text-base text-[var(--text)]">
                         {theme.displayName}
                       </h3>
-                      <SpeedRatingIndicator filled={theme.speedBars} />
+                      <SpeedIndicator speedBars={theme.speedBars} />
                     </div>
                     <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
                       {theme.summary}
@@ -222,7 +188,10 @@ export function ModeSelector() {
                 <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-[var(--text)]">
                   {getModeTheme(selectedMode).icon}
                   <span>{getModeTheme(selectedMode).displayName}</span>
-                  <SpeedRatingIndicator filled={getModeTheme(selectedMode).speedBars} />
+                  <SpeedIndicator
+                    speedBars={getModeTheme(selectedMode).speedBars}
+                    className="bg-transparent border-0 shadow-none px-0 py-0"
+                  />
                 </span>
               </div>
             </div>

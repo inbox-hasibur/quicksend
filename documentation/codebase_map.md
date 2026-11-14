@@ -58,6 +58,7 @@ flowchart TD
         QRDisp["QRCodeDisplay.tsx (SVG QR Generator & 6-Digit PIN Display)"]
         QRModal["QRScannerModal.tsx (Camera Viewport Scanner Dialog)"]
         TransferMod["TransferModal.tsx (Incoming Prompt, Speed, Progress Bar)"]
+        SpeedInd["SpeedIndicator.tsx (Solid High-Contrast Speed Indicator)"]
         HistoryMod["TransferHistoryModal.tsx (Ephemeral Session Transfer Drawer)"]
         FileTypeBdg["FileTypeBadge.tsx (Color-coded file type chips PDF, IMG, DOC, etc.)"]
         SegControl["SegmentedControl.tsx (Tactile Pill Track & Keyboard Navigation)"]
@@ -246,6 +247,10 @@ flowchart TD
 #### `src/components/SegmentedControl.tsx`
 - **Purpose:** Reusable segmented option switch matching the tactile reference UI. Features a soft neutral pill track, pure white elevated active tab with subtle shadow, `role="tablist"` accessibility, and keyboard arrow key navigation.
 - **Exports:** `SegmentedControl({ options, value, onChange, ariaLabel }: SegmentedControlProps): JSX.Element`
+
+#### `src/components/SpeedIndicator.tsx`
+- **Purpose:** Reusable transfer speed indicator with an explicit "Speed" text label, Lucide Gauge icon, and 5 solid high-contrast stepped pill segments (Emerald for 5/5, Indigo for 4/5, Blue for 3/5, Amber for 2/5). Clearly visible across both dark and light modes.
+- **Exports:** `SpeedIndicator({ speedBars, total, className, showIcon, showLabel }: SpeedIndicatorProps): JSX.Element`, `getSpeedColorClass(speedBars: number): string`
 
 #### `src/components/NetworkStatusBadge.tsx`
 - **Purpose:** Live connection status pill reflecting online/offline state.

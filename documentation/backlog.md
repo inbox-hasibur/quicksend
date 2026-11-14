@@ -178,4 +178,7 @@
 - [x] Provide STUN pool for Mode 2 (Same Wi-Fi) in `iceConfig.ts` to overcome mDNS `.local` host obfuscation across mobile and desktop.
 - [x] Fix TransferModal Close button: introduce user-dismissal state so dismissed error/completed dialogs stay closed and do not re-trigger in a loop.
 - [x] Prevent auto-connect infinite loop in `InternetSharingCard.tsx`: track initial room connection with `hasAutoConnectedRef` so it executes once on mount.
-- [x] **Sprint 5 Verification:** 117/117 unit tests passing across 19 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.
+- [x] Redesign Speed Indicator: reusable `SpeedIndicator.tsx` with explicit "Speed" label, Lucide Gauge icon, and 5 solid high-contrast stepped pill segments (Emerald for 5/5, Indigo for 4/5, Blue for 3/5, Amber for 2/5).
+- [x] Pause Via Camera Scan QR stream by default on Frame 1, add primary "Start Stream" / "Pause" / "Resume" controls, "Reset to Frame 1" jump, and non-blocking advisory banner for large payloads (> 300 frames).
+- [x] Fix Via Camera Scan receiver: keep viewfinder container always mounted to prevent zero-dimension crashes, add automatic camera constraints fallback for laptops/webcams without `environment` facingMode, upgrade Html5Qrcode to 20 fps with native barcode detection, and add "Scan from Screenshot / Image" fallback.
+- [x] **Sprint 6 Verification:** 123/123 unit tests passing across 20 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.

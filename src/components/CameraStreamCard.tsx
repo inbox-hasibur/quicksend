@@ -11,6 +11,8 @@ import {
   Copy,
   Check,
   RotateCcw,
+  AlertTriangle,
+  Upload,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Html5Qrcode } from "html5-qrcode";
@@ -32,10 +34,11 @@ type OpticalRole = "send" | "receive";
 export function CameraStreamCard() {
   const [role, setRole] = useState<OpticalRole>("send");
 
-  // Sender state
+  // Sender state (Starts paused on Frame 1 by default)
   const [frames, setFrames] = useState<OpticalDataFrame[]>([]);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [hasStartedStreaming, setHasStartedStreaming] = useState(false);
   const [speedMs, setSpeedMs] = useState<number>(320); // 320ms normal speed
   const [isEncoding, setIsEncoding] = useState(false);
 
@@ -56,6 +59,7 @@ export function CameraStreamCard() {
   const { addHistoryItem } = useTransferHistory();
   const collectorRef = useRef<OpticalDataCollector>(new OpticalDataCollector());
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const readerElementId = "camera-optical-viewfinder";
 
@@ -72,8 +76,8 @@ export function CameraStreamCard() {
       }
       setFrames(encoded);
       setCurrentFrameIndex(0);
-      // Keep stream initially paused so the user has time to frame the receiver camera
-      setIsPlaying(false);
+      setIsPlaying(false); // Start paused on Frame 1 by default
+      setHasStartedStreaming(false);
     } catch (err) {
       console.error("Failed to encode payload to optical frames:", err);
     } finally {
@@ -103,12 +107,84 @@ export function CameraStreamCard() {
     };
   }, [role, frames.length, isPlaying, speedMs]);
 
+  // Reusable frame processor for both live camera frames and image uploads
+  const processDecodedFrame = useCallback(
+    async (decodedText: string) => {
+      if (!isOpticalDataFrame(decodedText)) return;
+
+      const res = await collectorRef.current.ingestFrame(decodedText);
+      if (res.status === "collecting") {
+        setScanProgress({
+          fileName: res.fileName,
+          fileSize: res.fileSize,
+          totalChunks: res.totalChunks,
+          receivedCount: res.receivedCount,
+          percentage: res.percentage,
+          missingIndices: res.missingIndices,
+        });
+      } else if (res.status === "completed") {
+        setReceivedPayload(res.payload);
+        setScanProgress(null);
+
+        // Record to session history
+        addHistoryItem({
+          direction: "received",
+          mode: "Via Camera",
+          itemType: res.payload.text ? "text" : "file",
+          name: res.payload.fileName,
+          size: res.payload.fileSize,
+          status: "completed",
+          textSnippet: res.payload.text?.substring(0, 100),
+        });
+
+        // Stop scanner cleanly
+        if (scannerRef.current) {
+          try {
+            await scannerRef.current.stop();
+          } catch {
+            // Ignore stop errors
+          }
+          setIsCameraActive(false);
+        }
+
+        // Auto-trigger download for files
+        if (!res.payload.text) {
+          try {
+            const url = URL.createObjectURL(res.payload.blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = res.payload.fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 15000);
+          } catch {
+            // Ignore programmatic click block
+          }
+        }
+      }
+    },
+    [addHistoryItem]
+  );
+
   // Handle receiver camera initialization and scanning
   const startCamera = useCallback(async () => {
     setCameraError(null);
     setReceivedPayload(null);
     setScanProgress(null);
     collectorRef.current.reset();
+
+    // Check secure context / mediaDevices support (e.g. non-HTTPS local IP)
+    if (
+      typeof window !== "undefined" &&
+      !navigator?.mediaDevices &&
+      !window.isSecureContext
+    ) {
+      setCameraError(
+        "Camera access requires HTTPS or localhost. If opening over local IP, use 'Scan from Screenshot / Image' below."
+      );
+      return;
+    }
 
     try {
       if (scannerRef.current) {
@@ -117,84 +193,61 @@ export function CameraStreamCard() {
         } catch {
           // Ignore stop errors
         }
-        scannerRef.current = null;
       }
 
       const scanner = new Html5Qrcode(readerElementId);
       scannerRef.current = scanner;
 
-      const qrConfig = {
-        fps: 15,
-        qrbox: { width: 260, height: 260 },
+      const config = {
+        fps: 20,
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const edge = Math.floor(minEdge * 0.85);
+          return { width: edge, height: edge };
+        },
         aspectRatio: 1.0,
+        useBarCodeDetectorIfSupported: true,
       };
 
-      const handleScanSuccess = async (decodedText: string) => {
-        if (!isOpticalDataFrame(decodedText)) return;
-
-        const res = await collectorRef.current.ingestFrame(decodedText);
-        if (res.status === "collecting") {
-          setScanProgress({
-            fileName: res.fileName,
-            fileSize: res.fileSize,
-            totalChunks: res.totalChunks,
-            receivedCount: res.receivedCount,
-            percentage: res.percentage,
-            missingIndices: res.missingIndices,
-          });
-        } else if (res.status === "completed") {
-          setReceivedPayload(res.payload);
-          setScanProgress(null);
-
-          // Record to session history
-          addHistoryItem({
-            direction: "received",
-            mode: "Via Camera",
-            itemType: res.payload.text ? "text" : "file",
-            name: res.payload.fileName,
-            size: res.payload.fileSize,
-            status: "completed",
-            textSnippet: res.payload.text?.substring(0, 100),
-          });
-
-          // Stop scanner cleanly
-          try {
-            await scanner.stop();
-            setIsCameraActive(false);
-          } catch {
-            // Ignore
-          }
-
-          // Auto-trigger download for files
-          if (!res.payload.text) {
-            const url = URL.createObjectURL(res.payload.blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = res.payload.fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 10000);
-          }
-        }
-      };
-
-      // Try environment/back camera first (mobile phones)
-      // Fallback to front camera or default webcam (laptops/desktops)
+      // 1. Try environment (back) camera first
       try {
         await scanner.start(
           { facingMode: "environment" },
-          qrConfig,
-          handleScanSuccess,
-          () => {}
+          config,
+          (decodedText) => {
+            processDecodedFrame(decodedText);
+          },
+          () => {
+            // Frame failure (normal when scanning continuous stream)
+          }
         );
-      } catch {
-        await scanner.start(
-          { facingMode: "user" },
-          qrConfig,
-          handleScanSuccess,
-          () => {}
-        );
+      } catch (envError) {
+        // 2. Fallback to default camera for laptops / webcams that reject 'environment' constraint
+        try {
+          await scanner.start(
+            {},
+            config,
+            (decodedText) => {
+              processDecodedFrame(decodedText);
+            },
+            () => {}
+          );
+        } catch (fallbackError) {
+          // 3. Fallback to first available video input device ID
+          const cameras = await Html5Qrcode.getCameras().catch(() => []);
+          if (cameras.length > 0) {
+            await scanner.start(
+              cameras[0].id,
+              config,
+              (decodedText) => {
+                processDecodedFrame(decodedText);
+              },
+              () => {}
+            );
+          } else {
+            throw fallbackError || envError;
+          }
+        }
       }
 
       setIsCameraActive(true);
@@ -203,10 +256,43 @@ export function CameraStreamCard() {
       setCameraError(
         err instanceof Error
           ? err.message
-          : "Camera access was denied or is not available. Please allow camera permissions."
+          : "Camera access was denied or is not available. Please allow camera permissions or upload a QR screenshot below."
       );
     }
-  }, [addHistoryItem]);
+  }, [processDecodedFrame]);
+
+  // Fallback screenshot/image file scanner
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setCameraError(null);
+    try {
+      if (scannerRef.current && isCameraActive) {
+        await stopCamera();
+      }
+
+      const tempScanner = scannerRef.current || new Html5Qrcode(readerElementId);
+      scannerRef.current = tempScanner;
+
+      const decodedText = await tempScanner.scanFile(file, true);
+      if (decodedText) {
+        await processDecodedFrame(decodedText);
+      } else {
+        setCameraError("No QR code detected in the uploaded image.");
+      }
+    } catch (err) {
+      setCameraError(
+        err instanceof Error
+          ? err.message
+          : "Could not decode a valid QuickSend QR code from this image. Please ensure the QR is clear and well-lit."
+      );
+    } finally {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
 
   const stopCamera = useCallback(async () => {
     if (scannerRef.current) {
@@ -220,21 +306,11 @@ export function CameraStreamCard() {
     setIsCameraActive(false);
   }, []);
 
-  // Auto-start camera when switching to receive mode
-  useEffect(() => {
-    if (role === "receive" && !isCameraActive && !receivedPayload) {
-      const timer = setTimeout(() => {
-        startCamera().catch(() => {});
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [role, isCameraActive, receivedPayload, startCamera]);
-
   // Cleanup camera when component unmounts
   useEffect(() => {
     return () => {
       if (scannerRef.current) {
-        scannerRef.current.stop().catch(() => {});
+        scannerRef.current.stop().catch(() => { });
       }
     };
   }, []);
@@ -308,46 +384,18 @@ export function CameraStreamCard() {
             </div>
           ) : (
             <div className="space-y-5">
-              {/* Ready / Streaming Status Notice */}
-              <div
-                className={`p-3 rounded-2xl border text-xs flex flex-col sm:flex-row items-center justify-between gap-3 ${
-                  isPlaying
-                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300"
-                    : "bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <span
-                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                      isPlaying ? "bg-emerald-500 animate-ping" : "bg-amber-500"
-                    }`}
-                  />
-                  <span className="font-semibold text-center sm:text-left">
-                    {isPlaying
-                      ? `Streaming QR Frames (${speedMs}ms/frame)`
-                      : "Stream Paused • Place receiver camera at QR code, then tap Start"}
-                  </span>
+              {/* Large Payload Advisory Banner (> 300 frames) */}
+              {frames.length > 300 && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="space-y-0.5">
+                    <p className="font-semibold">Large Payload Advisory ({frames.length} frames)</p>
+                    <p className="text-[11px] opacity-90 leading-relaxed">
+                      Optical scanning will take approximately ~{Math.ceil((frames.length * (speedMs / 1000)) / 60)} min. For faster transfer of files over 500 KB, Same Wi-Fi or Internet mode is recommended.
+                    </p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsPlaying((prev) => !prev)}
-                  className={`w-full sm:w-auto px-4 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-xs ${
-                    isPlaying
-                      ? "bg-neutral-800 hover:bg-neutral-700 text-white"
-                      : "bg-emerald-600 hover:bg-emerald-500 text-white animate-pulse"
-                  }`}
-                >
-                  {isPlaying ? (
-                    <>
-                      <Pause className="w-3.5 h-3.5 fill-current" /> Pause
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-3.5 h-3.5 fill-current" /> Start QR Stream
-                    </>
-                  )}
-                </button>
-              </div>
+              )}
 
               {/* QR Display Card */}
               <div className="flex flex-col items-center justify-center p-6 sm:p-8 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl">
@@ -383,8 +431,9 @@ export function CameraStreamCard() {
                 </div>
 
                 {/* Playback & Speed Controls */}
-                <div className="flex items-center gap-2 mt-5">
+                <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
                   <button
+                    type="button"
                     onClick={() =>
                       setCurrentFrameIndex((prev) => (prev - 1 + frames.length) % frames.length)
                     }
@@ -396,21 +445,34 @@ export function CameraStreamCard() {
                   </button>
 
                   <button
-                    onClick={() => setIsPlaying((prev) => !prev)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
+                    type="button"
+                    onClick={() => {
+                      if (!hasStartedStreaming) {
+                        setHasStartedStreaming(true);
+                        setIsPlaying(true);
+                      } else {
+                        setIsPlaying((prev) => !prev);
+                      }
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-opacity cursor-pointer"
                   >
-                    {isPlaying ? (
+                    {!hasStartedStreaming || (currentFrameIndex === 0 && !isPlaying) ? (
+                      <>
+                        <Play className="w-3.5 h-3.5 fill-current" /> Start Stream
+                      </>
+                    ) : isPlaying ? (
                       <>
                         <Pause className="w-3.5 h-3.5" /> Pause
                       </>
                     ) : (
                       <>
-                        <Play className="w-3.5 h-3.5" /> Start
+                        <Play className="w-3.5 h-3.5 fill-current" /> Resume
                       </>
                     )}
                   </button>
 
                   <button
+                    type="button"
                     onClick={() => setCurrentFrameIndex((prev) => (prev + 1) % frames.length)}
                     className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
                     title="Next Frame"
@@ -419,13 +481,28 @@ export function CameraStreamCard() {
                     <ChevronRight className="w-4 h-4" />
                   </button>
 
-                  <div className="h-4 w-px bg-[var(--border-hairline)] mx-1" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCurrentFrameIndex(0);
+                      setIsPlaying(false);
+                      setHasStartedStreaming(false);
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text-muted)] hover:text-[var(--text)] text-xs font-semibold transition-colors cursor-pointer"
+                    title="Reset to Frame 1"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Frame 1</span>
+                  </button>
+
+                  <div className="h-4 w-px bg-[var(--border-hairline)] mx-1 hidden sm:block" />
 
                   {/* Speed Selector */}
                   <div className="flex items-center gap-1 bg-[var(--surface)] p-1 rounded-xl border border-[var(--border-hairline)]">
                     <button
+                      type="button"
                       onClick={() => setSpeedMs(500)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
                         speedMs === 500
                           ? "bg-[var(--text)] text-[var(--surface)]"
                           : "text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -434,8 +511,9 @@ export function CameraStreamCard() {
                       Slow
                     </button>
                     <button
+                      type="button"
                       onClick={() => setSpeedMs(320)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
                         speedMs === 320
                           ? "bg-[var(--text)] text-[var(--surface)]"
                           : "text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -444,8 +522,9 @@ export function CameraStreamCard() {
                       Normal
                     </button>
                     <button
+                      type="button"
                       onClick={() => setSpeedMs(220)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
                         speedMs === 220
                           ? "bg-[var(--text)] text-[var(--surface)]"
                           : "text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -460,8 +539,12 @@ export function CameraStreamCard() {
               {/* Reset action */}
               <div className="flex justify-center">
                 <button
+                  type="button"
                   onClick={() => {
                     setFrames([]);
+                    setCurrentFrameIndex(0);
+                    setIsPlaying(false);
+                    setHasStartedStreaming(false);
                   }}
                   className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors font-medium cursor-pointer"
                 >
@@ -480,28 +563,29 @@ export function CameraStreamCard() {
           {!receivedPayload ? (
             <div className="space-y-4">
               {/* Viewfinder or Camera Trigger */}
-              <div className="relative flex flex-col items-center justify-center p-6 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl min-h-[340px]">
-                {/* HTML5 QR Code Video Container: Always sized and accessible in DOM for Html5Qrcode */}
-                <div className="relative w-full max-w-[320px] aspect-square rounded-2xl overflow-hidden bg-black/5 dark:bg-black/30 border border-[var(--border-hairline)] flex items-center justify-center shadow-inner">
-                  <div id={readerElementId} className="w-full h-full" />
+              <div className="relative flex flex-col items-center justify-center p-6 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl min-h-[340px] w-full">
+                {/* Always-mounted viewfinder container to prevent zero-dimension crashes */}
+                <div
+                  id={readerElementId}
+                  className="w-full max-w-[320px] aspect-square rounded-2xl overflow-hidden bg-black/5 dark:bg-black/30 border border-[var(--border-hairline)] relative"
+                >
                   {!isCameraActive && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--surface-subtle)] p-6 text-center space-y-3 z-10">
-                      <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shadow-xs">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xs z-10 space-y-3">
+                      <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shadow-2xs">
                         <Camera className="w-6 h-6" />
                       </div>
                       <div>
                         <h4 className="font-semibold text-xs text-[var(--text)]">Point Camera at QR Stream</h4>
-                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-[220px]">
-                          Position your camera in front of the sender&apos;s animated QR code.
+                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-[200px]">
+                          Opens camera to continuously scan sequenced QR frames.
                         </p>
                       </div>
-
                       <button
                         type="button"
                         onClick={startCamera}
-                        className="px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold shadow-xs transition-opacity cursor-pointer flex items-center gap-2"
+                        className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-xs shadow-xs transition-opacity flex items-center gap-1.5 cursor-pointer"
                       >
-                        <Camera className="w-4 h-4" /> Start Camera Scanner
+                        <Camera className="w-3.5 h-3.5" /> Start Camera Scanner
                       </button>
                     </div>
                   )}
@@ -512,6 +596,29 @@ export function CameraStreamCard() {
                     {cameraError}
                   </div>
                 )}
+
+                {/* Image Upload Fallback for non-HTTPS or missing camera */}
+                <div className="mt-4 pt-3 border-t border-[var(--border-hairline)] w-full max-w-xs text-center space-y-2">
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Camera unavailable or local HTTP network?
+                  </p>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="hidden"
+                    id="optical-image-fallback-input"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Upload className="w-3.5 h-3.5 text-[var(--accent)]" />
+                    <span>Scan from Screenshot / Image</span>
+                  </button>
+                </div>
               </div>
 
               {/* Live Collection Progress */}
@@ -591,7 +698,7 @@ export function CameraStreamCard() {
                   <button
                     type="button"
                     onClick={handleCopyText}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-xs shadow-xs transition-opacity cursor-pointer"
                   >
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     {copied ? "Copied!" : "Copy Text"}
@@ -600,9 +707,9 @@ export function CameraStreamCard() {
                   <button
                     type="button"
                     onClick={handleDownloadReceived}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-xs transition-opacity cursor-pointer"
                   >
-                    <Download className="w-4 h-4" /> Download File
+                    <Download className="w-4 h-4" /> Save / Download File
                   </button>
                 )}
 

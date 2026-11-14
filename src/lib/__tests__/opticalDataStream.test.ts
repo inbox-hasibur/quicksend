@@ -82,4 +82,57 @@ describe("Optical Data Stream Protocol", () => {
     const reassembledBuf = await completed!.blob.arrayBuffer();
     expect(new Uint8Array(reassembledBuf)).toEqual(binaryData);
   });
+
+  it("should perform full round-trip with multi-byte UTF-8, out-of-order delivery, and duplicate frames", async () => {
+    const complexText = "🌟 QuickSend Optical 2.0: Bengali (বাংলা), Japanese (日本語), Arabic (العربية), & Emojis! 🚀⚡🔥";
+    const frames = await encodeTextToOpticalFrames(complexText, 25);
+    expect(frames.length).toBeGreaterThan(3);
+
+    const collector = new OpticalDataCollector();
+
+    // Create a sequence with reversed order AND duplicates
+    const mixedDelivery = [
+      ...frames.slice().reverse(),
+      frames[1], // duplicate
+      frames[0], // duplicate
+      frames[Math.floor(frames.length / 2)], // duplicate
+    ];
+
+    let finalPayload = null;
+    for (const frame of mixedDelivery) {
+      const res = await collector.ingestFrame(frame.encodedPayload);
+      if (res.status === "completed") {
+        finalPayload = res.payload;
+      }
+    }
+
+    expect(finalPayload).not.toBeNull();
+    expect(finalPayload?.text).toBe(complexText);
+    expect(finalPayload?.mimeType).toBe("text/plain");
+  });
+
+  it("should correctly reset collector state when a frame from a new transfer arrives", async () => {
+    const textA = "Transfer A Payload";
+    const textB = "Transfer B Payload";
+
+    const framesA = await encodeTextToOpticalFrames(textA, 10);
+    const framesB = await encodeTextToOpticalFrames(textB, 10);
+
+    const collector = new OpticalDataCollector();
+
+    // Ingest first frame of transfer A
+    const resA = await collector.ingestFrame(framesA[0].encodedPayload);
+    expect(resA.status).toBe("collecting");
+    if (resA.status === "collecting") {
+      expect(resA.transferId).toBe(framesA[0].transferId);
+    }
+
+    // Ingest first frame of transfer B (should reset and track B)
+    const resB = await collector.ingestFrame(framesB[0].encodedPayload);
+    expect(resB.status).toBe("collecting");
+    if (resB.status === "collecting") {
+      expect(resB.transferId).toBe(framesB[0].transferId);
+      expect(resB.receivedCount).toBe(1);
+    }
+  });
 });
