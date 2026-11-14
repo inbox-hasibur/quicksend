@@ -189,3 +189,11 @@
 - [x] Reorder channel tiles: move "Via Camera Scan" to the 5th and final position after Bluetooth (`["internet", "same-network", "hotspot", "bluetooth", "camera"]`).
 - [x] Redesign brand favicon and web app icon: generate custom lightning bolt squircle icon matching AppHeader logo in SVG (`src/app/icon.svg`, `public/icon.svg`) with dark/light mode responsiveness and 32x32 ICO format (`src/app/favicon.ico`, `public/favicon.ico`).
 - [x] **Sprint 8 Verification:** 127/127 unit tests passing across 21 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.
+
+### Sprint 9: Camera Scanner Hardening & Optical Stream Polish
+- [x] Fix `Scan / Receive` in Via Camera Scan (`src/components/CameraStreamCard.tsx`): implement serialized async mutex/ref guard (`isStartingRef`, `isUnmountedRef`, `shouldStopRef`, `scannerRef`) preventing React 19 StrictMode double-mount lifecycle crashes and unmounted camera leaks.
+- [x] Viewfinder & Camera Constraints Fallback: keep `#camera-optical-viewfinder` mounted with explicit `min-h-[280px]`, test `{ facingMode: "environment" }` -> `{ facingMode: "user" }` -> enumerated cameras -> `{}`, and add camera switcher dropdown UI when multiple cameras are detected.
+- [x] Secure Context & Diagnostics: detect non-HTTPS / missing `mediaDevices` with clear advisory notice and "Scan QR from Image" fallback; display live diagnostics (camera active status, last detected frame indicator, unrecognized format notice, and manual Stop Camera action).
+- [x] Compact & Highly Scannable Animated QR Codes: optimize `DEFAULT_CHUNK_RAW_BYTES` to 66 bytes (producing <= 88 base64 chars, <= 90 max payload chars) in `src/lib/opticalDataStream.ts`; render `<QRCodeSVG>` with `size={280}`, `level="L"`, `bgColor="#FFFFFF"`, `fgColor="#000000"`, `marginSize={3}`.
+- [x] Unit test in `src/lib/__tests__/opticalDataStream.test.ts` verifying compact frame payload sizes and bit-perfect reassembly at 66 raw bytes.
+- [x] **Sprint 9 Verification:** 128/128 unit tests passing across 21 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.

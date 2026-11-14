@@ -200,6 +200,10 @@ flowchart TD
 - **Purpose:** Mode 2 Controller (Same Network Wi-Fi). Prioritizes internal host ICE candidates across the local router subnet and supports Camera-to-Camera Optical QR fallback when the local network has no internet.
 - **Exports:** `SameNetworkCard(): JSX.Element`
 
+#### `src/components/CameraStreamCard.tsx`
+- **Purpose:** Mode 5 Controller (Via Camera Scan). Zero-network air-gapped file/text streaming via animated sequenced QR frames. Features React 19 lifecycle mutex protection, live webcam scanning with camera selector and multi-tier constraints fallback, compact 66-byte QR chunks (`QRCodeSVG` size 280, margin 3), live diagnostic frame indicator, and "Scan from Screenshot / Image" fallback.
+- **Exports:** `CameraStreamCard(): JSX.Element`
+
 #### `src/components/HotspotAssistantCard.tsx`
 - **Purpose:** Mode 3 Controller (Wi-Fi + Hotspot Interface). Guided wizard for mobile/laptop AP activation, Android settings shortcuts (`TETHER_SETTINGS`), standardized `WIFI:T:WPA;S:...` pairing QR code generation, and offline optical WebRTC handshake.
 - **Exports:** `HotspotAssistantCard(): JSX.Element`

@@ -25,7 +25,7 @@ export interface ReassembledPayload {
   text?: string;
 }
 
-const DEFAULT_CHUNK_RAW_BYTES = 280; // Produces ~380 chars base64, keeping QR code crisp and fast to scan
+export const DEFAULT_CHUNK_RAW_BYTES = 66; // Produces ~88 base64 characters (<= 90 chars max payload), keeping QR modules large and easily scannable on standard webcams
 
 /**
  * Encodes an ArrayBuffer or Blob into sequenced optical QR frames.
@@ -34,7 +34,7 @@ export async function encodeFileToOpticalFrames(
   file: File,
   chunkSize = DEFAULT_CHUNK_RAW_BYTES
 ): Promise<OpticalDataFrame[]> {
-  const transferId = `opt_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 6)}`;
+  const transferId = `opt_${Date.now().toString(36).slice(-4)}_${Math.random().toString(36).substring(2, 5)}`;
   const buffer = await file.arrayBuffer();
   const rawBytes = new Uint8Array(buffer);
 

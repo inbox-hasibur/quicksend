@@ -135,4 +135,31 @@ describe("Optical Data Stream Protocol", () => {
       expect(resB.receivedCount).toBe(1);
     }
   });
+
+  it("should generate compact frames with DEFAULT_CHUNK_RAW_BYTES for high webcam scannability", async () => {
+    const data = Array.from(
+      { length: 25 },
+      (_, i) => `Record ${i}: QuickSend optical streaming payload with high entropy ${(i * 9973).toString(36)}`
+    ).join("\n");
+    const frames = await encodeTextToOpticalFrames(data);
+
+    expect(frames.length).toBeGreaterThan(1);
+    for (const frame of frames) {
+      // Base64 chunk length for 66 raw bytes is at most 88 characters
+      expect(frame.base64Data.length).toBeLessThanOrEqual(92);
+      expect(frame.encodedPayload.startsWith("QS1|")).toBe(true);
+    }
+
+    const collector = new OpticalDataCollector();
+    let reassembled = null;
+    for (const frame of frames) {
+      const res = await collector.ingestFrame(frame.encodedPayload);
+      if (res.status === "completed") {
+        reassembled = res.payload;
+      }
+    }
+
+    expect(reassembled).not.toBeNull();
+    expect(reassembled?.text).toBe(data);
+  });
 });
