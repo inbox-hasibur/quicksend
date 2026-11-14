@@ -127,7 +127,7 @@
 - [x] Perform cross-browser and cross-device testing (Chrome, Edge, Safari, Android Chrome, iOS Safari).
 - [x] Prepare final production deployment configuration for Vercel (`vercel.json` with CSP, PWA cache policies, clean URLs).
 - [x] Rename project identity, package, PWA manifest, service worker cache, and documentation from Share Anything to QuickSend (`quicksend.vercel.app`).
-- [x] Add soft glass design system tokens and utility classes (`.glass-card`, `.pill`, `.pill-active`) in `src/app/globals.css`.
+- [x] Establish tactile design system foundation tokens in `src/app/globals.css` (`#F6F7FB` light / `#0B0D14` dark canvas, elevated cards, hairline borders, rich indigo-violet accents, `.tactile-card`, `.squircle`, `.pill-track`, and `.tabular-nums`).
 - [x] Create reusable `SegmentedControl` component with glass track and keyboard arrow navigation (`src/components/SegmentedControl.tsx`).
 - [x] Integrate `SegmentedControl` in `InternetSharingCard` (Send/Receive and pairing method) and `Dropzone` (Files/Text tabs).
 - [x] Apply `.glass-card` soft glass styling to `AppHeader` (with date display) and `ModeSelector` (accent squircle icon boxes and round arrows).

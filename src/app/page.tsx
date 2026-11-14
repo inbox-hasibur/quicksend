@@ -19,7 +19,7 @@ export default function Home() {
           </div>
 
           <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-tight mb-2.5 leading-tight">
-            Beam files &amp; text{" "}
+            Share any files or text{" "}
             <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-amber-500 bg-clip-text text-transparent">
               in seconds.
             </span>

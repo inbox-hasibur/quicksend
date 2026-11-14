@@ -1,23 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  /* Soft glass light theme */
-  --bg: #F4F5F7;
-  --surface: rgba(255, 255, 255, 0.7);
-  --surface-glass: rgba(255, 255, 255, 0.65);
+  /* Soft warm tactile workspace theme (Light) */
+  --bg: #F6F7FB;
+  --surface: #FFFFFF;
+  --surface-glass: rgba(255, 255, 255, 0.85);
+  --surface-subtle: #EEF0F6;
   --border-soft: rgba(0, 0, 0, 0.06);
-  --text: #14151a;
-  --text-muted: #6b7280;
-  --accent: #F5902B;
-  --accent-soft: rgba(245, 144, 43, 0.12);
+  --border-hairline: #E5E8F0;
+  --text: #12141D;
+  --text-muted: #647087;
+  --accent: #5B5BD6;
+  --accent-hover: #4E4EC8;
+  --accent-soft: rgba(91, 91, 214, 0.10);
   --radius-card: 28px;
-  --shadow-soft: 0 12px 36px rgba(0, 0, 0, 0.04);
+  --radius-tile: 20px;
+  --shadow-soft: 0 2px 4px rgba(18, 22, 33, 0.02), 0 10px 30px rgba(18, 22, 33, 0.04), 0 20px 48px rgba(18, 22, 33, 0.03);
+  --shadow-tile: 0 4px 16px rgba(18, 22, 33, 0.04);
 
-  /* Existing backward-compatible variables */
+  /* System mapping */
   --background: var(--bg);
   --foreground: var(--text);
-  --card-bg: #ffffff;
-  --card-subtle: #f1f3f7;
+  --card-bg: var(--surface);
+  --card-subtle: var(--surface-subtle);
 }
 
 @theme inline {
@@ -29,23 +34,28 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Soft glass dark theme */
-    --bg: #0B0C10;
-    --surface: rgba(255, 255, 255, 0.06);
-    --surface-glass: rgba(255, 255, 255, 0.04);
+    /* Soft tactile workspace theme (Dark) */
+    --bg: #0B0D14;
+    --surface: #131622;
+    --surface-glass: rgba(19, 22, 34, 0.85);
+    --surface-subtle: #191D2C;
     --border-soft: rgba(255, 255, 255, 0.08);
-    --text: #f0f1f5;
-    --text-muted: #9ca3af;
-    --accent: #F5902B;
-    --accent-soft: rgba(245, 144, 43, 0.2);
+    --border-hairline: #202538;
+    --text: #F2F4F8;
+    --text-muted: #8E99AF;
+    --accent: #6366F1;
+    --accent-hover: #7174F8;
+    --accent-soft: rgba(99, 102, 241, 0.16);
     --radius-card: 28px;
-    --shadow-soft: 0 12px 36px rgba(0, 0, 0, 0.35);
+    --radius-tile: 20px;
+    --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.35), 0 16px 44px rgba(0, 0, 0, 0.45);
+    --shadow-tile: 0 4px 16px rgba(0, 0, 0, 0.35);
 
-    /* Existing backward-compatible variables */
+    /* System mapping */
     --background: var(--bg);
     --foreground: var(--text);
-    --card-bg: #14151b;
-    --card-subtle: #1c1d25;
+    --card-bg: var(--surface);
+    --card-subtle: var(--surface-subtle);
   }
 }
 
@@ -57,8 +67,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glass utility classes */
-.glass-card {
+/* Tactile Card & Elevated Surfaces */
+.glass-card,
+.tactile-card {
   background: var(--surface-glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
@@ -67,11 +78,33 @@ body {
   box-shadow: var(--shadow-soft);
 }
 
+/* Squircle Icon Tiles */
+.squircle {
+  border-radius: var(--radius-tile);
+  background: var(--accent-soft);
+  box-shadow: var(--shadow-tile);
+  border: 1px solid var(--border-soft);
+}
+
+/* Segmented Pill Navigation */
 .pill {
   border-radius: 9999px;
+}
+
+.pill-track {
+  background: var(--surface-subtle);
+  border-radius: 9999px;
+  padding: 4px;
 }
 
 .pill-active {
   background-color: var(--accent);
   color: #ffffff;
+}
+
+/* Tabular Numbers for PIN codes, metrics, byte sizes */
+.tabular-numbers,
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
 }

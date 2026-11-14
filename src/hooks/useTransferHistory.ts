@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import type { TransferHistoryItem } from "@/types/transfer";
 
-const SESSION_STORAGE_KEY = "share_anything_session_history";
+const SESSION_STORAGE_KEY = "quicksend_session_history";
 
 export function useTransferHistory() {
   const [history, setHistory] = useState<TransferHistoryItem[]>(() => {

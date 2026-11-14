@@ -24,7 +24,7 @@ import type { TransferRole } from "@/types/mode";
 
 export function HotspotAssistantCard() {
   const [role, setRole] = useState<TransferRole>("send");
-  const [ssid, setSsid] = useState("ShareAnything-Hotspot");
+  const [ssid, setSsid] = useState("QuickSend-Hotspot");
   const [password, setPassword] = useState("12345678");
   const [showWifiQr, setShowWifiQr] = useState(false);
   const [selectedPayload, setSelectedPayload] = useState<{ files: File[]; text: string }>({

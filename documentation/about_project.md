@@ -253,7 +253,10 @@ quicksend/
     │   └── page.tsx
     ├── components/
     │   ├── .gitkeep
+    │   ├── __tests__/
+    │   │   └── SegmentedControl.test.tsx
     │   ├── AppHeader.tsx
+    │   ├── BottomNav.tsx
     │   ├── Dropzone.tsx
     │   ├── HotspotAssistantCard.tsx
     │   ├── InternetSharingCard.tsx
@@ -264,6 +267,7 @@ quicksend/
     │   ├── QRCodeDisplay.tsx
     │   ├── QRScannerModal.tsx
     │   ├── SameNetworkCard.tsx
+    │   ├── SegmentedControl.tsx
     │   ├── ServiceWorkerRegister.tsx
     │   ├── TransferHistoryModal.tsx
     │   └── TransferModal.tsx

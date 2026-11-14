@@ -28,7 +28,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS v4 (@tailwindcss/turbopack)"]
-        Vitest["Vitest v5 + happy-dom (37 Passing Tests)"]
+        Vitest["Vitest v5 + happy-dom (40 Passing Tests)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
