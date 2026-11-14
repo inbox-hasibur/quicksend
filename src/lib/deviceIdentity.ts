@@ -88,22 +88,26 @@ export function notifyProfileListeners() {
   }
 }
 
+export const SERVER_DEVICE_PROFILE: DeviceProfile = Object.freeze({
+  id: "srv_mock",
+  name: "QuickSend Device",
+  codename: "Curious Fox",
+  avatarEmoji: "🦊",
+  avatarColor: AVATAR_PRESETS[0].color,
+  formFactor: "desktop",
+  os: "Server",
+  browser: "Node",
+});
+
 export function getServerDeviceProfile(): DeviceProfile {
-  return {
-    id: "srv_mock",
-    name: "QuickSend Device",
-    codename: "Curious Fox",
-    avatarEmoji: "🦊",
-    avatarColor: AVATAR_PRESETS[0].color,
-    formFactor: "desktop",
-    os: "Server",
-    browser: "Node",
-  };
+  return SERVER_DEVICE_PROFILE;
 }
 
-export function getLocalDeviceProfile(): DeviceProfile {
+let cachedLocalProfile: DeviceProfile | null = null;
+
+function computeLocalDeviceProfile(): DeviceProfile {
   if (typeof window === "undefined") {
-    return getServerDeviceProfile();
+    return SERVER_DEVICE_PROFILE;
   }
 
   const { os, browser, formFactor } = getPlatformInfo();
@@ -137,7 +141,7 @@ export function getLocalDeviceProfile(): DeviceProfile {
     storedName ||
     `${preset.codename} (${os} ${formFactor === "mobile" ? "Phone" : formFactor === "tablet" ? "Tablet" : "PC"})`;
 
-  return {
+  return Object.freeze({
     id: storedId,
     name: deviceName,
     codename: preset.codename,
@@ -146,7 +150,27 @@ export function getLocalDeviceProfile(): DeviceProfile {
     formFactor,
     os,
     browser,
-  };
+  });
+}
+
+export function getLocalDeviceProfile(): DeviceProfile {
+  if (typeof window === "undefined") {
+    return SERVER_DEVICE_PROFILE;
+  }
+  if (!cachedLocalProfile) {
+    cachedLocalProfile = computeLocalDeviceProfile();
+  }
+  return cachedLocalProfile;
+}
+
+export function invalidateDeviceProfileCache(): DeviceProfile {
+  cachedLocalProfile = computeLocalDeviceProfile();
+  notifyProfileListeners();
+  return cachedLocalProfile;
+}
+
+export function resetDeviceProfileCache(): void {
+  cachedLocalProfile = null;
 }
 
 export function updateLocalAvatar(preset: AvatarPreset): DeviceProfile {
@@ -158,13 +182,12 @@ export function updateLocalAvatar(preset: AvatarPreset): DeviceProfile {
     if (!storedName || AVATAR_PRESETS.some((p) => storedName.startsWith(p.codename))) {
       localStorage.removeItem("quicksend_device_name");
     }
-    notifyProfileListeners();
   }
-  return getLocalDeviceProfile();
+  return invalidateDeviceProfileCache();
 }
 
 export function cycleLocalAvatar(): DeviceProfile {
-  if (typeof window === "undefined") return getLocalDeviceProfile();
+  if (typeof window === "undefined") return SERVER_DEVICE_PROFILE;
   const current = getLocalDeviceProfile();
   const currentIndex = AVATAR_PRESETS.findIndex((p) => p.emoji === current.avatarEmoji);
   const nextIndex = (currentIndex + 1) % AVATAR_PRESETS.length;
@@ -174,6 +197,6 @@ export function cycleLocalAvatar(): DeviceProfile {
 export function updateLocalDeviceName(newName: string): void {
   if (typeof window !== "undefined" && newName.trim()) {
     localStorage.setItem("quicksend_device_name", newName.trim());
-    notifyProfileListeners();
+    invalidateDeviceProfileCache();
   }
 }

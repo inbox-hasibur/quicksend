@@ -3,12 +3,14 @@ import {
   getPlatformInfo,
   getLocalDeviceProfile,
   updateLocalDeviceName,
+  resetDeviceProfileCache,
 } from "@/lib/deviceIdentity";
 
 describe("Device Identity Utility", () => {
   beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
+    resetDeviceProfileCache();
   });
 
   it("should accurately detect Windows and Chrome", () => {

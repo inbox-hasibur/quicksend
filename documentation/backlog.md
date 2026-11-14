@@ -166,4 +166,5 @@
 - [x] Eliminate aggressive 30-second passive timeout in WebRTC: listening and pairing remain active until user navigates away or cancels.
 - [x] Fix QR code URL generation in local dev to point to production domain, preventing mobile camera scan failures ("this page couldn't load").
 - [x] Auto-connect receiver upon URL query navigation (`/?room=123456`) and fix modal dismiss handling.
-- [x] **Sprint 5 Verification:** 110/110 unit tests passing across 19 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.
+- [x] Fix React 19 `useSyncExternalStore` snapshot referential identity: ensure `getLocalDeviceProfile()` caches the snapshot reference at module level, `SERVER_DEVICE_PROFILE` is frozen, and audit `useNetworkStatus`, `useNearbyShare`, and `useTransferHistory`.
+- [x] **Sprint 5 Verification:** 115/115 unit tests passing across 19 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.

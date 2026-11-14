@@ -55,6 +55,12 @@ interface WebBluetoothAPI {
 
 const emptySubscribe = () => () => {};
 
+const serverCapabilities: NearbyCapabilities = Object.freeze({
+  hasWebShare: false,
+  canShareFiles: false,
+  hasBluetooth: false,
+});
+
 let cachedCapabilities: NearbyCapabilities | null = null;
 
 function getCapabilitiesSnapshot(): NearbyCapabilities {
@@ -73,27 +79,15 @@ function getCapabilitiesSnapshot(): NearbyCapabilities {
 
     const hasBluetooth = "bluetooth" in navigator;
 
-    cachedCapabilities = {
+    cachedCapabilities = Object.freeze({
       hasWebShare,
       canShareFiles,
       hasBluetooth,
-    };
+    });
   }
 
-  return (
-    cachedCapabilities ?? {
-      hasWebShare: false,
-      canShareFiles: false,
-      hasBluetooth: false,
-    }
-  );
+  return cachedCapabilities ?? serverCapabilities;
 }
-
-const serverCapabilities: NearbyCapabilities = {
-  hasWebShare: false,
-  canShareFiles: false,
-  hasBluetooth: false,
-};
 
 export function useNearbyShare() {
   const capabilities = useSyncExternalStore(

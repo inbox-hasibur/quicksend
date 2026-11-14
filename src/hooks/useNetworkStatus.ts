@@ -35,22 +35,22 @@ export function useNetworkStatus(): boolean {
 // Immutable capabilities subscription & snapshot
 const emptySubscribe = () => () => {};
 
+const serverCapabilities: Omit<BrowserCapabilities, "isOnline"> = Object.freeze({
+  hasWebShare: false,
+  hasBluetooth: false,
+});
+
 let cachedCapabilities: Omit<BrowserCapabilities, "isOnline"> | null = null;
 
 function getCapabilitiesSnapshot(): Omit<BrowserCapabilities, "isOnline"> {
   if (!cachedCapabilities && typeof navigator !== "undefined") {
-    cachedCapabilities = {
+    cachedCapabilities = Object.freeze({
       hasWebShare: "share" in navigator,
       hasBluetooth: "bluetooth" in navigator,
-    };
+    });
   }
-  return cachedCapabilities ?? { hasWebShare: false, hasBluetooth: false };
+  return cachedCapabilities ?? serverCapabilities;
 }
-
-const serverCapabilities: Omit<BrowserCapabilities, "isOnline"> = {
-  hasWebShare: false,
-  hasBluetooth: false,
-};
 
 function getServerCapabilitiesSnapshot(): Omit<BrowserCapabilities, "isOnline"> {
   return serverCapabilities;
