@@ -98,6 +98,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const hasAcceptedRef = useRef<boolean>(false);
   const acceptedResolverRef = useRef<(() => void) | null>(null);
   const receivedChunkCountRef = useRef<number>(0);
+  const activeDownloadUrlsRef = useRef<string[]>([]);
+  const isCleaningUpRef = useRef<boolean>(false);
 
   const clearIceTimeout = useCallback(() => {
     if (iceTimerRef.current) {
@@ -153,6 +155,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   // Cleanup helper
   const cleanup = useCallback(() => {
+    isCleaningUpRef.current = true;
     clearIceTimeout();
     activeTransportRef.current = null;
     isConnectedRef.current = false;
@@ -166,39 +169,61 @@ export function useWebRTC(mode: TransferMode = "internet") {
       diskWriterRef.current = null;
     }
 
-    if (dataConnRef.current) {
+    // Revoke any created object URLs on reset
+    for (const url of activeDownloadUrlsRef.current) {
       try {
-        dataConnRef.current.close();
+        URL.revokeObjectURL(url);
       } catch {
         // Ignore
       }
+    }
+    activeDownloadUrlsRef.current = [];
+
+    if (dataConnRef.current) {
+      const conn = dataConnRef.current;
       dataConnRef.current = null;
+      try {
+        conn.close();
+      } catch {
+        // Ignore
+      }
     }
     if (peerInstanceRef.current) {
+      const peer = peerInstanceRef.current;
+      peerInstanceRef.current = null;
       try {
-        peerInstanceRef.current.destroy();
+        peer.destroy();
       } catch {
         // Ignore
       }
-      peerInstanceRef.current = null;
     }
 
     signalingRef.current.leaveRoom();
     if (dcRef.current) {
+      const dc = dcRef.current;
+      dcRef.current = null;
+      dc.onopen = null;
+      dc.onclose = null;
+      dc.onerror = null;
+      dc.onmessage = null;
       try {
-        dcRef.current.close();
+        dc.close();
       } catch {
         // Ignore
       }
-      dcRef.current = null;
     }
     if (pcRef.current) {
+      const pc = pcRef.current;
+      pcRef.current = null;
+      pc.onicecandidate = null;
+      pc.oniceconnectionstatechange = null;
+      pc.onconnectionstatechange = null;
+      pc.ondatachannel = null;
       try {
-        pcRef.current.close();
+        pc.close();
       } catch {
         // Ignore
       }
-      pcRef.current = null;
     }
     receivedChunksRef.current = [];
     receivedChunkCountRef.current = 0;
@@ -217,6 +242,10 @@ export function useWebRTC(mode: TransferMode = "internet") {
       progressPercentage: 0,
       speedBps: 0,
     });
+    // Reset cleanup flag on next tick
+    setTimeout(() => {
+      isCleaningUpRef.current = false;
+    }, 50);
   }, [clearIceTimeout]);
 
   useEffect(() => {
@@ -370,13 +399,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
           }
 
           const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = header.file.name;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          URL.revokeObjectURL(url);
+          activeDownloadUrlsRef.current.push(url);
+
+          // Attempt direct programmatic download (desktop)
+          try {
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = header.file.name;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          } catch {
+            // Silently ignore programmatic click blocks on mobile browsers
+          }
         }
 
         let fullText: string | undefined;
@@ -413,10 +448,16 @@ export function useWebRTC(mode: TransferMode = "internet") {
           !header.fileIndex ||
           header.fileIndex >= header.totalFiles;
 
+        const latestDownloadUrl =
+          activeDownloadUrlsRef.current.length > 0
+            ? activeDownloadUrlsRef.current[activeDownloadUrlsRef.current.length - 1]
+            : undefined;
+
         setProgress((prev) => ({
           ...prev,
           status: isLastInBatch ? "completed" : "transferring",
           textContent: fullText,
+          downloadUrl: latestDownloadUrl,
           progressPercentage: 100,
           speedBps: 0,
           isVerified,
@@ -438,6 +479,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       };
 
       dc.onclose = () => {
+        if (isCleaningUpRef.current) return;
         if (activeTransportRef.current === "webrtc") {
           isConnectedRef.current = false;
           setIsConnected(false);
@@ -445,6 +487,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       };
 
       dc.onerror = () => {
+        if (isCleaningUpRef.current || !dcRef.current) return;
         setProgress((prev) => {
           if (prev.status === "completed" || prev.status === "idle") return prev;
           return {
@@ -486,6 +529,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       };
 
       pc.oniceconnectionstatechange = () => {
+        if (isCleaningUpRef.current || !pcRef.current) return;
         // If PeerJS is already active, ignore raw WebRTC ICE failures
         if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
           return;
@@ -507,6 +551,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       };
 
       pc.onconnectionstatechange = () => {
+        if (isCleaningUpRef.current || !pcRef.current) return;
         if (pc.connectionState === "connected") {
           clearIceTimeout();
           activeTransportRef.current = "webrtc";

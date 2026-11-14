@@ -19,6 +19,24 @@ export const PUBLIC_STUN_SERVERS: RTCIceServer[] = [
 ];
 
 /**
+ * Free community TURN relay servers (OpenRelay by Metered) for symmetric NAT & firewall traversal.
+ * Resolves over TCP port 443 / TLS to bypass carrier CGNAT and restrictive corporate/school Wi-Fi.
+ */
+export const PUBLIC_TURN_SERVERS: RTCIceServer[] = [
+  {
+    urls: [
+      "stun:openrelay.metered.ca:80",
+      "turn:openrelay.metered.ca:80",
+      "turn:openrelay.metered.ca:443",
+      "turn:openrelay.metered.ca:443?transport=tcp",
+      "turns:openrelay.metered.ca:443?transport=tcp",
+    ],
+    username: "openrelay",
+    credential: "openrelay",
+  },
+];
+
+/**
  * Extracts optional TURN server configuration from environment variables if present.
  * Accepts comma-separated URLs via NEXT_PUBLIC_TURN_URL.
  */
@@ -45,10 +63,10 @@ export function getTurnServers(): RTCIceServer[] {
 
 /**
  * Returns optimized RTCConfiguration based on the active transfer mode.
- * - Same Wi-Fi: Includes public STUN pool so reflexive srflx candidates resolve across mobile/desktop
- *   even if mDNS obfuscation or AP isolation interferes, while host candidates are still evaluated with highest priority.
+ * - Same Wi-Fi: Includes public STUN pool + community TURN fallback so reflexive & relayed candidates
+ *   resolve across mobile/desktop even if mDNS obfuscation, AP isolation, or Windows Firewall interferes.
  * - Offline Camera / Offline Hotspot: Empty iceServers to prevent external DNS stalls in air-gapped setups.
- * - Internet: Full multi-provider STUN pool + optional TURN relay.
+ * - Internet: Full multi-provider STUN pool + TURN relay pool.
  */
 export function getRtcConfig(mode: TransferMode = "internet"): RTCConfiguration {
   if (mode === "camera" || mode === "hotspot") {
@@ -58,8 +76,11 @@ export function getRtcConfig(mode: TransferMode = "internet"): RTCConfiguration 
     };
   }
 
+  const customTurn = getTurnServers();
+  const effectiveTurn = customTurn.length > 0 ? customTurn : PUBLIC_TURN_SERVERS;
+
   return {
-    iceServers: [...PUBLIC_STUN_SERVERS, ...getTurnServers()],
+    iceServers: [...PUBLIC_STUN_SERVERS, ...effectiveTurn],
     iceCandidatePoolSize: 10,
   };
 }

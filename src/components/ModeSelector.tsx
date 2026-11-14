@@ -20,6 +20,32 @@ import { HotspotAssistantCard } from "@/components/HotspotAssistantCard";
 import { NearbyShareCard } from "@/components/NearbyShareCard";
 import { CameraStreamCard } from "@/components/CameraStreamCard";
 
+function SignalBars({ filled, total = 5 }: { filled: number; total?: number }) {
+  const heights = ["30%", "45%", "65%", "82%", "100%"];
+  return (
+    <div
+      className="flex items-end gap-[2.5px] h-3.5"
+      title={`Speed Rating: ${filled}/${total} bars`}
+      aria-label={`${filled} of ${total} speed bars`}
+    >
+      {Array.from({ length: total }, (_, i) => {
+        const isFilled = i < filled;
+        return (
+          <div
+            key={i}
+            style={{ height: heights[i] || "100%" }}
+            className={`w-[3px] rounded-xs transition-colors ${
+              isFilled
+                ? "bg-emerald-500 dark:bg-emerald-400"
+                : "bg-neutral-300 dark:bg-neutral-700 opacity-35"
+            }`}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
 export function ModeSelector() {
   const searchParams = useSearchParams();
   const initialRoomCode = searchParams.get("room") || undefined;
@@ -38,18 +64,12 @@ export function ModeSelector() {
 
   const getModeTheme = (mode: TransferMode) => {
     switch (mode) {
-      case "internet":
-        return {
-          displayName: "Via Internet",
-          icon: <Globe className="h-5 w-5" />,
-          tag: "Global Relay",
-          summary: "Send or receive via 6-digit PIN, mobile number, or QR code across any network.",
-        };
       case "same-network":
         return {
           displayName: "Same Wi-Fi",
           icon: <Wifi className="h-5 w-5" />,
           tag: "Local LAN",
+          speedBars: 5,
           summary: "Ultra-fast direct transfer between devices sharing the same Wi-Fi router.",
         };
       case "hotspot":
@@ -57,13 +77,23 @@ export function ModeSelector() {
           displayName: "Wi-Fi Hotspot",
           icon: <Smartphone className="h-5 w-5" />,
           tag: "Direct AP",
+          speedBars: 5,
           summary: "Connect devices directly via mobile hotspot or Wi-Fi access point without internet.",
+        };
+      case "internet":
+        return {
+          displayName: "Via Internet",
+          icon: <Globe className="h-5 w-5" />,
+          tag: "Global Relay",
+          speedBars: 4,
+          summary: "Send or receive via 6-digit PIN, mobile number, or QR code across any network.",
         };
       case "bluetooth":
         return {
           displayName: "Bluetooth",
           icon: <Bluetooth className="h-5 w-5" />,
           tag: "Wireless",
+          speedBars: 3,
           summary: "Quick Share, AirDrop, and Bluetooth transfer for nearby devices.",
         };
       case "camera":
@@ -71,6 +101,7 @@ export function ModeSelector() {
           displayName: "Via Camera Scan",
           icon: <Camera className="h-5 w-5" />,
           tag: "Air-Gapped",
+          speedBars: 2,
           summary: "Stream files as animated QR codes scanned by the other device's camera.",
         };
     }
@@ -140,10 +171,15 @@ export function ModeSelector() {
                       </span>
                     </div>
 
-                    {/* Mode Title & Summary */}
-                    <h3 className="font-bold text-base text-[var(--text)] mt-4">
-                      {theme.displayName}
-                    </h3>
+                    {/* Mode Title & Speed Indicator */}
+                    <div className="flex items-center justify-between gap-2 mt-4">
+                      <h3 className="font-bold text-base text-[var(--text)]">
+                        {theme.displayName}
+                      </h3>
+                      <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-md bg-neutral-100/80 dark:bg-neutral-800/80 border border-neutral-200/50 dark:border-neutral-700/50">
+                        <SignalBars filled={theme.speedBars} />
+                      </div>
+                    </div>
                     <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
                       {theme.summary}
                     </p>
@@ -178,9 +214,10 @@ export function ModeSelector() {
                 <span className="text-xs text-[var(--text-muted)] hidden sm:inline">
                   Active Channel:
                 </span>
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-[var(--text)]">
+                <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-[var(--text)]">
                   {getModeTheme(selectedMode).icon}
                   <span>{getModeTheme(selectedMode).displayName}</span>
+                  <SignalBars filled={getModeTheme(selectedMode).speedBars} />
                 </span>
               </div>
             </div>

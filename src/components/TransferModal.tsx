@@ -248,6 +248,19 @@ export function TransferModal({
                 </div>
               </div>
 
+              {progress.itemType === "file" && progress.downloadUrl && (
+                <a
+                  href={progress.downloadUrl}
+                  download={progress.fileName || "download"}
+                  className="w-full py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors shadow-xs cursor-pointer text-center"
+                >
+                  <ArrowDownToLine className="h-4 w-4" />
+                  <span>
+                    Save / Download File ({formatBytes(progress.fileSize || progress.totalBytes)})
+                  </span>
+                </a>
+              )}
+
               {progress.itemType === "text" && progress.textContent && (
                 <div className="space-y-2">
                   <div className="p-3 max-h-36 overflow-y-auto rounded-xl bg-neutral-100 dark:bg-neutral-800 font-mono text-xs whitespace-pre-wrap break-all">

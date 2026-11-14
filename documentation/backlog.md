@@ -168,6 +168,12 @@
 - [x] Auto-connect receiver upon URL query navigation (`/?room=123456`) and fix modal dismiss handling.
 - [x] Fix React 19 `useSyncExternalStore` snapshot referential identity: ensure `getLocalDeviceProfile()` caches the snapshot reference at module level, `SERVER_DEVICE_PROFILE` is frozen, and audit `useNetworkStatus`, `useNearbyShare`, and `useTransferHistory`.
 - [x] Fix DataChannel packet overflow: reduce `DEFAULT_CHUNK_SIZE` from 64 KB to 16 KB (safe standard for SCTP data channel on mobile and desktop, resolving `DataChannel error occurred during transfer`).
+- [x] Fix WebRTC cleanup & Close button responsiveness: detach all listeners on DataChannel and PeerConnection before calling close/destroy, preventing ghost error state triggers upon closing.
+- [x] Add OpenRelay community TURN relay fallback in `iceConfig.ts` to guarantee connection establishment across symmetric NAT, mobile cellular networks, and restrictive firewalls.
+- [x] Add prominent 1-tap "Save / Download File" action in `TransferModal.tsx` for mobile browsers that block asynchronous programmatic download clicks.
+- [x] Simplify Same Wi-Fi fallback flow with local 6-digit PIN display, instant room QR code, and 1-tap direct camera scanner without extra steps.
+- [x] Add visual speed indicator signal bars to all transfer channels (5/5 for Same Wi-Fi & Hotspot, 4/5 for Internet, 3/5 for Bluetooth, 2/5 for Camera Scan).
+- [x] Remove artificial "100% Offline" and "Live radar" badges from Via Camera Scan and Same Wi-Fi.
 - [x] Eliminate dual transport race condition: isolate PeerJS and raw WebRTC transports with `activeTransportRef`, suppress redundant error overrides, and provide unified chunk sending with backpressure.
 - [x] Provide STUN pool for Mode 2 (Same Wi-Fi) in `iceConfig.ts` to overcome mDNS `.local` host obfuscation across mobile and desktop.
 - [x] Fix TransferModal Close button: introduce user-dismissal state so dismissed error/completed dialogs stay closed and do not re-trigger in a loop.

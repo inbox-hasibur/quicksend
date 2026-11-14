@@ -98,8 +98,8 @@ export function QRScannerModal({
       }
     };
 
-    // Small delay to ensure modal DOM is mounted
-    const timeout = setTimeout(startScanner, 200);
+    // Fast microtask delay to ensure modal DOM container is mounted
+    const timeout = setTimeout(startScanner, 50);
 
     return () => {
       isSubscribed = false;

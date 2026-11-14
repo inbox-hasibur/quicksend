@@ -59,6 +59,8 @@ export interface TransferProgressState {
   // Integrity verification
   sha256?: string;
   isVerified?: boolean;
+  // File download URL for direct mobile/desktop save
+  downloadUrl?: string;
 }
 
 export interface TransferHistoryItem {

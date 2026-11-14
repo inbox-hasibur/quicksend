@@ -9,18 +9,21 @@ import {
   Edit2,
   Check,
   Send,
-  Radio,
   ChevronDown,
   ChevronUp,
   QrCode,
   AlertCircle,
+  Copy,
+  Camera,
+  X,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Dropzone } from "@/components/Dropzone";
 import { TransferModal } from "@/components/TransferModal";
-import { OpticalHandshakeModal } from "@/components/OpticalHandshakeModal";
+import { QRScannerModal } from "@/components/QRScannerModal";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useLocalDiscovery, type NearbyPeer } from "@/hooks/useLocalDiscovery";
-import { encodeOpticalSdp } from "@/lib/opticalSdp";
+import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
 
 function generateLanSessionCode(): string {
   return `lan${Math.floor(100000 + Math.random() * 900000)}`;
@@ -46,8 +49,10 @@ export function SameNetworkCard() {
   const [customNameInput, setCustomNameInput] = useState(profile.name);
   const [isManualExpanded, setIsManualExpanded] = useState(false);
   const [manualCode, setManualCode] = useState("");
-  const [isOpticalOpen, setIsOpticalOpen] = useState(false);
-  const [opticalPayloadQr, setOpticalPayloadQr] = useState<string>("");
+  const [localDevicePin] = useState(() => Math.floor(100000 + Math.random() * 900000).toString());
+  const [isShowQrModalOpen, setIsShowQrModalOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
+  const [copiedPin, setCopiedPin] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const {
@@ -139,31 +144,51 @@ export function SameNetworkCard() {
     }
   };
 
-  const handleStartOpticalSender = async () => {
-    if (selectedPayload.files.length === 0 && !selectedPayload.text.trim()) {
-      setErrorMsg("Please select at least one file or enter text to share.");
+  const handleCopyPin = async () => {
+    try {
+      await navigator.clipboard.writeText(localDevicePin);
+      setCopiedPin(true);
+      setTimeout(() => setCopiedPin(false), 2000);
+    } catch {
+      // Ignore copy error
+    }
+  };
+
+  const handleManualConnect = async () => {
+    const clean = normalizeRoomCode(manualCode);
+    if (!isValidRoomCode(clean)) {
+      setErrorMsg("Please enter a valid 6-digit PIN.");
       return;
     }
-
+    setErrorMsg(null);
     try {
-      setErrorMsg(null);
-      const pc = new RTCPeerConnection({ iceServers: [] });
-      pc.createDataChannel("lan-share", { ordered: true });
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      const candidates: RTCIceCandidateInit[] = [];
-      pc.onicecandidate = (e) => {
-        if (e.candidate) candidates.push(e.candidate.toJSON());
-      };
-
-      await new Promise((res) => setTimeout(res, 300));
-      const qrString = encodeOpticalSdp(offer, candidates);
-      setOpticalPayloadQr(qrString);
-      setIsOpticalOpen(true);
+      const hasPayload = selectedPayload.files.length > 0 || selectedPayload.text.trim().length > 0;
+      if (hasPayload) {
+        await startSender(clean);
+      } else {
+        await startReceiver(clean);
+      }
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to initiate optical LAN handshake");
+      setErrorMsg(err instanceof Error ? err.message : "Failed to connect to PIN.");
+    }
+  };
+
+  const handleScannerSuccess = async (scannedCode: string) => {
+    setIsScannerOpen(false);
+    setManualCode(scannedCode);
+    const clean = normalizeRoomCode(scannedCode);
+    if (!isValidRoomCode(clean)) return;
+
+    setErrorMsg(null);
+    try {
+      const hasPayload = selectedPayload.files.length > 0 || selectedPayload.text.trim().length > 0;
+      if (hasPayload) {
+        await startSender(clean);
+      } else {
+        await startReceiver(clean);
+      }
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to connect via QR code.");
     }
   };
 
@@ -172,12 +197,7 @@ export function SameNetworkCard() {
       {/* Network & Local Device Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-hairline)]">
         <div>
-          <div className="flex items-center gap-2">
-            <h3 className="font-bold text-base text-[var(--text)]">Same Wi-Fi (Local Radar)</h3>
-            <span className="flex items-center gap-1 text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              <Radio className="w-3 h-3 animate-pulse" /> Live Radar
-            </span>
-          </div>
+          <h3 className="font-bold text-base text-[var(--text)]">Same Wi-Fi</h3>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Automatic local discovery. Tap any discovered device on the radar to send files directly over Wi-Fi.
           </p>
@@ -374,78 +394,151 @@ export function SameNetworkCard() {
         </div>
       </div>
 
-      {/* Direct PIN / Optical Fallback Accordion */}
+      {/* Direct PIN / QR Fallback Accordion */}
       <div className="border border-[var(--border-hairline)] rounded-2xl overflow-hidden bg-[var(--surface-subtle)]">
         <button
+          type="button"
           onClick={() => setIsManualExpanded((prev) => !prev)}
-          className="w-full flex items-center justify-between p-4 text-xs font-semibold text-[var(--text)] hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors"
+          className="w-full flex items-center justify-between p-4 text-xs font-semibold text-[var(--text)] hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
         >
-          <span>Can&apos;t find device on radar? Use 6-Digit PIN or Camera Optical QR</span>
+          <span>Can&apos;t find device on radar? Use 6-Digit PIN or QR Code</span>
           {isManualExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
 
         {isManualExpanded && (
           <div className="p-4 pt-2 border-t border-[var(--border-hairline)] space-y-4 bg-[var(--surface)]">
-            <p className="text-xs text-[var(--text-muted)]">
-              If your Wi-Fi router has Client Isolation enabled (common in public or guest Wi-Fi), devices cannot discover each other automatically. Use direct PIN or Optical Handshake below:
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+              If client isolation is active on your router, devices cannot find each other on the radar. Use this device&apos;s PIN or scan QR directly:
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <div className="space-y-2">
-                <label className="text-[11px] font-semibold text-[var(--text-muted)] block">
-                  Connect by 6-Digit PIN
-                </label>
+              {/* This Device's PIN & QR Display */}
+              <div className="p-3.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-[var(--text-muted)]">
+                    This Device PIN
+                  </span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">Ready</span>
+                </div>
+                <div className="flex items-center justify-between gap-2 bg-[var(--surface)] p-2 rounded-xl border border-[var(--border-hairline)]">
+                  <span className="font-mono text-base font-bold text-[var(--text)] tracking-wider">
+                    {formatRoomCode(localDevicePin)}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={handleCopyPin}
+                      className="p-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-800 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                      title="Copy PIN"
+                    >
+                      {copiedPin ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsShowQrModalOpen(true);
+                        startReceiver(localDevicePin).catch(() => {});
+                      }}
+                      className="px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+                    >
+                      <QrCode className="w-3.5 h-3.5" /> Show QR
+                    </button>
+                  </div>
+                </div>
+                <p className="text-[11px] text-[var(--text-muted)]">
+                  Share this PIN or QR with the sender to connect directly.
+                </p>
+              </div>
+
+              {/* Connect to Peer's PIN or Instant Scan */}
+              <div className="p-3.5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-2.5">
+                <span className="text-[11px] font-semibold text-[var(--text-muted)] block">
+                  Connect by Peer&apos;s PIN or QR
+                </span>
                 <div className="flex gap-2">
                   <input
                     type="text"
-                    placeholder="Enter PIN"
+                    placeholder="Enter 6-Digit PIN"
                     value={manualCode}
                     onChange={(e) => setManualCode(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-xs text-[var(--text)] focus:outline-none"
+                    onKeyDown={(e) => e.key === "Enter" && handleManualConnect()}
+                    className="w-full px-3 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-xs text-[var(--text)] font-mono focus:outline-none"
                   />
                   <button
-                    onClick={() => {
-                      if (manualCode.trim()) {
-                        startSender(manualCode.trim()).catch((err) => setErrorMsg(err.message));
-                      }
-                    }}
-                    className="px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] text-xs font-semibold hover:opacity-90 transition-opacity"
+                    type="button"
+                    onClick={handleManualConnect}
+                    className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer whitespace-nowrap"
                   >
                     Connect
                   </button>
                 </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[11px] font-semibold text-[var(--text-muted)] block">
-                  Offline Camera Handshake
-                </label>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleStartOpticalSender}
-                    className="flex-1 px-3 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--text)] hover:bg-neutral-200/60 transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <QrCode className="w-3.5 h-3.5" /> Show QR
-                  </button>
-                  <button
-                    onClick={() => setIsOpticalOpen(true)}
-                    className="flex-1 px-3 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--text)] hover:bg-neutral-200/60 transition-colors flex items-center justify-center gap-1.5"
-                  >
-                    <QrCode className="w-3.5 h-3.5" /> Scan QR
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsScannerOpen(true)}
+                  className="w-full py-2 px-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 text-xs font-semibold text-[var(--text)] flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5 text-[var(--accent)]" />
+                  <span>Scan QR Code with Camera</span>
+                </button>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {/* Optical Handshake Modal for fallback */}
-      <OpticalHandshakeModal
-        isOpen={isOpticalOpen}
-        onClose={() => setIsOpticalOpen(false)}
-        role="sender"
-        localPayloadQr={opticalPayloadQr}
+      {/* Direct QR Modal */}
+      {isShowQrModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="relative w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--border-hairline)] p-6 shadow-2xl space-y-4 text-center">
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border-hairline)]">
+              <span className="font-bold text-sm text-[var(--text)]">Direct Wi-Fi Room QR</span>
+              <button
+                type="button"
+                onClick={() => setIsShowQrModalOpen(false)}
+                className="p-1 rounded-full text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 bg-white rounded-2xl border border-neutral-200 inline-block mx-auto shadow-sm">
+              <QRCodeSVG
+                value={
+                  typeof window !== "undefined"
+                    ? `${window.location.origin}/?room=${localDevicePin}`
+                    : `https://quicksend.vercel.app/?room=${localDevicePin}`
+                }
+                size={200}
+                level="M"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <p className="text-xs text-[var(--text-muted)]">Room PIN</p>
+              <p className="font-mono text-2xl font-black text-[var(--text)] tracking-widest">
+                {formatRoomCode(localDevicePin)}
+              </p>
+              <p className="text-[11px] text-[var(--text-muted)]">
+                Scan with any camera or enter PIN in QuickSend
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsShowQrModalOpen(false)}
+              className="w-full py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold transition-all cursor-pointer shadow-xs"
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Immediate Camera QR Scanner Modal */}
+      <QRScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onScanSuccess={handleScannerSuccess}
       />
 
       {/* Live WebRTC Transfer Modal */}
