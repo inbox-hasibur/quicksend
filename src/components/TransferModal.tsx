@@ -81,14 +81,14 @@ export function TransferModal({
           {(progress.status === "completed" ||
             progress.status === "rejected" ||
             progress.status === "error") && (
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
         </div>
 
         {/* Content Details */}

@@ -15,7 +15,8 @@ export interface SegmentedControlProps {
 }
 
 /**
- * Segmented control with soft glass track and keyboard arrow navigation.
+ * Segmented control matching the tactile reference image:
+ * Soft neutral pill track with pure white elevated active tab and subtle shadow.
  */
 export function SegmentedControl({
   options,
@@ -23,7 +24,6 @@ export function SegmentedControl({
   onChange,
   ariaLabel,
 }: SegmentedControlProps) {
-  // Handle arrow key navigation between tabs
   const handleKeyDown = (e: KeyboardEvent<HTMLButtonElement>, currentIndex: number) => {
     if (options.length === 0) return;
 
@@ -42,7 +42,7 @@ export function SegmentedControl({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className="inline-flex p-1 rounded-full border border-[var(--border-soft)] bg-[var(--surface-glass)] backdrop-blur-md shadow-xs"
+      className="inline-flex p-1 rounded-full border border-[var(--border-hairline)] bg-[var(--surface-subtle)]"
     >
       {options.map((opt, idx) => {
         const isActive = opt.value === value;
@@ -56,10 +56,10 @@ export function SegmentedControl({
             tabIndex={isActive ? 0 : -1}
             onClick={() => onChange(opt.value)}
             onKeyDown={(e) => handleKeyDown(e, idx)}
-            className={`pill px-4 py-1.5 text-xs font-semibold transition-all cursor-pointer ${
+            className={`pill px-4 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer ${
               isActive
-                ? "pill-active shadow-xs"
-                : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                ? "pill-active bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-xs"
+                : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
             }`}
           >
             {opt.label}

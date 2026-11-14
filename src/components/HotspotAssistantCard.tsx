@@ -9,8 +9,6 @@ import {
   Eye,
   AlertCircle,
   Radio,
-  Send,
-  Download,
   ArrowRight,
   Sparkles,
 } from "lucide-react";
@@ -18,6 +16,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { Dropzone } from "@/components/Dropzone";
 import { TransferModal } from "@/components/TransferModal";
 import { OpticalHandshakeModal } from "@/components/OpticalHandshakeModal";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { buildWifiQrString, ANDROID_INTENTS } from "@/lib/wifiQr";
 import { encodeOpticalSdp } from "@/lib/opticalSdp";
@@ -103,47 +102,30 @@ export function HotspotAssistantCard() {
 
   return (
     <div className="space-y-6">
-      {/* Role Switcher (Segmented Pill Style) */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+      {/* Role Switcher */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-[var(--border-hairline)]">
         <div>
-          <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+          <h3 className="font-bold text-base text-[var(--text)]">
             Wi-Fi + Hotspot Assistant
           </h3>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Zero-internet transfer via mobile AP &amp; optical QR pairing
           </p>
         </div>
 
-        <div className="inline-flex items-center p-1 rounded-full bg-neutral-100 dark:bg-neutral-800/80">
-          <button
-            type="button"
-            onClick={() => setRole("send")}
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              role === "send"
-                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-          >
-            <Send className="h-3.5 w-3.5 text-amber-500" />
-            <span>Send (Host AP)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setRole("receive")}
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              role === "receive"
-                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-          >
-            <Download className="h-3.5 w-3.5 text-amber-500" />
-            <span>Receive (Join AP)</span>
-          </button>
-        </div>
+        <SegmentedControl
+          ariaLabel="Transfer Role"
+          value={role}
+          onChange={(val) => setRole(val as TransferRole)}
+          options={[
+            { value: "send", label: "Send (Host AP)" },
+            { value: "receive", label: "Receive (Join AP)" },
+          ]}
+        />
       </div>
 
       {errorMsg && (
-        <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
           <span>{errorMsg}</span>
         </div>
@@ -151,16 +133,16 @@ export function HotspotAssistantCard() {
 
       {/* SENDER: Step-by-Step Hotspot Setup */}
       {role === "send" ? (
-        <div className="space-y-6">
-          <div className="p-6 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 space-y-4">
+        <div className="space-y-5">
+          <div className="p-5 sm:p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-400">
-                <Radio className="h-4 w-4 text-amber-500" />
+              <div className="flex items-center gap-2 text-xs font-bold text-[var(--text)]">
+                <Radio className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
                 <span>Step 1: Configure Hotspot Credentials</span>
               </div>
               <a
                 href={ANDROID_INTENTS.TETHER_SETTINGS}
-                className="inline-flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400 hover:underline font-medium"
+                className="inline-flex items-center gap-1 text-[11px] text-neutral-600 dark:text-neutral-400 hover:underline font-medium"
               >
                 <span>Android Hotspot Settings</span>
                 <ExternalLink className="h-3 w-3" />
@@ -169,25 +151,25 @@ export function HotspotAssistantCard() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-[11px] font-semibold text-neutral-500 block mb-1">
+                <label className="text-[11px] font-semibold text-[var(--text-muted)] block mb-1">
                   Hotspot Name (SSID)
                 </label>
                 <input
                   type="text"
                   value={ssid}
                   onChange={(e) => setSsid(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs font-mono text-neutral-900 dark:text-neutral-100"
+                  className="w-full p-2.5 rounded-xl border border-[var(--border-hairline)] bg-white dark:bg-neutral-800 text-xs font-mono text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white"
                 />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] font-semibold text-neutral-500">
+                  <label className="text-[11px] font-semibold text-[var(--text-muted)]">
                     Password
                   </label>
                   <button
                     type="button"
                     onClick={handleGeneratePassword}
-                    className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-semibold text-neutral-600 dark:text-neutral-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
                   >
                     <Sparkles className="h-3 w-3" />
                     <span>Generate Strong</span>
@@ -197,7 +179,7 @@ export function HotspotAssistantCard() {
                   type="text"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-xs font-mono text-neutral-900 dark:text-neutral-100"
+                  className="w-full p-2.5 rounded-xl border border-[var(--border-hairline)] bg-white dark:bg-neutral-800 text-xs font-mono text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white"
                 />
               </div>
             </div>
@@ -206,7 +188,7 @@ export function HotspotAssistantCard() {
               <button
                 type="button"
                 onClick={() => setShowWifiQr(!showWifiQr)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-neutral-800 dark:text-neutral-200 hover:underline cursor-pointer"
               >
                 <QrCode className="h-4 w-4" />
                 <span>{showWifiQr ? "Hide Wi-Fi Join QR" : "Show Wi-Fi Join QR Code"}</span>
@@ -214,11 +196,11 @@ export function HotspotAssistantCard() {
             </div>
 
             {showWifiQr && (
-              <div className="flex flex-col items-center p-4 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 space-y-2 animate-in fade-in">
-                <div className="p-3 bg-white rounded-2xl shadow-sm">
+              <div className="flex flex-col items-center p-4 rounded-xl bg-white dark:bg-neutral-800 border border-[var(--border-hairline)] space-y-2 animate-in fade-in">
+                <div className="p-3 bg-white rounded-xl shadow-2xs">
                   <QRCodeSVG value={wifiQrString} size={160} level="M" />
                 </div>
-                <p className="text-[11px] text-neutral-500 text-center max-w-xs">
+                <p className="text-[11px] text-[var(--text-muted)] text-center max-w-xs">
                   Scan this QR code with the receiver phone&apos;s camera to automatically join this hotspot without typing the password!
                 </p>
               </div>
@@ -226,7 +208,7 @@ export function HotspotAssistantCard() {
           </div>
 
           <div className="space-y-2">
-            <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block px-1">
+            <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block px-1">
               Step 2: Select Files or Text to Beam
             </span>
             <Dropzone onSelectionChange={setSelectedPayload} />
@@ -235,24 +217,24 @@ export function HotspotAssistantCard() {
           <button
             type="button"
             onClick={handleStartOpticalSender}
-            className="w-full py-4 px-6 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3.5 px-6 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
           >
-            <Eye className="h-4 w-4 text-amber-400 dark:text-amber-600" />
+            <Eye className="h-4 w-4" />
             <span>Generate Optical WebRTC QR Handshake</span>
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       ) : (
         /* RECEIVER FLOW */
-        <div className="p-8 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 text-center space-y-5 max-w-md mx-auto">
-          <div className="h-14 w-14 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
-            <Smartphone className="h-7 w-7" />
+        <div className="p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-center space-y-4 max-w-md mx-auto">
+          <div className="h-11 w-11 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs text-neutral-800 dark:text-neutral-200 flex items-center justify-center mx-auto">
+            <Smartphone className="h-5 w-5" />
           </div>
           <div>
-            <h4 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+            <h4 className="font-bold text-sm text-[var(--text)]">
               Join Sender&apos;s Hotspot
             </h4>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1 leading-relaxed">
+            <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">
               Scan the sender&apos;s Wi-Fi QR code with your camera or connect to their hotspot in Wi-Fi settings.
             </p>
           </div>
@@ -260,19 +242,19 @@ export function HotspotAssistantCard() {
           <div className="space-y-2">
             <a
               href={ANDROID_INTENTS.WIFI_SETTINGS}
-              className="w-full py-3 px-4 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-white dark:hover:bg-neutral-800 text-neutral-800 dark:text-neutral-200 font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs"
+              className="w-full py-2.5 px-4 rounded-xl border border-[var(--border-hairline)] hover:bg-white dark:hover:bg-neutral-800 text-[var(--text)] font-semibold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs"
             >
-              <Wifi className="h-3.5 w-3.5 text-amber-500" />
+              <Wifi className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400" />
               <span>Open Android Wi-Fi Settings</span>
-              <ExternalLink className="h-3 w-3 text-neutral-400" />
+              <ExternalLink className="h-3 w-3 text-[var(--text-muted)]" />
             </a>
 
             <button
               type="button"
               onClick={() => setIsOpticalOpen(true)}
-              className="w-full py-3.5 px-6 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-3 px-6 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Eye className="h-4 w-4 text-amber-400 dark:text-amber-600" />
+              <Eye className="h-4 w-4" />
               <span>Scan Sender&apos;s Optical QR</span>
               <ArrowRight className="h-4 w-4" />
             </button>

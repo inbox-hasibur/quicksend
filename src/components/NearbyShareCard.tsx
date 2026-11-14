@@ -15,6 +15,7 @@ import {
   Radio,
 } from "lucide-react";
 import { Dropzone } from "@/components/Dropzone";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { useNearbyShare } from "@/hooks/useNearbyShare";
 import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
 import { ANDROID_INTENTS } from "@/lib/wifiQr";
@@ -95,60 +96,24 @@ export function NearbyShareCard() {
         </div>
 
         {/* Segmented Pill Selector */}
-        <div className="inline-flex items-center p-1 rounded-full bg-neutral-100 dark:bg-neutral-800/80">
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("quickshare");
-              clearError();
-            }}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "quickshare"
-                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-          >
-            <Share2 className="h-3.5 w-3.5 text-blue-500" />
-            <span>Quick Share</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("ble");
-              clearError();
-            }}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "ble"
-                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-          >
-            <Bluetooth className="h-3.5 w-3.5 text-indigo-500" />
-            <span>BLE Client</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("guide");
-              clearError();
-            }}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              activeTab === "guide"
-                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-          >
-            <Info className="h-3.5 w-3.5 text-amber-500" />
-            <span>Guide</span>
-          </button>
-        </div>
+        <SegmentedControl
+          ariaLabel="Nearby Mode"
+          value={activeTab}
+          onChange={(val) => {
+            setActiveTab(val as NearbyTab);
+            clearError();
+          }}
+          options={[
+            { value: "quickshare", label: "Quick Share" },
+            { value: "ble", label: "BLE Client" },
+            { value: "guide", label: "Guide" },
+          ]}
+        />
       </div>
 
       {/* Error Banner */}
       {errorMsg && (
-        <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
           <span>{errorMsg}</span>
         </div>
@@ -156,7 +121,7 @@ export function NearbyShareCard() {
 
       {/* Success Banner */}
       {shareSuccess && (
-        <div className="flex items-center gap-2.5 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs animate-in fade-in">
+        <div className="flex items-center gap-2.5 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs animate-in fade-in">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
           <span>Payload handed off to Native OS Share Sheet successfully!</span>
         </div>
@@ -164,9 +129,9 @@ export function NearbyShareCard() {
 
       {/* TAB 1: QUICK SHARE (NATIVE OS PROXIMITY) */}
       {activeTab === "quickshare" && (
-        <div className="space-y-6">
-          <div className="p-4 sm:p-5 rounded-3xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-800/40 flex items-start gap-3.5 text-xs text-blue-900 dark:text-blue-200">
-            <Radio className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+        <div className="space-y-5">
+          <div className="p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] flex items-start gap-3 text-xs text-[var(--text)]">
+            <Radio className="h-4 w-4 text-neutral-600 dark:text-neutral-400 shrink-0 mt-0.5" />
             <div className="leading-relaxed">
               <span className="font-bold">Seamless OS Proximity Handoff: </span>
               Uses your operating system&apos;s native share sheet. Automatically leverages{" "}
@@ -176,7 +141,7 @@ export function NearbyShareCard() {
           </div>
 
           {!capabilities.hasWebShare && (
-            <div className="p-3.5 rounded-2xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/50 flex items-start gap-2.5 text-xs text-amber-900 dark:text-amber-200">
+            <div className="p-3.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] flex items-start gap-2.5 text-xs text-[var(--text)]">
               <Info className="h-4 w-4 shrink-0 text-amber-500 mt-0.5" />
               <p>
                 Native Web Share is not supported in this browser. To send files to nearby devices without restrictions, switch to <strong>Mode 1 (Via Internet)</strong> or <strong>Mode 2 (Same Wi-Fi)</strong>.
@@ -185,18 +150,18 @@ export function NearbyShareCard() {
           )}
 
           <div className="space-y-2">
-            <span className="text-xs font-bold text-neutral-500 uppercase tracking-wider block px-1">
+            <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block px-1">
               Select Files or Text to Handoff
             </span>
             <Dropzone onSelectionChange={setSelectedPayload} />
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+          <div className="flex flex-col sm:flex-row gap-3 pt-1">
             <button
               type="button"
               onClick={handleTriggerShare}
               disabled={isSharing}
-              className="flex-1 py-4 px-6 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              className="flex-1 py-3 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
               {isSharing ? (
                 <>
@@ -205,7 +170,7 @@ export function NearbyShareCard() {
                 </>
               ) : (
                 <>
-                  <Share2 className="h-4 w-4 text-blue-400 dark:text-blue-600" />
+                  <Share2 className="h-4 w-4" />
                   <span>Beam via Quick Share / AirDrop</span>
                 </>
               )}
@@ -213,11 +178,11 @@ export function NearbyShareCard() {
 
             <a
               href={ANDROID_INTENTS.BLUETOOTH_SETTINGS}
-              className="py-4 px-6 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-200 font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-2xs"
+              className="py-3 px-5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] hover:bg-neutral-200/60 dark:hover:bg-neutral-750 text-[var(--text)] font-semibold text-xs flex items-center justify-center gap-2 transition-all shadow-2xs"
             >
-              <Smartphone className="h-4 w-4 text-blue-500" />
+              <Smartphone className="h-4 w-4" />
               <span>Android Bluetooth Settings</span>
-              <ExternalLink className="h-3.5 w-3.5 text-neutral-400" />
+              <ExternalLink className="h-3.5 w-3.5 text-[var(--text-muted)]" />
             </a>
           </div>
         </div>
@@ -235,20 +200,20 @@ export function NearbyShareCard() {
           </div>
 
           {!capabilities.hasBluetooth ? (
-            <div className="p-8 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 text-center space-y-4 max-w-md mx-auto">
-              <div className="h-14 w-14 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center mx-auto">
-                <AlertCircle className="h-7 w-7" />
+            <div className="p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-center space-y-4 max-w-md mx-auto">
+              <div className="h-11 w-11 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs text-amber-500 flex items-center justify-center mx-auto">
+                <AlertCircle className="h-5 w-5" />
               </div>
-              <div className="space-y-1.5">
-                <h4 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+              <div className="space-y-1">
+                <h4 className="font-bold text-sm text-[var(--text)]">
                   Web Bluetooth Unavailable
                 </h4>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 leading-relaxed">
+                <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                   Your current browser (such as iOS Safari or Firefox) restricts Web Bluetooth APIs.
                 </p>
               </div>
-              <div className="p-3.5 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200/70 dark:border-neutral-800 text-left text-xs text-neutral-600 dark:text-neutral-400 space-y-2">
-                <span className="font-semibold text-neutral-900 dark:text-neutral-200 block">
+              <div className="p-3.5 rounded-xl bg-white dark:bg-neutral-800 border border-[var(--border-hairline)] text-left text-xs text-[var(--text-muted)] space-y-2">
+                <span className="font-semibold text-[var(--text)] block">
                   Recommended Alternatives:
                 </span>
                 <ul className="list-disc pl-4 space-y-1 text-[11px]">
@@ -262,16 +227,16 @@ export function NearbyShareCard() {
               </div>
             </div>
           ) : !bleDevice ? (
-            <div className="p-8 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 text-center space-y-4 max-w-md mx-auto">
-              <div className="h-14 w-14 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 flex items-center justify-center mx-auto">
-                <Bluetooth className="h-7 w-7" />
+            <div className="p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-center space-y-4 max-w-md mx-auto">
+              <div className="h-11 w-11 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs text-neutral-800 dark:text-neutral-200 flex items-center justify-center mx-auto">
+                <Bluetooth className="h-5 w-5" />
               </div>
 
               <div>
-                <h4 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+                <h4 className="font-bold text-sm text-[var(--text)]">
                   Scan for Nearby BLE Peripherals
                 </h4>
-                <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                <p className="text-xs text-[var(--text-muted)] mt-1">
                   Click below to open the browser&apos;s Bluetooth device picker.
                 </p>
               </div>
@@ -280,7 +245,7 @@ export function NearbyShareCard() {
                 type="button"
                 onClick={requestBleDevice}
                 disabled={isConnectingBle}
-                className="w-full py-3.5 px-6 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full py-3 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isConnectingBle ? (
                   <>
@@ -289,24 +254,24 @@ export function NearbyShareCard() {
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-4 w-4 text-indigo-400 dark:text-indigo-600" />
+                    <Sparkles className="h-4 w-4" />
                     <span>Pair BLE Hardware Peripheral</span>
                   </>
                 )}
               </button>
             </div>
           ) : (
-            <div className="p-6 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 space-y-4">
+            <div className="p-5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-2xl bg-indigo-100 dark:bg-indigo-950/60 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                  <div className="h-10 w-10 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs flex items-center justify-center text-neutral-800 dark:text-neutral-200">
                     <Bluetooth className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
+                    <h4 className="font-bold text-sm text-[var(--text)]">
                       {bleDevice.name}
                     </h4>
-                    <p className="text-[11px] font-mono text-neutral-400">
+                    <p className="text-[11px] font-mono text-[var(--text-muted)]">
                       ID: {bleDevice.id.slice(0, 12)}... • Status:{" "}
                       <span className={bleDevice.connected ? "text-emerald-500 font-bold" : "text-neutral-400"}>
                         {bleDevice.connected ? "Connected" : "Disconnected"}
@@ -318,7 +283,7 @@ export function NearbyShareCard() {
                 <button
                   type="button"
                   onClick={disconnectBleDevice}
-                  className="px-4 py-1.5 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-200 dark:hover:bg-neutral-750 text-xs font-semibold text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-full border border-[var(--border-hairline)] hover:bg-white dark:hover:bg-neutral-800 text-xs font-semibold text-[var(--text)] transition-colors cursor-pointer"
                 >
                   Disconnect
                 </button>

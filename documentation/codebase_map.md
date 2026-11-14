@@ -56,8 +56,7 @@ flowchart TD
         TransferMod["TransferModal.tsx (Incoming Prompt, Speed, Progress Bar)"]
         HistoryMod["TransferHistoryModal.tsx (Ephemeral Session Transfer Drawer)"]
         FileTypeBdg["FileTypeBadge.tsx (Color-coded file type chips PDF, IMG, DOC, etc.)"]
-        SegControl["SegmentedControl.tsx (Glass Track & Keyboard Navigation)"]
-        BtmNav["BottomNav.tsx (Mobile Glass Bottom Navigation)"]
+        SegControl["SegmentedControl.tsx (Tactile Pill Track & Keyboard Navigation)"]
     end
 
     subgraph Src_Hooks["src/hooks/ (Custom React Hooks)"]
@@ -227,15 +226,11 @@ flowchart TD
 - **Exports:** `AppHeader(): JSX.Element`
 
 #### `src/components/ModeSelector.tsx`
-- **Purpose:** Desktop & mobile adaptive workspace coordinator. Features a sleek desktop left navigation rail (`hidden lg:flex w-64`) for 1-click mode switching, elevated main workspace card, tactile Home Hub tiles with colorful squircle containers and offline indicators, distraction-free mode transitions with "All Modes" return pill, and mobile bottom navigation.
+- **Purpose:** Clean, linear 4-channel workspace coordinator. In the default Home state, renders the 4 transfer option tiles in a tactile 2x2 grid directly styled after the reference card aesthetic (soft neutral `#F4F5F7` surface, uniform `rounded-2xl`, squircle icon, clean typography). Selecting any mode smoothly transitions into a focused workspace card with an "All Channels" return pill. No artificial sidebars or bottom navigation menus.
 - **Exports:** `ModeSelector(): JSX.Element`
 
-#### `src/components/BottomNav.tsx`
-- **Purpose:** Mobile-first floating bottom navigation bar visible only below `lg` breakpoint. Renders Home, Send, Receive, and History tabs with safe-area padding and accent active indicators.
-- **Exports:** `BottomNav({ activeItem, onHome, onSend, onReceive, onHistory }: BottomNavProps): JSX.Element`
-
 #### `src/components/SegmentedControl.tsx`
-- **Purpose:** Reusable segmented option switch with a soft glass pill track (`.pill`), `.pill-active` highlight, `role="tablist"` accessibility, and keyboard arrow key navigation.
+- **Purpose:** Reusable segmented option switch matching the tactile reference UI. Features a soft neutral pill track, pure white elevated active tab with subtle shadow, `role="tablist"` accessibility, and keyboard arrow key navigation.
 - **Exports:** `SegmentedControl({ options, value, onChange, ariaLabel }: SegmentedControlProps): JSX.Element`
 
 #### `src/components/NetworkStatusBadge.tsx`

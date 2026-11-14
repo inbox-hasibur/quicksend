@@ -101,7 +101,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       acceptedResolverRef.current = null;
     }
     if (diskWriterRef.current) {
-      diskWriterRef.current.abort().catch(() => {});
+      diskWriterRef.current.abort().catch(() => { });
       diskWriterRef.current = null;
     }
 
@@ -147,9 +147,9 @@ export function useWebRTC(mode: TransferMode = "internet") {
           // If this is part of a previously accepted batch (e.g. file 2 of 5), don't block on modal
           const isAutoAcceptedBatch = Boolean(
             header.batchId &&
-              hasReceiverAcceptedBatchRef.current === header.batchId &&
-              header.fileIndex &&
-              header.fileIndex > 1
+            hasReceiverAcceptedBatchRef.current === header.batchId &&
+            header.fileIndex &&
+            header.fileIndex > 1
           );
 
           if (isAutoAcceptedBatch) {
@@ -364,7 +364,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         if (event.candidate) {
           signalingRef.current
             .sendSignal("candidate", event.candidate.toJSON())
-            .catch(() => {});
+            .catch(() => { });
         }
       };
 
@@ -798,7 +798,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     if (dc && dc.readyState === "open") {
       dc.send(JSON.stringify({ type: "transfer-rejected" }));
     }
-    signalingRef.current.sendSignal("transfer-rejected").catch(() => {});
+    signalingRef.current.sendSignal("transfer-rejected").catch(() => { });
     setProgress((prev) => ({
       ...prev,
       status: "rejected",

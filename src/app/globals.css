@@ -1,22 +1,23 @@
 @import "tailwindcss";
 
 :root {
-  /* Soft warm tactile workspace theme (Light) */
-  --bg: #F6F7FB;
+  /* Clean tactile neutral workspace theme (Light) */
+  --bg: #ECEEF1;
   --surface: #FFFFFF;
-  --surface-glass: rgba(255, 255, 255, 0.85);
-  --surface-subtle: #EEF0F6;
-  --border-soft: rgba(0, 0, 0, 0.06);
-  --border-hairline: #E5E8F0;
-  --text: #12141D;
-  --text-muted: #647087;
-  --accent: #5B5BD6;
-  --accent-hover: #4E4EC8;
-  --accent-soft: rgba(91, 91, 214, 0.10);
-  --radius-card: 28px;
-  --radius-tile: 20px;
-  --shadow-soft: 0 2px 4px rgba(18, 22, 33, 0.02), 0 10px 30px rgba(18, 22, 33, 0.04), 0 20px 48px rgba(18, 22, 33, 0.03);
-  --shadow-tile: 0 4px 16px rgba(18, 22, 33, 0.04);
+  --surface-glass: rgba(255, 255, 255, 0.96);
+  --surface-subtle: #F4F5F7;
+  --border-soft: rgba(0, 0, 0, 0.08);
+  --border-hairline: #E5E7EB;
+  --text: #111827;
+  --text-muted: #6B7280;
+  --accent: #111827;
+  --accent-hover: #1F2937;
+  --accent-soft: rgba(17, 24, 39, 0.05);
+  --radius-frame: 28px;
+  --radius-card: 20px;
+  --radius-control: 12px;
+  --shadow-soft: 0 1px 3px rgba(0, 0, 0, 0.02), 0 8px 24px rgba(0, 0, 0, 0.04);
+  --shadow-tile: 0 1px 2px rgba(0, 0, 0, 0.03);
 
   /* System mapping */
   --background: var(--bg);
@@ -34,22 +35,23 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Soft tactile workspace theme (Dark) */
-    --bg: #0B0D14;
-    --surface: #131622;
-    --surface-glass: rgba(19, 22, 34, 0.85);
-    --surface-subtle: #191D2C;
+    /* Clean tactile workspace theme (Dark) */
+    --bg: #0D0F14;
+    --surface: #151822;
+    --surface-glass: rgba(21, 24, 34, 0.96);
+    --surface-subtle: #1D212E;
     --border-soft: rgba(255, 255, 255, 0.08);
-    --border-hairline: #202538;
-    --text: #F2F4F8;
-    --text-muted: #8E99AF;
-    --accent: #6366F1;
-    --accent-hover: #7174F8;
-    --accent-soft: rgba(99, 102, 241, 0.16);
-    --radius-card: 28px;
-    --radius-tile: 20px;
-    --shadow-soft: 0 4px 16px rgba(0, 0, 0, 0.35), 0 16px 44px rgba(0, 0, 0, 0.45);
-    --shadow-tile: 0 4px 16px rgba(0, 0, 0, 0.35);
+    --border-hairline: #262B3A;
+    --text: #F3F4F6;
+    --text-muted: #9CA3AF;
+    --accent: #FFFFFF;
+    --accent-hover: #E5E7EB;
+    --accent-soft: rgba(255, 255, 255, 0.08);
+    --radius-frame: 28px;
+    --radius-card: 20px;
+    --radius-control: 12px;
+    --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.35);
+    --shadow-tile: 0 2px 8px rgba(0, 0, 0, 0.25);
 
     /* System mapping */
     --background: var(--bg);
@@ -67,23 +69,40 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Tactile Card & Elevated Surfaces */
+/* Tactile Frame Surfaces */
 .glass-card,
 .tactile-card {
-  background: var(--surface-glass);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-card);
+  background: var(--surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-frame);
   box-shadow: var(--shadow-soft);
 }
 
-/* Squircle Icon Tiles */
+/* Tactile Tile Cards */
+.tactile-tile {
+  background: var(--surface-subtle);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-card);
+  transition: all 0.2s ease;
+}
+
+.tactile-tile:hover {
+  background: #ECEEF2;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  .tactile-tile:hover {
+    background: #232736;
+  }
+}
+
+/* Squircle Icon Containers */
 .squircle {
-  border-radius: var(--radius-tile);
-  background: var(--accent-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
   box-shadow: var(--shadow-tile);
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--border-hairline);
 }
 
 /* Segmented Pill Navigation */
@@ -95,14 +114,16 @@ body {
   background: var(--surface-subtle);
   border-radius: 9999px;
   padding: 4px;
+  border: 1px solid var(--border-hairline);
 }
 
 .pill-active {
-  background-color: var(--accent);
-  color: #ffffff;
+  background-color: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* Tabular Numbers for PIN codes, metrics, byte sizes */
+/* Tabular Numbers */
 .tabular-numbers,
 .tabular-nums {
   font-variant-numeric: tabular-nums;

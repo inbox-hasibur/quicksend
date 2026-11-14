@@ -131,9 +131,9 @@
 - [x] Create reusable `SegmentedControl` component with glass track and keyboard arrow navigation (`src/components/SegmentedControl.tsx`).
 - [x] Integrate `SegmentedControl` in `InternetSharingCard` (Send/Receive and pairing method) and `Dropzone` (Files/Text tabs).
 - [x] Apply `.glass-card` soft glass styling to `AppHeader` (with date display) and `ModeSelector` (accent squircle icon boxes and round arrows).
-- [x] Create mobile glass bottom navigation bar (`src/components/BottomNav.tsx`) with Home, Send, Receive, History items, safe-area padding, and Mode 1 role preselection in `ModeSelector.tsx`.
+- [x] Streamline workspace into a clean, linear 4-channel flow in `ModeSelector.tsx`: removed artificial sidebars and bottom navigation menus, providing an uncluttered Option Hub and focused workspace.
 - [x] Create reusable `FileTypeBadge` component (`src/components/FileTypeBadge.tsx`) with color-coded badges for PDF, images, docs, archives, video, audio, and text.
-- [x] Integrate desktop left navigation rail in `ModeSelector.tsx` alongside main elevated workspace card for 1-click mode switching.
+- [x] Harmonize tactile theme and corner radius scale across all components (`rounded-3xl` frames, `rounded-2xl` tiles, `rounded-xl` controls) matching reference UI.
 - [x] Upgrade typography across all components (`Dropzone`, `QRCodeDisplay`, `TransferModal`, `TransferHistoryModal`) with oversized `tabular-nums` for PINs, file sizes, and transfer rates.
 - [x] Harden WebRTC signaling backend with dual-mode store (`src/lib/signalStore.ts`): zero-dependency Redis REST mode (`UPSTASH_REDIS_REST_URL` / `KV_REST_API_URL`) and in-memory fallback with TTL pruning and capacity guard.
 - [x] Refactor `/api/signal` route handler to return clean standard HTTP status codes (`400`, `404`, `409`, `200`).

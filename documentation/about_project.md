@@ -268,7 +268,6 @@ quicksend/
     │   │   ├── FileTypeBadge.test.tsx
     │   │   └── SegmentedControl.test.tsx
     │   ├── AppHeader.tsx
-    │   ├── BottomNav.tsx
     │   ├── Dropzone.tsx
     │   ├── FileTypeBadge.tsx
     │   ├── HotspotAssistantCard.tsx

@@ -55,8 +55,8 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
   const totalSize = files.reduce((acc, f) => acc + f.size, 0);
 
   return (
-    <div className="w-full space-y-4">
-      {/* Tabs: Files vs Text with dark/indigo tactile pill */}
+    <div className="w-full space-y-3.5">
+      {/* Segmented Pill Tabs */}
       <SegmentedControl
         ariaLabel="Payload Type"
         value={activeTab}
@@ -81,10 +81,10 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
             onDragLeave={onDragLeave}
             onDrop={onDrop}
             onClick={() => fileInputRef.current?.click()}
-            className={`border-2 border-dashed rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
+            className={`border-2 border-dashed rounded-2xl p-6 sm:p-8 flex flex-col items-center justify-center text-center cursor-pointer transition-all ${
               isDragging
-                ? "border-[var(--accent)] bg-[var(--accent-soft)] scale-[0.99]"
-                : "border-[var(--border-hairline)] dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-700 bg-neutral-50/50 dark:bg-neutral-900/40"
+                ? "border-neutral-800 dark:border-white bg-neutral-100/70 dark:bg-neutral-800/60 scale-[0.99]"
+                : "border-[var(--border-hairline)] hover:border-neutral-400 dark:hover:border-neutral-600 bg-[var(--surface-subtle)]"
             }`}
           >
             <input
@@ -96,22 +96,21 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
                 if (e.target.files) handleFilesAdded(e.target.files);
               }}
             />
-            <div className="h-12 w-12 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)] mb-3">
-              <UploadCloud className="h-6 w-6" />
+            <div className="h-11 w-11 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs flex items-center justify-center text-neutral-800 dark:text-neutral-200 mb-3">
+              <UploadCloud className="h-5 w-5" />
             </div>
-            <p className="text-sm font-bold text-neutral-900 dark:text-neutral-100">
-              Drag &amp; drop files here, or{" "}
-              <span className="text-[var(--accent)] hover:underline">browse</span>
+            <p className="text-sm font-bold text-[var(--text)]">
+              Drag &amp; drop files here, or <span className="underline">browse</span>
             </p>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
-              Any file type (documents, photos, videos, archives) up to gigabytes
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              Documents, photos, videos, archives up to gigabytes
             </p>
           </div>
 
           {/* Selected File List */}
           {files.length > 0 && (
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs text-neutral-500 font-mono px-1 tabular-nums">
+              <div className="flex items-center justify-between text-xs text-[var(--text-muted)] font-mono px-1 tabular-nums">
                 <span>Selected ({files.length})</span>
                 <span>Total: {formatBytes(totalSize)}</span>
               </div>
@@ -119,14 +118,14 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
                 {files.map((file, i) => (
                   <div
                     key={`${file.name}-${i}`}
-                    className="flex items-center justify-between p-3 rounded-2xl border border-[var(--border-hairline)] dark:border-neutral-800 bg-white dark:bg-neutral-850 text-xs shadow-2xs"
+                    className="flex items-center justify-between p-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-xs shadow-2xs"
                   >
                     <div className="flex items-center gap-2.5 min-w-0 pr-2">
                       <FileTypeBadge fileName={file.name} mimeType={file.type} />
-                      <span className="truncate font-semibold text-neutral-800 dark:text-neutral-200">
+                      <span className="truncate font-semibold text-[var(--text)]">
                         {file.name}
                       </span>
-                      <span className="shrink-0 text-neutral-400 font-mono text-[11px] tabular-nums">
+                      <span className="shrink-0 text-[var(--text-muted)] font-mono text-[11px] tabular-nums">
                         ({formatBytes(file.size)})
                       </span>
                     </div>
@@ -136,10 +135,10 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
                         e.stopPropagation();
                         handleRemoveFile(i);
                       }}
-                      className="p-1 rounded-full text-neutral-400 hover:text-red-500 hover:bg-neutral-100 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+                      className="p-1 rounded-full text-neutral-400 hover:text-red-500 hover:bg-neutral-200/60 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
                       title="Remove file"
                     >
-                      <X className="h-3.5 w-3.5" />
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
@@ -148,17 +147,18 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
           )}
         </div>
       ) : (
+        /* Text / Link Input */
         <div className="space-y-2">
           <textarea
             value={text}
             onChange={handleTextChange}
-            placeholder="Paste text snippets, code, terminal logs, or links to beam instantly..."
+            placeholder="Type or paste any text, URL, code snippet, or notes here..."
             rows={5}
-            className="w-full p-4 rounded-2xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--accent)] font-mono resize-none placeholder:text-neutral-400 text-neutral-900 dark:text-neutral-100"
+            className="w-full p-4 text-xs font-mono rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white resize-none placeholder:text-[var(--text-muted)]"
           />
-          <div className="flex items-center justify-between text-xs text-neutral-400 px-1 font-mono tabular-nums">
-            <span>Instant clipboard beam</span>
-            <span>{text.length} chars</span>
+          <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)] px-1 font-mono tabular-nums">
+            <span>{text.length} characters</span>
+            <span>{text.split(/\s+/).filter(Boolean).length} words</span>
           </div>
         </div>
       )}

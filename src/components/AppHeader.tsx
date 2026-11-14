@@ -32,13 +32,13 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="z-10 w-full max-w-5xl flex items-center justify-between p-3.5 sm:p-4 glass-card mb-6 sm:mb-8">
+      <header className="z-10 w-full max-w-4xl flex items-center justify-between p-3.5 sm:p-4 glass-card mb-6">
         <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-[var(--accent)] text-white shadow-sm flex items-center justify-center shrink-0">
-            <Zap className="h-5 w-5 fill-current" />
+          <div className="h-9 w-9 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-2xs flex items-center justify-center shrink-0">
+            <Zap className="h-4 w-4 fill-current" />
           </div>
           <div>
-            <h1 className="font-extrabold text-lg sm:text-xl text-[var(--text)] tracking-tight leading-tight">
+            <h1 className="font-extrabold text-base sm:text-lg text-[var(--text)] tracking-tight leading-tight">
               QuickSend
             </h1>
             <p className="text-[11px] text-[var(--text-muted)] font-medium">
@@ -51,13 +51,13 @@ export function AppHeader() {
           <button
             type="button"
             onClick={() => setIsHistoryOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 pill bg-white dark:bg-neutral-800 border border-[var(--border-soft)] text-xs font-semibold text-[var(--text)] hover:bg-neutral-50 dark:hover:bg-neutral-750 transition-all shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text)] hover:bg-neutral-200/60 dark:hover:bg-neutral-750 transition-all cursor-pointer"
             title="Session Transfer History"
           >
             <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
             <span className="hidden sm:inline">History</span>
             {history.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-[var(--accent)] text-white text-[10px] font-bold tabular-nums">
+              <span className="px-1.5 py-0.2 rounded-full bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-[10px] font-bold tabular-nums">
                 {history.length}
               </span>
             )}

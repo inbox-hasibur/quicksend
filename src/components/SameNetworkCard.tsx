@@ -3,8 +3,6 @@
 import { useState } from "react";
 import {
   Wifi,
-  Send,
-  Download,
   CheckCircle2,
   AlertCircle,
   Eye,
@@ -13,6 +11,7 @@ import {
 import { Dropzone } from "@/components/Dropzone";
 import { TransferModal } from "@/components/TransferModal";
 import { OpticalHandshakeModal } from "@/components/OpticalHandshakeModal";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { encodeOpticalSdp } from "@/lib/opticalSdp";
@@ -88,47 +87,30 @@ export function SameNetworkCard() {
 
   return (
     <div className="space-y-6">
-      {/* Role Switcher (Segmented Pill Style) */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800">
+      {/* Role Switcher */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-[var(--border-hairline)]">
         <div>
-          <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+          <h3 className="font-bold text-base text-[var(--text)]">
             Same Network (Local Wi-Fi LAN)
           </h3>
-          <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+          <p className="text-xs text-[var(--text-muted)] mt-0.5">
             Host ICE candidates prioritized for fast router-only routing
           </p>
         </div>
 
-        <div className="inline-flex items-center p-1 rounded-full bg-neutral-100 dark:bg-neutral-800/80">
-          <button
-            type="button"
-            onClick={() => setRole("send")}
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              role === "send"
-                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-          >
-            <Send className="h-3.5 w-3.5 text-emerald-500" />
-            <span>Send</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setRole("receive")}
-            className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-              role === "receive"
-                ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-            }`}
-          >
-            <Download className="h-3.5 w-3.5 text-emerald-500" />
-            <span>Receive</span>
-          </button>
-        </div>
+        <SegmentedControl
+          ariaLabel="Transfer Role"
+          value={role}
+          onChange={(val) => setRole(val as TransferRole)}
+          options={[
+            { value: "send", label: "Send" },
+            { value: "receive", label: "Receive" },
+          ]}
+        />
       </div>
 
       {errorMsg && (
-        <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
+        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
           <span>{errorMsg}</span>
         </div>
@@ -136,8 +118,8 @@ export function SameNetworkCard() {
 
       {/* Offline Alert when No Internet is Present */}
       {!isOnline && (
-        <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 text-xs text-amber-800 dark:text-amber-300">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-xs text-[var(--text)]">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
           <div className="leading-relaxed">
             <span className="font-semibold">Offline Network Detected: </span>
             External internet is unreachable on this Wi-Fi. The camera-to-camera optical handshake below enables 100% offline peer connection over your local router subnet.
@@ -146,8 +128,8 @@ export function SameNetworkCard() {
       )}
 
       {/* Network Requirements Banner */}
-      <div className="flex items-start gap-3 p-4 rounded-2xl bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/40 text-xs text-emerald-800 dark:text-emerald-300">
-        <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+      <div className="flex items-start gap-3 p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-xs text-[var(--text)]">
+        <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-neutral-600 dark:text-neutral-400" />
         <div className="leading-relaxed">
           <span className="font-semibold">Local Router Subnet: </span>
           Both devices must be connected to the same Wi-Fi router or Ethernet LAN. Transfers stream locally without consuming internet data.
@@ -155,38 +137,38 @@ export function SameNetworkCard() {
       </div>
 
       {role === "send" ? (
-        <div className="space-y-5">
+        <div className="space-y-4">
           <Dropzone onSelectionChange={setSelectedPayload} />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <button
               type="button"
               onClick={handleStartOpticalSender}
-              className="py-3.5 px-6 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              className="py-3 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Eye className="h-4 w-4 text-emerald-400 dark:text-emerald-600" />
+              <Eye className="h-4 w-4" />
               <span>Offline Camera QR Handshake</span>
             </button>
             <button
               type="button"
               onClick={handleTransferSelected}
-              className="py-3.5 px-6 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-800 dark:text-neutral-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              className="py-3 px-5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] hover:bg-neutral-200/60 dark:hover:bg-neutral-750 font-semibold text-xs text-[var(--text)] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
             >
-              <Wifi className="h-4 w-4 text-emerald-500" />
+              <Wifi className="h-4 w-4" />
               <span>Broadcast Over Subnet</span>
             </button>
           </div>
         </div>
       ) : (
-        <div className="p-8 rounded-3xl bg-neutral-50 dark:bg-neutral-850 border border-neutral-200/70 dark:border-neutral-800 text-center space-y-4 max-w-md mx-auto">
-          <div className="h-14 w-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center mx-auto">
-            <Wifi className="h-7 w-7 animate-pulse" />
+        <div className="p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-center space-y-4 max-w-md mx-auto">
+          <div className="h-11 w-11 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs text-neutral-800 dark:text-neutral-200 flex items-center justify-center mx-auto">
+            <Wifi className="h-5 w-5 animate-pulse" />
           </div>
           <div>
-            <h4 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+            <h4 className="font-bold text-sm text-[var(--text)]">
               Ready to Ingest LAN Payload
             </h4>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+            <p className="text-xs text-[var(--text-muted)] mt-1">
               Ensure this device is connected to the same Wi-Fi as the sender.
             </p>
           </div>
@@ -194,9 +176,9 @@ export function SameNetworkCard() {
           <button
             type="button"
             onClick={handleStartOpticalReceiver}
-            className="w-full py-3.5 px-6 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-md inline-flex items-center justify-center gap-2 transition-all cursor-pointer"
+            className="w-full py-3 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs inline-flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
-            <Eye className="h-4 w-4 text-emerald-400 dark:text-emerald-600" />
+            <Eye className="h-4 w-4" />
             <span>Scan Sender&apos;s Optical QR</span>
             <ArrowRight className="h-4 w-4" />
           </button>
