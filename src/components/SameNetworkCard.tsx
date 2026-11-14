@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Smartphone,
   Laptop,
@@ -63,13 +63,27 @@ export function SameNetworkCard() {
     cleanup,
   } = useWebRTC("same-network");
 
+  const processedBeamCodeRef = useRef<string | null>(null);
+
   // When an incoming beam is directed to this device by a peer, automatically start receiver session
   useEffect(() => {
-    if (incomingBeam && !isConnected && progress.status === "idle") {
+    if (
+      incomingBeam &&
+      !isConnected &&
+      progress.status === "idle" &&
+      processedBeamCodeRef.current !== incomingBeam.roomCode
+    ) {
+      processedBeamCodeRef.current = incomingBeam.roomCode;
       clearIncomingBeam();
       startReceiver(incomingBeam.roomCode).catch(() => {});
     }
   }, [incomingBeam, isConnected, progress.status, clearIncomingBeam, startReceiver]);
+
+  const handleModalClose = () => {
+    cleanup();
+    setTargetPeer(null);
+    setErrorMsg(null);
+  };
 
   // When sender connects to target peer, automatically transmit selected payload
   useEffect(() => {
@@ -87,14 +101,16 @@ export function SameNetworkCard() {
   }, [rtcRole, isConnected, progress.status, selectedPayload, sendFiles, sendPayload]);
 
   const handleSendToPeer = async (peer: NearbyPeer) => {
-    if (selectedPayload.files.length === 0 && !selectedPayload.text.trim()) {
-      setErrorMsg(`Please select a file or enter text in the dropzone above to send to ${peer.codename || peer.name}.`);
+    setTargetPeer(peer);
+    setErrorMsg(null);
+
+    // If no payload is selected yet, user is selecting the target device first
+    const hasPayload = selectedPayload.files.length > 0 || selectedPayload.text.trim().length > 0;
+    if (!hasPayload) {
       return;
     }
 
     try {
-      setErrorMsg(null);
-      setTargetPeer(peer);
       const sessionCode = generateLanSessionCode();
       await startSender(sessionCode);
       await beamToPeer(peer.id, sessionCode);
@@ -213,20 +229,33 @@ export function SameNetworkCard() {
 
       {/* File Dropzone */}
       <div className="space-y-2">
-        <label className="text-xs font-semibold text-[var(--text)] flex items-center justify-between">
-          <span>1. Select Files or Text to Share</span>
-          {selectedPayload.files.length > 0 && (
-            <span className="text-[11px] text-[var(--text-muted)]">
-              {selectedPayload.files.length} file(s) selected — Tap a device below to send
+        <div className="flex items-center justify-between gap-2">
+          <label className="text-xs font-semibold text-[var(--text)]">
+            1. Select Files or Text to Share
+          </label>
+          {targetPeer && (
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text)] shadow-2xs">
+              <span className="text-base">{targetPeer.avatarEmoji}</span>
+              <span>Ready to send to {targetPeer.codename || targetPeer.name}</span>
             </span>
           )}
-        </label>
+        </div>
         <Dropzone
           onSelectionChange={(payload: { files: File[]; text: string }) => {
             setSelectedPayload(payload);
             setErrorMsg(null);
           }}
         />
+        {targetPeer && (selectedPayload.files.length > 0 || selectedPayload.text.trim().length > 0) && (
+          <button
+            type="button"
+            onClick={() => handleSendToPeer(targetPeer)}
+            className="w-full py-3 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
+          >
+            <span>Beam to {targetPeer.avatarEmoji} {targetPeer.codename || targetPeer.name}</span>
+            <Send className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
       {/* RADAR DISCOVERY SCREEN */}
@@ -424,7 +453,7 @@ export function SameNetworkCard() {
         progress={progress}
         onAccept={acceptIncomingTransfer}
         onReject={rejectIncomingTransfer}
-        onClose={cleanup}
+        onClose={handleModalClose}
       />
     </div>
   );

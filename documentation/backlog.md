@@ -167,4 +167,9 @@
 - [x] Fix QR code URL generation in local dev to point to production domain, preventing mobile camera scan failures ("this page couldn't load").
 - [x] Auto-connect receiver upon URL query navigation (`/?room=123456`) and fix modal dismiss handling.
 - [x] Fix React 19 `useSyncExternalStore` snapshot referential identity: ensure `getLocalDeviceProfile()` caches the snapshot reference at module level, `SERVER_DEVICE_PROFILE` is frozen, and audit `useNetworkStatus`, `useNearbyShare`, and `useTransferHistory`.
-- [x] **Sprint 5 Verification:** 115/115 unit tests passing across 19 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.
+- [x] Fix DataChannel packet overflow: reduce `DEFAULT_CHUNK_SIZE` from 64 KB to 16 KB (safe standard for SCTP data channel on mobile and desktop, resolving `DataChannel error occurred during transfer`).
+- [x] Eliminate dual transport race condition: isolate PeerJS and raw WebRTC transports with `activeTransportRef`, suppress redundant error overrides, and provide unified chunk sending with backpressure.
+- [x] Provide STUN pool for Mode 2 (Same Wi-Fi) in `iceConfig.ts` to overcome mDNS `.local` host obfuscation across mobile and desktop.
+- [x] Fix TransferModal Close button: introduce user-dismissal state so dismissed error/completed dialogs stay closed and do not re-trigger in a loop.
+- [x] Prevent auto-connect infinite loop in `InternetSharingCard.tsx`: track initial room connection with `hasAutoConnectedRef` so it executes once on mount.
+- [x] **Sprint 5 Verification:** 117/117 unit tests passing across 19 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.

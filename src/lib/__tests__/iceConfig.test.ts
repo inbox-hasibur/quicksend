@@ -56,11 +56,7 @@ describe("ICE & WebRTC Configuration", () => {
     ]);
   });
 
-  it("should return empty iceServers for Same Wi-Fi, Hotspot, and Camera modes to prioritize local host candidates", () => {
-    const sameNetConfig = getRtcConfig("same-network");
-    expect(sameNetConfig.iceServers).toEqual([]);
-    expect(sameNetConfig.iceCandidatePoolSize).toBe(0);
-
+  it("should return empty iceServers for Hotspot and Camera offline modes", () => {
     const hotspotConfig = getRtcConfig("hotspot");
     expect(hotspotConfig.iceServers).toEqual([]);
     expect(hotspotConfig.iceCandidatePoolSize).toBe(0);
@@ -70,7 +66,10 @@ describe("ICE & WebRTC Configuration", () => {
     expect(cameraConfig.iceCandidatePoolSize).toBe(0);
   });
 
-  it("should return STUN pool and candidate pool size for Internet mode", () => {
+  it("should return STUN pool for Same Wi-Fi and Internet modes for NAT & mDNS resilience", () => {
+    const sameNetConfig = getRtcConfig("same-network");
+    expect(sameNetConfig.iceServers?.length).toBeGreaterThan(0);
+
     const internetConfig = getRtcConfig("internet");
     expect(internetConfig.iceServers?.length).toBeGreaterThan(0);
     expect(internetConfig.iceCandidatePoolSize).toBe(10);

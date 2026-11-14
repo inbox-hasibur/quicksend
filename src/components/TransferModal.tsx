@@ -30,24 +30,29 @@ export function TransferModal({
   onClose,
 }: TransferModalProps) {
   const [copied, setCopied] = useState(false);
-  const [dismissedStatus, setDismissedStatus] = useState<string | null>(null);
-  const [prevStatus, setPrevStatus] = useState(progress.status);
+  const [isDismissedByUser, setIsDismissedByUser] = useState(false);
+  const [lastActiveStatus, setLastActiveStatus] = useState<string | null>(null);
 
-  if (progress.status !== prevStatus) {
-    setPrevStatus(progress.status);
-    setDismissedStatus(null);
+  // If a new transfer starts (waiting-acceptance or transferring), reset dismissal so user sees progress
+  if (
+    (progress.status === "waiting-acceptance" || progress.status === "transferring") &&
+    lastActiveStatus !== progress.status
+  ) {
+    setLastActiveStatus(progress.status);
+    setIsDismissedByUser(false);
   }
 
   const handleDismiss = () => {
-    setDismissedStatus(progress.status);
+    setIsDismissedByUser(true);
+    setLastActiveStatus(null);
     onClose();
   };
 
-  // Modal is only visible when transfer is active or completed/rejected
+  // Modal is only visible when transfer is active or completed/rejected and not dismissed
   if (
     progress.status === "idle" ||
     progress.status === "connecting" ||
-    dismissedStatus === progress.status
+    isDismissedByUser
   ) {
     return null;
   }

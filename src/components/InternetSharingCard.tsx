@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   KeyRound,
   Phone,
@@ -39,6 +39,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
   });
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const hasAutoConnectedRef = useRef(false);
 
   const {
     role: rtcRole,
@@ -123,9 +124,14 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     [inputCode, startReceiver]
   );
 
-  // Auto-connect receiver if initialRoomCode was passed in URL query param (?room=123456)
+  // Auto-connect receiver ONCE if initialRoomCode was passed in URL query param (?room=123456)
   useEffect(() => {
-    if (initialRoomCode && isValidRoomCode(normalizeRoomCode(initialRoomCode))) {
+    if (
+      initialRoomCode &&
+      isValidRoomCode(normalizeRoomCode(initialRoomCode)) &&
+      !hasAutoConnectedRef.current
+    ) {
+      hasAutoConnectedRef.current = true;
       const clean = normalizeRoomCode(initialRoomCode);
       const timer = setTimeout(() => {
         handleStartReceiver(clean);
@@ -140,6 +146,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
   };
 
   const handleReset = () => {
+    hasAutoConnectedRef.current = true;
     cleanup();
     setErrorMsg(null);
   };

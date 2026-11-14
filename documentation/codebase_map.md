@@ -67,6 +67,7 @@ flowchart TD
     subgraph Src_Hooks["src/hooks/ (Custom React Hooks)"]
         UseNet["useNetworkStatus.ts (useNetworkStatus, useBrowserCapabilities)"]
         UseRTC["useWebRTC.ts (useWebRTC: Peer Connection & Stream Controller)"]
+        UseLocalDisc["useLocalDiscovery.ts (Radar Presence & Peering)"]
         UseNearby["useNearbyShare.ts (useNearbyShare: Web Share & Web-BLE Client)"]
         UseHist["useTransferHistory.ts (useTransferHistory: Ephemeral Session Storage)"]
         UseThm["useTheme.ts (useTheme: Light / Dark Mode Controller)"]
@@ -76,6 +77,8 @@ flowchart TD
         ModeAvail["modeAvailability.ts (isModeAvailable, getModeStatus, getAllModesStatus)"]
         CodeGen["codeGenerator.ts (generateRoomCode, formatRoomCode, normalizeRoomCode)"]
         Chunker["chunker.ts (sliceBlobIntoChunks, reassembly, formatBytes, formatSpeed)"]
+        DevId["deviceIdentity.ts (Device Avatars & Non-Colliding Identity)"]
+        OptStream["opticalDataStream.ts (Visual Base64 Chunker & Optical Collector)"]
         SigClient["signalingClient.ts (SignalingClient: Room & Signal Polling Engine)"]
         SignalStore["signalStore.ts (Dual-Mode: Upstash Redis REST + Memory TTL)"]
         IceConfig["iceConfig.ts (Multi-Provider STUN Pool + TURN Config)"]
@@ -100,8 +103,13 @@ flowchart TD
     ModeSel --> ModeAvail
     ModeSel --> InternetCard
     ModeSel --> SameNetCard
+    ModeSel --> CameraCard
     ModeSel --> HotspotCard
-    ModeSel --> BtmNav
+    ModeSel --> NearbyCard
+
+    SameNetCard --> UseLocalDisc
+    SameNetCard --> DevId
+    CameraCard --> OptStream
 
     InternetCard --> UseRTC
     InternetCard --> DropzoneComp

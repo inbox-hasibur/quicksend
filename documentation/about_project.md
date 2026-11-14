@@ -38,21 +38,27 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 ---
 
 ### Mode 1: Share via Internet (Dual WebRTC Transport + PIN / Mobile / QR)
-- **Primary Use Case:** Remote or cross-network P2P transfer between any devices globally.
+- **Primary Use Case:** Remote or cross-network P2P transfer between any devices globally when on different networks.
 - **Dual Connection Transport:**
   1. **Primary Broker:** Real-time PeerJS cloud signaling (`0.peerjs.com`) over WebSockets with zero serverless cold starts.
-  2. **Secondary Fallback:** `/api/signal` REST polling with Upstash Redis or ephemeral store.
+  2. **Secondary Fallback:** `/api/signal` REST polling with Upstash Redis or ephemeral memory store.
   3. **STUN Pool & Seamless ICE:** Expanded Google + Cloudflare STUN pool without aggressive premature timeouts.
   4. **Dynamic QR Code & Auto-Connect:** QR encodes full URL with `?room=...` query param that auto-selects Internet mode and auto-joins session seamlessly.
+  5. **Flexible Pairing Keys:** 6-digit numeric PIN, mobile phone number, or custom keyword/secret.
+  6. **Sequential Multi-File Batch Queue:** Seamlessly beams multiple files sequentially over an open `RTCDataChannel` without dropping connection.
+  7. **SHA-256 Bit-Perfect Integrity:** Computes and verifies SHA-256 checksums on payloads with `"Verified ✓"` visual confirmation.
+  8. **Large-File Disk Streaming:** File System Access API (`showSaveFilePicker`) for files > 100MB to stream chunks directly to disk.
 
 ---
 
 ### Mode 2: Same Wi-Fi (Interactive Animated Radar & Auto-Discovery)
 - **Primary Use Case:** Direct LAN transfer between phones, laptops, and PCs sharing the same Wi-Fi router.
 - **Interactive Radar UI & Animal Avatars:**
-  - Distinct colorful creature avatars (🦊 Curious Fox, 🐬 Swift Dolphin, 🦁 Golden Lion, etc.) and OS badges for instant recognition even when mobile user-agents mask phone models.
+  - Distinct colorful creature avatars (🦊 Curious Fox, 🐬 Swift Dolphin, 🦁 Golden Lion, etc.) and OS badges for instant recognition even when mobile user-agents mask phone models. Non-colliding dynamic avatar reassignment.
   - Interactive radar plate with 360-degree sweep and pulsing concentric waves.
-  - 1-Tap Direct Beaming: Select files and tap any discovered peer on the radar; direct beam signaling automatically coordinates session without manual room PIN entry.
+  - 1-Tap Direct Beaming: Select files and tap any discovered peer on the radar (or tap peer first and drop payload); direct beam signaling automatically coordinates session without manual room PIN entry.
+  - Subnet grouping for all loopback and RFC 1918 private LAN IPs under `'local-lan'` for instant local dev & cross-device testing.
+  - Normalizing IPv6 addresses to `/64` prefix so devices sharing a Wi-Fi router discover each other despite SLAAC privacy changes.
   - Collapsible manual fallback for 6-digit PIN and camera optical handshake (for guest Wi-Fi client isolation).
 
 ---
@@ -62,40 +68,6 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 - **Visual Streaming Engine:**
   - **Sender:** Compresses files with Deflate, slices into compact base64 chunks (`QS1|...`), and cycles an animated high-contrast QR stream with speed controls (Slow 500ms, Normal 320ms, Fast 220ms) and frame scrubbers.
   - **Receiver:** Points camera viewfinder at sender's screen; reactive `OpticalDataCollector` captures frames in any order, tracks visual progress blocks, reassembles original Blob/file upon 100% completion, verifies data, and triggers download.
-
----
-
-### Mode 1: Share via Internet (WebRTC P2P via PIN, Mobile Number, Keyword, or QR)
-- **Primary Use Case:** When both the lab PC and mobile device have general internet access, but cannot discover each other on a local subnet due to campus AP client isolation.
-- **Workflow & Key Strategy Options:**
-  1. **Flexible Pairing Key:** Users can pair via multiple memorable methods (4–20 alphanumeric chars supported across both devices):
-     - **Auto PIN:** Fast 6-digit auto-generated numeric PIN (e.g. `834-291`).
-     - **Mobile Number:** Enter your own memorized phone number (e.g. `01712345678`) so you don't need to memorize a new PIN.
-     - **Custom Keyword / Secret:** Type a familiar unique keyword or code phrase (e.g. `HR998877`).
-     - **QR Code:** Instant one-click camera scanning bypassing all manual typing.
-  2. **Role Selection:** User chooses **Send** (upload files/paste text, select pairing strategy, generate room code/QR) or **Receive** (enter PIN, phone number, keyword, or scan QR with camera).
-- **Protocol:** WebRTC Data Channel (`RTCDataChannel`) with lightweight serverless signaling.
-- **Handshake Mechanism:**
-  - Signaling coordinates SDP offer, answer, and ICE candidates via a multi-provider public STUN pool (Google + Cloudflare) with optional TURN server relay (`NEXT_PUBLIC_TURN_URL`).
-  - Dual-mode serverless signaling store (`signalStore.ts`):
-    - **Redis REST Mode:** Automatically activates with `UPSTASH_REDIS_REST_URL/TOKEN` or `KV_REST_API_URL/TOKEN` using zero npm dependencies via native `fetch`, enforcing 15-minute TTL expiration.
-    - **In-Memory TTL Fallback:** Zero-config single-node fallback with stale room pruning and max capacity guard.
-  - Automatic 10-second ICE timeout watchdog detecting symmetric NAT / corporate firewall blockage and suggesting Mode 2 (Same Wi-Fi) or Mode 3 (Hotspot) fallbacks.
-  - Once peers connect via DTLS/SCTP, the signaling channel is released.
-  - **Sequential Multi-File Batch Queue:** Seamlessly beams multiple files sequentially over an open `RTCDataChannel` without dropping connection, tracking both item and batch progress.
-  - **SHA-256 Bit-Perfect Integrity:** Computes and verifies SHA-256 checksums on payloads using the browser's Web Crypto API with `"Verified ✓"` visual confirmation.
-  - **Large-File Disk Streaming Fallback:** Automatically leverages the File System Access API (`showSaveFilePicker`) for files > 100MB to stream chunks directly to disk, preventing RAM overflow while falling back safely to in-memory Blob assembly on Safari/Firefox.
-  - Files and text are streamed directly peer-to-peer with end-to-end encryption.
-
----
-
-### Mode 2: Share via Same Network (Wi-Fi LAN)
-- **Primary Use Case:** High-speed, high-bandwidth local transfers (e.g., video recordings, large datasets) when both devices share the same local Wi-Fi or wired network.
-- **Protocol:** Local WebRTC prioritizing internal network interfaces.
-- **Handshake Mechanism:**
-  - Signaling prioritizes `host` ICE candidates (RFC 1918 private IPv4 addresses: `192.168.x.x`, `10.x.x.x`, `172.16.x.x` or link-local IPv6).
-  - Keeps data traffic strictly within the local switch/router, bypassing external WAN bandwidth caps and campus firewall throttling.
-  - **No-Internet LAN Fallback:** If the local Wi-Fi router does not have WAN/internet access to reach the public signaling relay, the UI seamlessly falls back to the **Camera-to-Camera Optical QR Handshake** (Mode 3 engine) to exchange SDP offers/answers offline across the room while streaming data over the local LAN. Features an automated offline network banner and animated QR carousel.
 
 ---
 
@@ -132,12 +104,13 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 ## 3. Zero-Login UX Flow
 
 ### Home Screen Hub (Compact Option Tiles & Focused Next-Step Workspace)
-Instead of overwhelming users with multi-column pricing-style cards, the interface features a clean, mobile-first design with 4 compact option tiles (`rounded-3xl` with soft squircle icons, subtle shadows, and arrow indicators). Tapping any tile cleanly transitions into that mode's dedicated workspace with a top "← All Modes" back navigation pill:
+Instead of overwhelming users with multi-column pricing-style cards, the interface features a clean, mobile-first design with 5 compact option tiles (`rounded-3xl` with soft squircle icons, subtle shadows, and arrow indicators). Tapping any tile cleanly transitions into that mode's dedicated workspace with a top "← All Channels" back navigation pill:
 
 ```
 [ QuickSend Home Hub ]
    ├── [ Mode 1: Internet ] ────> Opens Dedicated Workspace ────> [ Send | Receive ]
-   ├── [ Mode 2: Same Wi-Fi ] ───> Opens Dedicated Workspace ────> [ LAN Send | Optical Receive ]
+   ├── [ Mode 2: Same Wi-Fi ] ───> Opens Dedicated Workspace ────> [ Radar Discovery & Beaming ]
+   ├── [ Mode 5: Via Camera ] ───> Opens Dedicated Workspace ────> [ Animated QR Stream ]
    ├── [ Mode 3: Hotspot ] ──────> Opens Dedicated Workspace ────> [ Host AP | Join AP ]
    └── [ Mode 4: Bluetooth ] ────> Opens Dedicated Workspace ────> [ Native Share | BLE ]
 ```
@@ -181,32 +154,24 @@ Instead of overwhelming users with multi-column pricing-style cards, the interfa
 
 ---
 
-## 4. Offline PWA Caching & Graceful Degradation
+## 4. Offline Detection & Graceful Degradation Matrix
 
-### Service Worker Caching Architecture
-- **Application Shell:** HTML, CSS, JavaScript bundles, static SVG assets, and font files are pre-cached upon initial load.
-- **Tooling Libraries:** Client-side QR generator (`qrcode.react`), camera QR scanner (`html5-qrcode`), and crypto hashing utilities function completely offline.
-- **Manifest:** Configured via `src/app/manifest.ts` allowing users to install "QuickSend" to their desktop or home screen for instant offline access.
-
-### Dynamic Network State Detection
-The application actively monitors network state via:
-- `navigator.onLine`
-- `window.addEventListener('online', ...)`
-- `window.addEventListener('offline', ...)`
+The application continuously monitors network connectivity using `navigator.onLine` and `window.addEventListener('online' | 'offline')`:
 
 ```
 +-------------------------------------------------------------+
-|                     Online Status Detection                 |
+|               Online / Offline State Machine                |
 +-------------------------------------------------------------+
                │                                │
         (State: Online)                  (State: Offline)
                │                                │
                ▼                                ▼
   +--------------------------+    +--------------------------+
-  |  All 4 Modes Available   |    | Internet Mode Disabled   |
+  |  All 5 Modes Available   |    | Internet Mode Disabled   |
   |  - Internet (WebRTC)     |    | (Greyed out with badge)  |
   |  - Same Wi-Fi (LAN)      |    |                          |
-  |  - Wi-Fi Hotspot         |    | Offline Modes Highlighted|
+  |  - Via Camera (Optical)  |    | Offline Modes Highlighted|
+  |  - Wi-Fi Hotspot         |    | - Via Camera (Air-Gapped)|
   |  - Bluetooth / WebShare  |    | - Wi-Fi Hotspot Guide    |
   +--------------------------+    | - Same Wi-Fi (Offline QR)|
                                   | - Bluetooth / WebShare   |
@@ -215,7 +180,7 @@ The application actively monitors network state via:
 
 When an offline condition is detected:
 - **Mode 1 (Internet):** Visually disabled (greyed out) with an informative badge: *"Requires Internet Access"*.
-- **Modes 2, 3 & 4:** Prominently elevated to primary actions with offline guides.
+- **Modes 2, 3, 4 & 5:** Prominently elevated to primary actions with offline guides.
 
 ---
 
@@ -234,8 +199,9 @@ Web standards enforce security sandboxes that prevent web applications from beha
 ### 3. WebRTC NAT Traversal (STUN vs. TURN)
 - **Limitation:** In strict corporate or university environments with Symmetric NATs or UDP port blocking, direct peer-to-peer WebRTC connections between different networks may fail without a relay server.
 - **Solution & Fallback:**
-  - Initial handshake attempts direct P2P via Google's public STUN servers.
-  - If ICE gathering fails or candidate pairs cannot reach `connected` state within a fallback timeout window (10 seconds), the UI alerts the user and suggests switching to **Same Wi-Fi** or **Hotspot Mode**.
+  - Initial handshake attempts direct P2P via Google and Cloudflare public STUN servers and PeerJS WebSocket broker.
+  - Safe 16 KB SCTP chunking prevents message buffer overflows.
+  - If ICE fails or candidate pairs cannot reach `connected` state, the UI alerts the user and suggests switching to **Same Wi-Fi**, **Via Camera**, or **Hotspot Mode**.
 
 ---
 
@@ -271,6 +237,10 @@ quicksend/
 └── src/
     ├── app/
     │   ├── api/
+    │   │   ├── discover/
+    │   │   │   ├── __tests__/
+    │   │   │   │   └── route.test.ts
+    │   │   │   └── route.ts
     │   │   ├── health/
     │   │   │   ├── __tests__/
     │   │   │   │   └── route.test.ts
@@ -285,11 +255,11 @@ quicksend/
     │   ├── manifest.ts
     │   └── page.tsx
     ├── components/
-    │   ├── .gitkeep
     │   ├── __tests__/
     │   │   ├── FileTypeBadge.test.tsx
     │   │   └── SegmentedControl.test.tsx
     │   ├── AppHeader.tsx
+    │   ├── CameraStreamCard.tsx
     │   ├── Dropzone.tsx
     │   ├── FileTypeBadge.tsx
     │   ├── HotspotAssistantCard.tsx
@@ -307,10 +277,11 @@ quicksend/
     │   ├── TransferHistoryModal.tsx
     │   └── TransferModal.tsx
     ├── hooks/
-    │   ├── .gitkeep
     │   ├── __tests__/
+    │   │   ├── useLocalDiscovery.test.tsx
     │   │   ├── useTheme.test.tsx
     │   │   └── useTransferHistory.test.ts
+    │   ├── useLocalDiscovery.ts
     │   ├── useNearbyShare.ts
     │   ├── useNetworkStatus.ts
     │   ├── useTheme.ts
@@ -320,25 +291,27 @@ quicksend/
     │   ├── __tests__/
     │   │   ├── chunker.test.ts
     │   │   ├── codeGenerator.test.ts
+    │   │   ├── deviceIdentity.test.ts
     │   │   ├── diskStream.test.ts
     │   │   ├── iceConfig.test.ts
     │   │   ├── modeAvailability.test.ts
     │   │   ├── nearbyShare.test.ts
+    │   │   ├── opticalDataStream.test.ts
     │   │   ├── opticalSdp.test.ts
     │   │   ├── signalStore.test.ts
     │   │   └── wifiQr.test.ts
-    │   ├── .gitkeep
     │   ├── chunker.ts
     │   ├── codeGenerator.ts
+    │   ├── deviceIdentity.ts
     │   ├── diskStream.ts
     │   ├── iceConfig.ts
     │   ├── modeAvailability.ts
+    │   ├── opticalDataStream.ts
     │   ├── opticalSdp.ts
     │   ├── signalStore.ts
     │   ├── signalingClient.ts
     │   └── wifiQr.ts
     └── types/
-        ├── .gitkeep
         ├── mode.ts
         ├── signaling.ts
         └── transfer.ts

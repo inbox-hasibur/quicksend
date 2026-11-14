@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { GET, POST } from "../route";
+import { GET, POST, computeNetworkId, normalizeIpv6Prefix, isLocalOrPrivateIp } from "../route";
 
 describe("Discovery API Route (/api/discover)", () => {
-  it("should return networkId and empty peer list on initial GET", async () => {
+  it("should return local-lan networkId for private LAN and loopback IPs", async () => {
     const req = new Request("http://localhost/api/discover", {
       headers: { "x-forwarded-for": "192.168.1.105" },
     });
@@ -11,8 +11,35 @@ describe("Discovery API Route (/api/discover)", () => {
 
     const json = await res.json();
     expect(json.success).toBe(true);
-    expect(json.networkId).toMatch(/^lan_/);
+    expect(json.networkId).toBe("local-lan");
     expect(Array.isArray(json.peers)).toBe(true);
+  });
+
+  it("should classify loopback and private subnets under local-lan", () => {
+    expect(isLocalOrPrivateIp("127.0.0.1")).toBe(true);
+    expect(isLocalOrPrivateIp("::1")).toBe(true);
+    expect(isLocalOrPrivateIp("192.168.0.1")).toBe(true);
+    expect(isLocalOrPrivateIp("10.0.0.5")).toBe(true);
+    expect(isLocalOrPrivateIp("172.16.5.10")).toBe(true);
+    expect(isLocalOrPrivateIp("172.31.255.1")).toBe(true);
+    expect(isLocalOrPrivateIp("fe80::1")).toBe(true);
+    expect(isLocalOrPrivateIp("203.0.113.4")).toBe(false);
+
+    expect(computeNetworkId("127.0.0.1")).toBe("local-lan");
+    expect(computeNetworkId("::1")).toBe("local-lan");
+    expect(computeNetworkId("192.168.1.5")).toBe("local-lan");
+    expect(computeNetworkId("10.1.2.3")).toBe("local-lan");
+    expect(computeNetworkId("172.20.0.1")).toBe("local-lan");
+  });
+
+  it("should normalize IPv6 /64 prefix so SLAAC devices group together", () => {
+    const ip1 = "2001:db8:85a3:0042:1000:8a2e:0370:7334";
+    const ip2 = "2001:db8:85a3:0042:2000:8a2e:0370:9999";
+    const prefix1 = normalizeIpv6Prefix(ip1);
+    const prefix2 = normalizeIpv6Prefix(ip2);
+
+    expect(prefix1).toBe(prefix2);
+    expect(computeNetworkId(ip1)).toBe(computeNetworkId(ip2));
   });
 
   it("should register peer announcement and return other active peers on the same network", async () => {

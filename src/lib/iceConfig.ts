@@ -45,11 +45,13 @@ export function getTurnServers(): RTCIceServer[] {
 
 /**
  * Returns optimized RTCConfiguration based on the active transfer mode.
- * - Same Wi-Fi / Hotspot: Local internal host candidate priority (empty iceServers prevents external DNS stalls).
+ * - Same Wi-Fi: Includes public STUN pool so reflexive srflx candidates resolve across mobile/desktop
+ *   even if mDNS obfuscation or AP isolation interferes, while host candidates are still evaluated with highest priority.
+ * - Offline Camera / Offline Hotspot: Empty iceServers to prevent external DNS stalls in air-gapped setups.
  * - Internet: Full multi-provider STUN pool + optional TURN relay.
  */
 export function getRtcConfig(mode: TransferMode = "internet"): RTCConfiguration {
-  if (mode === "same-network" || mode === "hotspot" || mode === "camera") {
+  if (mode === "camera" || mode === "hotspot") {
     return {
       iceServers: [],
       iceCandidatePoolSize: 0,

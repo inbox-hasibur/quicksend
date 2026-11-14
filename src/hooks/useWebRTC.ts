@@ -31,7 +31,7 @@ import type {
   TransferPayloadHeader,
 } from "@/types/transfer";
 
-const BUFFER_THRESHOLD = 1024 * 1024; // 1 MB backpressure threshold
+const BUFFER_THRESHOLD = 512 * 1024; // 512 KB backpressure threshold for smooth streaming
 
 interface PeerJsConnection {
   open?: boolean;
@@ -46,6 +46,8 @@ interface PeerJsInstance {
   connect: (id: string, options?: unknown) => PeerJsConnection;
   destroy: () => void;
 }
+
+type ActiveTransport = "peerjs" | "webrtc" | null;
 
 async function loadPeerConstructor() {
   try {
@@ -77,6 +79,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     speedBps: 0,
   });
 
+  const activeTransportRef = useRef<ActiveTransport>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const signalingRef = useRef<SignalingClient>(new SignalingClient());
@@ -89,8 +92,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   // Batch queue & disk streaming refs
   const diskWriterRef = useRef<DiskStreamWriter | null>(null);
-  const peerInstanceRef = useRef<unknown>(null);
-  const dataConnRef = useRef<unknown>(null);
+  const peerInstanceRef = useRef<PeerJsInstance | null>(null);
+  const dataConnRef = useRef<PeerJsConnection | null>(null);
   const hasReceiverAcceptedBatchRef = useRef<string | null>(null);
   const hasAcceptedRef = useRef<boolean>(false);
   const acceptedResolverRef = useRef<(() => void) | null>(null);
@@ -110,9 +113,48 @@ export function useWebRTC(mode: TransferMode = "internet") {
     // "ami back na dile timeout hoyar dorkar nei in sob case"
   }, [clearIceTimeout]);
 
+  // Unified Data Sender across active transport
+  const sendRawData = useCallback((data: string | ArrayBuffer) => {
+    if (activeTransportRef.current === "peerjs" && dataConnRef.current) {
+      try {
+        dataConnRef.current.send(data);
+        return;
+      } catch {
+        // Fallback to DataChannel if PeerJS send threw
+      }
+    }
+    if (dcRef.current && dcRef.current.readyState === "open") {
+      try {
+        dcRef.current.send(data as any); // eslint-disable-line @typescript-eslint/no-explicit-any
+        return;
+      } catch {
+        // Channel may be closing
+      }
+    }
+    if (dataConnRef.current) {
+      try {
+        dataConnRef.current.send(data);
+      } catch {
+        // Channel closed
+      }
+    }
+  }, []);
+
+  // Backpressure buffer monitor
+  const getBufferedAmount = useCallback((): number => {
+    if (dcRef.current) {
+      return dcRef.current.bufferedAmount;
+    }
+    if (dataConnRef.current && dataConnRef.current.dataChannel) {
+      return dataConnRef.current.dataChannel.bufferedAmount;
+    }
+    return 0;
+  }, []);
+
   // Cleanup helper
   const cleanup = useCallback(() => {
     clearIceTimeout();
+    activeTransportRef.current = null;
     isConnectedRef.current = false;
     hasAcceptedRef.current = false;
     hasReceiverAcceptedBatchRef.current = null;
@@ -126,7 +168,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
     if (dataConnRef.current) {
       try {
-        (dataConnRef.current as { close: () => void }).close();
+        dataConnRef.current.close();
       } catch {
         // Ignore
       }
@@ -134,7 +176,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     }
     if (peerInstanceRef.current) {
       try {
-        (peerInstanceRef.current as { destroy: () => void }).destroy();
+        peerInstanceRef.current.destroy();
       } catch {
         // Ignore
       }
@@ -143,11 +185,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
     signalingRef.current.leaveRoom();
     if (dcRef.current) {
-      dcRef.current.close();
+      try {
+        dcRef.current.close();
+      } catch {
+        // Ignore
+      }
       dcRef.current = null;
     }
     if (pcRef.current) {
-      pcRef.current.close();
+      try {
+        pcRef.current.close();
+      } catch {
+        // Ignore
+      }
       pcRef.current = null;
     }
     receivedChunksRef.current = [];
@@ -175,7 +225,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     };
   }, [cleanup]);
 
-  // Receiver handling incoming chunks & headers
+  // Receiver handling incoming chunks & control messages
   const handleIncomingData = useCallback(async (data: unknown) => {
     if (typeof data === "string") {
       try {
@@ -236,30 +286,59 @@ export function useWebRTC(mode: TransferMode = "internet") {
               isVerified: false,
             });
           }
+        } else if (msg.type === "transfer-accepted") {
+          hasAcceptedRef.current = true;
+          if (acceptedResolverRef.current) {
+            acceptedResolverRef.current();
+            acceptedResolverRef.current = null;
+          }
+        } else if (msg.type === "transfer-rejected") {
+          hasAcceptedRef.current = false;
+          if (acceptedResolverRef.current) {
+            acceptedResolverRef.current = null;
+          }
+          setProgress((prev) => ({
+            ...prev,
+            status: "rejected",
+            errorMessage: "Receiver declined the incoming transfer.",
+          }));
         }
       } catch {
         // Non-json string, ignore
       }
-    } else if (data instanceof ArrayBuffer) {
+      return;
+    }
+
+    // Binary chunk handling: normalize ArrayBuffer, Uint8Array, or Blob
+    let buffer: ArrayBuffer | null = null;
+    if (data instanceof ArrayBuffer) {
+      buffer = data;
+    } else if (ArrayBuffer.isView(data)) {
+      buffer = (data.buffer as ArrayBuffer).slice(data.byteOffset, data.byteOffset + data.byteLength);
+    } else if (typeof Blob !== "undefined" && data instanceof Blob) {
+      buffer = await data.arrayBuffer();
+    }
+
+    if (buffer) {
       const header = currentHeaderRef.current;
       if (!header) return;
 
       receivedChunkCountRef.current++;
 
       if (diskWriterRef.current) {
-        await diskWriterRef.current.writeChunk(data);
+        await diskWriterRef.current.writeChunk(buffer);
       } else {
-        receivedChunksRef.current.push(data);
+        receivedChunksRef.current.push(buffer);
       }
 
       const totalBytes =
         header.type === "file" ? header.file?.size || 0 : header.text?.length || 0;
 
       const currentBytes = diskWriterRef.current
-        ? Math.min(totalBytes, receivedChunkCountRef.current * DEFAULT_CHUNK_SIZE)
+        ? Math.min(totalBytes, receivedChunkCountRef.current * (header.chunkSize || DEFAULT_CHUNK_SIZE))
         : receivedChunksRef.current.reduce((acc, chunk) => acc + chunk.byteLength, 0);
 
-      const progressPercent = Math.min(100, Math.round((currentBytes / totalBytes) * 100));
+      const progressPercent = Math.min(100, Math.round((currentBytes / (totalBytes || 1)) * 100));
       const elapsedSec = (Date.now() - startTimeRef.current) / 1000 || 0.1;
       const speed = Math.round(currentBytes / elapsedSec);
 
@@ -346,25 +425,28 @@ export function useWebRTC(mode: TransferMode = "internet") {
     }
   }, [mode]);
 
-  // Setup DataChannel listeners
+  // Setup DataChannel listeners for direct WebRTC
   const setupDataChannel = useCallback(
-    (dc: RTCDataChannel, currentRole: PeerRole) => {
+    (dc: RTCDataChannel) => {
       dc.binaryType = "arraybuffer";
 
       dc.onopen = () => {
         clearIceTimeout();
+        activeTransportRef.current = "webrtc";
         isConnectedRef.current = true;
         setIsConnected(true);
       };
 
       dc.onclose = () => {
-        isConnectedRef.current = false;
-        setIsConnected(false);
+        if (activeTransportRef.current === "webrtc") {
+          isConnectedRef.current = false;
+          setIsConnected(false);
+        }
       };
 
       dc.onerror = () => {
         setProgress((prev) => {
-          if (prev.status === "completed") return prev;
+          if (prev.status === "completed" || prev.status === "idle") return prev;
           return {
             ...prev,
             status: "error",
@@ -373,37 +455,22 @@ export function useWebRTC(mode: TransferMode = "internet") {
         });
       };
 
-      if (currentRole === "receiver") {
-        dc.onmessage = (event) => {
-          handleIncomingData(event.data);
-        };
-      } else {
-        dc.onmessage = (event) => {
-          if (typeof event.data === "string") {
-            try {
-              const msg = JSON.parse(event.data);
-              if (msg.type === "transfer-accepted") {
-                hasAcceptedRef.current = true;
-                if (acceptedResolverRef.current) {
-                  acceptedResolverRef.current();
-                  acceptedResolverRef.current = null;
-                }
-              }
-            } catch {
-              // Ignore non-json
-            }
-          }
-        };
-      }
+      dc.onmessage = (event) => {
+        handleIncomingData(event.data);
+      };
     },
-    [handleIncomingData, clearIceTimeout]
+    [clearIceTimeout, handleIncomingData]
   );
 
   // Setup Peer Connection
   const createPeerConnection = useCallback(
     (currentRole: PeerRole) => {
       if (pcRef.current) {
-        pcRef.current.close();
+        try {
+          pcRef.current.close();
+        } catch {
+          // Ignore
+        }
       }
 
       const config = getRtcConfig(mode);
@@ -419,12 +486,17 @@ export function useWebRTC(mode: TransferMode = "internet") {
       };
 
       pc.oniceconnectionstatechange = () => {
+        // If PeerJS is already active, ignore raw WebRTC ICE failures
+        if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
+          return;
+        }
+
         if (pc.iceConnectionState === "failed") {
           clearIceTimeout();
           isConnectedRef.current = false;
           setIsConnected(false);
           setProgress((prev) => {
-            if (prev.status === "completed") return prev;
+            if (prev.status === "completed" || prev.status === "idle") return prev;
             return {
               ...prev,
               status: "error",
@@ -437,6 +509,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === "connected") {
           clearIceTimeout();
+          activeTransportRef.current = "webrtc";
           isConnectedRef.current = true;
           setIsConnected(true);
         } else if (
@@ -444,12 +517,17 @@ export function useWebRTC(mode: TransferMode = "internet") {
           pc.connectionState === "disconnected" ||
           pc.connectionState === "closed"
         ) {
+          // If PeerJS is active, ignore raw WebRTC disconnect
+          if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
+            return;
+          }
+
           isConnectedRef.current = false;
           setIsConnected(false);
           if (pc.connectionState === "failed") {
             clearIceTimeout();
             setProgress((prev) => {
-              if (prev.status === "completed") return prev;
+              if (prev.status === "completed" || prev.status === "idle") return prev;
               return {
                 ...prev,
                 status: "error",
@@ -464,7 +542,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
         pc.ondatachannel = (event) => {
           const dc = event.channel;
           dcRef.current = dc;
-          setupDataChannel(dc, "receiver");
+          activeTransportRef.current = "webrtc";
+          setupDataChannel(dc);
         };
       }
 
@@ -483,7 +562,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
           if (currentRole === "sender" && pc) {
             const dc = pc.createDataChannel("share-channel", { ordered: true });
             dcRef.current = dc;
-            setupDataChannel(dc, "sender");
+            setupDataChannel(dc);
 
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
@@ -600,14 +679,25 @@ export function useWebRTC(mode: TransferMode = "internet") {
             peer.on("connection", (rawConn: unknown) => {
               const conn = rawConn as PeerJsConnection;
               dataConnRef.current = conn;
+
               const handleOpen = () => {
                 clearIceTimeout();
+                activeTransportRef.current = "peerjs";
                 if (conn.dataChannel) {
                   dcRef.current = conn.dataChannel;
-                  setupDataChannel(conn.dataChannel, "sender");
                 }
                 isConnectedRef.current = true;
                 setIsConnected(true);
+
+                // Tear down competing raw RTCPeerConnection to avoid false timeout
+                if (pcRef.current) {
+                  try {
+                    pcRef.current.close();
+                  } catch {
+                    // Ignore
+                  }
+                  pcRef.current = null;
+                }
               };
 
               if (conn.open) {
@@ -621,8 +711,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
               });
 
               conn.on("close", () => {
-                isConnectedRef.current = false;
-                setIsConnected(false);
+                if (activeTransportRef.current === "peerjs") {
+                  isConnectedRef.current = false;
+                  setIsConnected(false);
+                }
+              });
+
+              conn.on("error", (err: unknown) => {
+                console.debug("PeerJS conn error:", err);
               });
             });
 
@@ -646,7 +742,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       return { roomId: newRoomId, code: generatedCode };
     },
-    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, setupDataChannel, startIceTimeout, clearIceTimeout, mode]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, mode]
   );
 
   // Receiver joins a session with dual PeerJS cloud broker + signaling fallback
@@ -684,17 +780,27 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
             peer.on("open", () => {
               const targetId = `qs-${cleanCode.toLowerCase()}`;
-              const conn = peer.connect(targetId, { reliable: true });
+              const conn = peer.connect(targetId, { reliable: true, serialization: "raw" });
               dataConnRef.current = conn;
 
               const handleOpen = () => {
                 clearIceTimeout();
+                activeTransportRef.current = "peerjs";
                 if (conn.dataChannel) {
                   dcRef.current = conn.dataChannel;
-                  setupDataChannel(conn.dataChannel, "receiver");
                 }
                 isConnectedRef.current = true;
                 setIsConnected(true);
+
+                // Tear down competing raw RTCPeerConnection to avoid false timeout
+                if (pcRef.current) {
+                  try {
+                    pcRef.current.close();
+                  } catch {
+                    // Ignore
+                  }
+                  pcRef.current = null;
+                }
               };
 
               if (conn.open) {
@@ -708,8 +814,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
               });
 
               conn.on("close", () => {
-                isConnectedRef.current = false;
-                setIsConnected(false);
+                if (activeTransportRef.current === "peerjs") {
+                  isConnectedRef.current = false;
+                  setIsConnected(false);
+                }
+              });
+
+              conn.on("error", (err: unknown) => {
+                console.debug("PeerJS receiver conn error:", err);
               });
             });
 
@@ -731,23 +843,11 @@ export function useWebRTC(mode: TransferMode = "internet") {
         })
         .catch(() => {});
     },
-    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, setupDataChannel, startIceTimeout, clearIceTimeout, mode]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, mode]
   );
 
   // Sequential Multi-File Batch Queue Sender
   const sendFiles = useCallback(async (files: File[]) => {
-    let dc = dcRef.current;
-    if (!dc || dc.readyState !== "open") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (dataConnRef.current && (dataConnRef.current as any).dataChannel) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        dc = (dataConnRef.current as any).dataChannel;
-        dcRef.current = dc;
-      }
-    }
-    if (!dc || dc.readyState !== "open") {
-      throw new Error("WebRTC DataChannel is not open for transfer");
-    }
     if (files.length === 0) return;
 
     const totalBatchBytes = files.reduce((acc, f) => acc + f.size, 0);
@@ -790,7 +890,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       });
 
       // 1. Send header JSON
-      dc.send(JSON.stringify({ type: "header", header }));
+      sendRawData(JSON.stringify({ type: "header", header }));
 
       // 2. Wait for receiver acceptance on the first file
       if (i === 0 && !hasAcceptedRef.current) {
@@ -805,14 +905,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
       let sentFileBytes = 0;
 
       for await (const chunkInfo of sliceBlobIntoChunks(currentFile, DEFAULT_CHUNK_SIZE)) {
-        while (dc.bufferedAmount > BUFFER_THRESHOLD) {
+        while (getBufferedAmount() > BUFFER_THRESHOLD) {
           await new Promise((resolve) => setTimeout(resolve, 30));
         }
 
-        dc.send(chunkInfo.chunk);
+        sendRawData(chunkInfo.chunk);
         sentFileBytes += chunkInfo.chunk.byteLength;
 
-        const progressPercent = Math.min(100, Math.round((sentFileBytes / currentFile.size) * 100));
+        const progressPercent = Math.min(100, Math.round((sentFileBytes / (currentFile.size || 1)) * 100));
         const elapsedSec = (Date.now() - startTimeRef.current) / 1000 || 0.1;
         const speed = Math.round(sentFileBytes / elapsedSec);
 
@@ -850,24 +950,11 @@ export function useWebRTC(mode: TransferMode = "internet") {
       progressPercentage: 100,
       speedBps: 0,
     }));
-  }, [mode]);
+  }, [mode, sendRawData, getBufferedAmount]);
 
   // Text snippet sender
   const sendText = useCallback(async (text: string) => {
-    let dc = dcRef.current;
-    if (!dc || dc.readyState !== "open") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if (dataConnRef.current && (dataConnRef.current as any).dataChannel) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        dc = (dataConnRef.current as any).dataChannel;
-        dcRef.current = dc;
-      }
-    }
-    if (!dc || dc.readyState !== "open") {
-      throw new Error("WebRTC DataChannel is not open for transfer");
-    }
-
-    const header = createTextHeader(text);
+    const header = createTextHeader(text, DEFAULT_CHUNK_SIZE);
     const blobToSend = new Blob([text], { type: "text/plain;charset=utf-8" });
     const totalBytes = blobToSend.size;
 
@@ -881,27 +968,22 @@ export function useWebRTC(mode: TransferMode = "internet") {
       speedBps: 0,
     });
 
-    dc.send(JSON.stringify({ type: "header", header }));
+    // 1. Send header JSON
+    sendRawData(JSON.stringify({ type: "header", header }));
 
-    if (!hasAcceptedRef.current) {
-      await new Promise<void>((resolve) => {
-        acceptedResolverRef.current = resolve;
-      });
-      hasAcceptedRef.current = true;
-    }
-
+    // 2. Stream text chunks with backpressure
     startTimeRef.current = Date.now();
     let sentBytes = 0;
 
     for await (const chunkInfo of sliceBlobIntoChunks(blobToSend, DEFAULT_CHUNK_SIZE)) {
-      while (dc.bufferedAmount > BUFFER_THRESHOLD) {
+      while (getBufferedAmount() > BUFFER_THRESHOLD) {
         await new Promise((resolve) => setTimeout(resolve, 30));
       }
 
-      dc.send(chunkInfo.chunk);
+      sendRawData(chunkInfo.chunk);
       sentBytes += chunkInfo.chunk.byteLength;
 
-      const progressPercent = Math.min(100, Math.round((sentBytes / totalBytes) * 100));
+      const progressPercent = Math.min(100, Math.round((sentBytes / (totalBytes || 1)) * 100));
       const elapsedSec = (Date.now() - startTimeRef.current) / 1000 || 0.1;
       const speed = Math.round(sentBytes / elapsedSec);
 
@@ -913,15 +995,13 @@ export function useWebRTC(mode: TransferMode = "internet") {
       }));
     }
 
-    const modeLabel =
-      mode === "internet" ? "Via Internet" : mode === "same-network" ? "Same Wi-Fi" : "Hotspot";
     addTransferHistoryItem({
       direction: "sent",
-      mode: modeLabel,
+      mode: mode === "internet" ? "Via Internet" : mode === "same-network" ? "Same Wi-Fi" : "Hotspot",
       itemType: "text",
       name: text.length > 30 ? `${text.slice(0, 30)}...` : text,
       textSnippet: text,
-      size: blobToSend.size,
+      size: totalBytes,
       status: "completed",
     });
 
@@ -931,7 +1011,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       progressPercentage: 100,
       speedBps: 0,
     }));
-  }, [mode]);
+  }, [mode, sendRawData, getBufferedAmount]);
 
   // Universal payload sender
   const sendPayload = useCallback(
@@ -951,7 +1031,6 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   // Receiver accepts incoming payload (with disk streaming support for files > 100MB)
   const acceptIncomingTransfer = useCallback(async () => {
-    const dc = dcRef.current;
     const header = currentHeaderRef.current;
 
     // Check if large-file disk streaming applies
@@ -974,44 +1053,25 @@ export function useWebRTC(mode: TransferMode = "internet") {
       hasReceiverAcceptedBatchRef.current = header.batchId;
     }
 
-    if (dc && dc.readyState === "open") {
-      dc.send(JSON.stringify({ type: "transfer-accepted" }));
-    } else if (dataConnRef.current) {
-      try {
-        (dataConnRef.current as { send: (data: unknown) => void }).send(
-          JSON.stringify({ type: "transfer-accepted" })
-        );
-      } catch {
-        // Ignore
-      }
-    }
+    sendRawData(JSON.stringify({ type: "transfer-accepted" }));
+    signalingRef.current.sendSignal("transfer-accepted").catch(() => {});
+
     setProgress((prev) => ({
       ...prev,
       status: "transferring",
     }));
-  }, []);
+  }, [sendRawData]);
 
   // Receiver rejects incoming payload
   const rejectIncomingTransfer = useCallback(() => {
-    const dc = dcRef.current;
-    if (dc && dc.readyState === "open") {
-      dc.send(JSON.stringify({ type: "transfer-rejected" }));
-    } else if (dataConnRef.current) {
-      try {
-        (dataConnRef.current as { send: (data: unknown) => void }).send(
-          JSON.stringify({ type: "transfer-rejected" })
-        );
-      } catch {
-        // Ignore
-      }
-    }
+    sendRawData(JSON.stringify({ type: "transfer-rejected" }));
     signalingRef.current.sendSignal("transfer-rejected").catch(() => { });
     setProgress((prev) => ({
       ...prev,
       status: "rejected",
     }));
     cleanup();
-  }, [cleanup]);
+  }, [cleanup, sendRawData]);
 
   return {
     role,
