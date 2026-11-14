@@ -100,6 +100,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const receivedChunkCountRef = useRef<number>(0);
   const activeDownloadUrlsRef = useRef<string[]>([]);
   const isCleaningUpRef = useRef<boolean>(false);
+  const sessionGenRef = useRef<number>(0);
 
   const clearIceTimeout = useCallback(() => {
     if (iceTimerRef.current) {
@@ -155,6 +156,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   // Cleanup helper
   const cleanup = useCallback(() => {
+    sessionGenRef.current++;
     isCleaningUpRef.current = true;
     clearIceTimeout();
     activeTransportRef.current = null;
@@ -162,6 +164,11 @@ export function useWebRTC(mode: TransferMode = "internet") {
     hasAcceptedRef.current = false;
     hasReceiverAcceptedBatchRef.current = null;
     if (acceptedResolverRef.current) {
+      try {
+        acceptedResolverRef.current();
+      } catch {
+        // Ignore
+      }
       acceptedResolverRef.current = null;
     }
     if (diskWriterRef.current) {
@@ -488,8 +495,10 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       dc.onerror = () => {
         if (isCleaningUpRef.current || !dcRef.current) return;
+        // Never override active PeerJS transfer or already finished/verified transfers
+        if (activeTransportRef.current === "peerjs") return;
         setProgress((prev) => {
-          if (prev.status === "completed" || prev.status === "idle") return prev;
+          if (prev.status === "completed" || prev.status === "idle" || prev.progressPercentage >= 100) return prev;
           return {
             ...prev,
             status: "error",
@@ -530,8 +539,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       pc.oniceconnectionstatechange = () => {
         if (isCleaningUpRef.current || !pcRef.current) return;
-        // If PeerJS is already active, ignore raw WebRTC ICE failures
-        if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
+        // If PeerJS is active or connected, ignore raw WebRTC ICE failures
+        if (activeTransportRef.current === "peerjs" || isConnectedRef.current) {
           return;
         }
 
@@ -540,7 +549,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
           isConnectedRef.current = false;
           setIsConnected(false);
           setProgress((prev) => {
-            if (prev.status === "completed" || prev.status === "idle") return prev;
+            if (prev.status === "completed" || prev.status === "idle" || prev.progressPercentage >= 100) return prev;
             return {
               ...prev,
               status: "error",
@@ -572,7 +581,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
           if (pc.connectionState === "failed") {
             clearIceTimeout();
             setProgress((prev) => {
-              if (prev.status === "completed" || prev.status === "idle") return prev;
+              if (prev.status === "completed" || prev.status === "idle" || prev.progressPercentage >= 100) return prev;
               return {
                 ...prev,
                 status: "error",
@@ -691,6 +700,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const startSender = useCallback(
     async (customCode?: string): Promise<{ roomId: string; code: string }> => {
       cleanup();
+      const currentSession = sessionGenRef.current;
       setRole("sender");
       setProgress({
         status: "connecting",
@@ -713,7 +723,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       if (typeof window !== "undefined" && mode !== "hotspot") {
         loadPeerConstructor()
           .then((PeerClass) => {
-            if (!PeerClass || isConnectedRef.current) return;
+            if (sessionGenRef.current !== currentSession || !PeerClass || isConnectedRef.current) return;
             const peerId = `qs-${generatedCode.toLowerCase()}`;
             const peer = new PeerClass(peerId, {
               config: getRtcConfig(mode),
@@ -726,6 +736,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
               dataConnRef.current = conn;
 
               const handleOpen = () => {
+                if (sessionGenRef.current !== currentSession) return;
                 clearIceTimeout();
                 activeTransportRef.current = "peerjs";
                 if (conn.dataChannel) {
@@ -734,14 +745,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
                 isConnectedRef.current = true;
                 setIsConnected(true);
 
-                // Tear down competing raw RTCPeerConnection to avoid false timeout
+                // Tear down competing raw RTCPeerConnection cleanly to avoid false timeout
                 if (pcRef.current) {
+                  const rawPc = pcRef.current;
+                  pcRef.current = null;
+                  rawPc.oniceconnectionstatechange = null;
+                  rawPc.onconnectionstatechange = null;
+                  rawPc.onicecandidate = null;
+                  rawPc.ondatachannel = null;
                   try {
-                    pcRef.current.close();
+                    rawPc.close();
                   } catch {
                     // Ignore
                   }
-                  pcRef.current = null;
                 }
               };
 
@@ -779,9 +795,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
       signalingRef.current
         .createRoom(generatedCode)
         .then(({ roomId: sigRoomId, code: sigCode }) => {
+          if (sessionGenRef.current !== currentSession || !sigCode || isConnectedRef.current) return;
           setRoomId(sigRoomId);
           setRoomCode(sigCode);
-          signalingRef.current.startPolling((msg) => handleSignalMessage(msg, "sender"));
+          signalingRef.current.startPolling((msg) => {
+            if (sessionGenRef.current === currentSession) {
+              handleSignalMessage(msg, "sender");
+            }
+          });
         })
         .catch(() => {});
 
@@ -794,6 +815,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const startReceiver = useCallback(
     async (code: string): Promise<void> => {
       cleanup();
+      const currentSession = sessionGenRef.current;
       setRole("receiver");
       setProgress({
         status: "connecting",
@@ -816,7 +838,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       if (typeof window !== "undefined" && mode !== "hotspot") {
         loadPeerConstructor()
           .then((PeerClass) => {
-            if (!PeerClass || isConnectedRef.current) return;
+            if (sessionGenRef.current !== currentSession || !PeerClass || isConnectedRef.current) return;
             const peer = new PeerClass(undefined, {
               config: getRtcConfig(mode),
               debug: 1,
@@ -829,6 +851,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
               dataConnRef.current = conn;
 
               const handleOpen = () => {
+                if (sessionGenRef.current !== currentSession) return;
                 clearIceTimeout();
                 activeTransportRef.current = "peerjs";
                 if (conn.dataChannel) {
@@ -837,14 +860,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
                 isConnectedRef.current = true;
                 setIsConnected(true);
 
-                // Tear down competing raw RTCPeerConnection to avoid false timeout
+                // Tear down competing raw RTCPeerConnection cleanly to avoid false timeout
                 if (pcRef.current) {
+                  const rawPc = pcRef.current;
+                  pcRef.current = null;
+                  rawPc.oniceconnectionstatechange = null;
+                  rawPc.onconnectionstatechange = null;
+                  rawPc.onicecandidate = null;
+                  rawPc.ondatachannel = null;
                   try {
-                    pcRef.current.close();
+                    rawPc.close();
                   } catch {
                     // Ignore
                   }
-                  pcRef.current = null;
                 }
               };
 
@@ -882,9 +910,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
       signalingRef.current
         .joinRoom(cleanCode)
         .then(({ roomId: sigRoomId, code: sigCode }) => {
+          if (sessionGenRef.current !== currentSession || !sigCode || isConnectedRef.current) return;
           setRoomId(sigRoomId);
           setRoomCode(sigCode);
-          signalingRef.current.startPolling((msg) => handleSignalMessage(msg, "receiver"));
+          signalingRef.current.startPolling((msg) => {
+            if (sessionGenRef.current === currentSession) {
+              handleSignalMessage(msg, "receiver");
+            }
+          });
         })
         .catch(() => {});
     },

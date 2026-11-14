@@ -23,11 +23,14 @@ describe("codeGenerator utilities", () => {
     expect(formatRoomCode("12")).toBe("12");
   });
 
-  it("should normalize room code input by removing non-alphanumeric chars", () => {
+  it("should normalize room code input by removing non-alphanumeric chars and extracting from URLs", () => {
     expect(normalizeRoomCode(" 834 - 291 ")).toBe("834291");
     expect(normalizeRoomCode("abc-def")).toBe("ABCDEF");
     expect(normalizeRoomCode("+880 1712-345678")).toBe("8801712345678");
     expect(normalizeRoomCode("hr-998877")).toBe("HR998877");
+    expect(normalizeRoomCode("https://quicksend.vercel.app/?room=834291")).toBe("834291");
+    expect(normalizeRoomCode("/?room=834291")).toBe("834291");
+    expect(normalizeRoomCode("https://example.com/share?pin=998811")).toBe("998811");
     expect(normalizeRoomCode("")).toBe("");
   });
 

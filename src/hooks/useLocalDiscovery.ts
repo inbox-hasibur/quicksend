@@ -74,6 +74,8 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
           setPeers(data.peers || []);
           if (data.incomingBeam) {
             setIncomingBeam(data.incomingBeam);
+          } else {
+            setIncomingBeam(null);
           }
           // If server reassigned avatar to avoid conflict on this subnet, update local profile
           if (

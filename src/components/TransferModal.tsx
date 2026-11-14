@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   FileText,
   CheckCircle2,
@@ -30,30 +30,39 @@ export function TransferModal({
   onClose,
 }: TransferModalProps) {
   const [copied, setCopied] = useState(false);
-  const [isDismissedByUser, setIsDismissedByUser] = useState(false);
-  const [lastActiveStatus, setLastActiveStatus] = useState<string | null>(null);
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null);
 
-  // If a new transfer starts (waiting-acceptance or transferring), reset dismissal so user sees progress
-  if (
-    (progress.status === "waiting-acceptance" || progress.status === "transferring") &&
-    lastActiveStatus !== progress.status
-  ) {
-    setLastActiveStatus(progress.status);
-    setIsDismissedByUser(false);
-  }
+  // Derive unique key for current status + payload + error so dismissal is 100% deterministic
+  const currentTransferKey =
+    progress.status === "idle" || progress.status === "connecting"
+      ? null
+      : `${progress.status}_${progress.fileName || progress.totalBytes}_${progress.errorMessage || ""}`;
+
+  const isDismissed = Boolean(currentTransferKey && dismissedKey === currentTransferKey);
 
   const handleDismiss = () => {
-    setIsDismissedByUser(true);
-    setLastActiveStatus(null);
+    if (currentTransferKey) {
+      setDismissedKey(currentTransferKey);
+    }
     onClose();
   };
 
+  // Keyboard Escape listener to dismiss modal when transfer is completed, rejected, or in error
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === "Escape" &&
+        (progress.status === "error" || progress.status === "completed" || progress.status === "rejected")
+      ) {
+        handleDismiss();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  });
+
   // Modal is only visible when transfer is active or completed/rejected and not dismissed
-  if (
-    progress.status === "idle" ||
-    progress.status === "connecting" ||
-    isDismissedByUser
-  ) {
+  if (!currentTransferKey || isDismissed) {
     return null;
   }
 
@@ -87,7 +96,20 @@ export function TransferModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+    <div
+      role="dialog"
+      aria-modal="true"
+      data-testid="transfer-modal-backdrop"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
+      onClick={(e) => {
+        if (
+          e.target === e.currentTarget &&
+          (progress.status === "error" || progress.status === "completed" || progress.status === "rejected")
+        ) {
+          handleDismiss();
+        }
+      }}
+    >
       <div className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-[var(--shadow-card)] p-6 space-y-5 animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -104,6 +126,7 @@ export function TransferModal({
             progress.status === "error") && (
               <button
                 type="button"
+                data-testid="transfer-modal-x-close"
                 onClick={handleDismiss}
                 className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
                 aria-label="Close transfer dialog"
@@ -305,6 +328,7 @@ export function TransferModal({
               </div>
               <button
                 type="button"
+                data-testid="transfer-modal-bottom-close"
                 onClick={handleDismiss}
                 className="w-full py-2 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold transition-colors cursor-pointer"
               >

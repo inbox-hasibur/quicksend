@@ -21,11 +21,38 @@ export function formatRoomCode(code: string): string {
 }
 
 /**
+ * Extracts a room code from a raw string, URL, or query parameter.
+ * Handles inputs like "https://quicksend.vercel.app/?room=834291", "/?room=834291", or bare keys.
+ */
+export function extractRoomCodeFromUrl(raw: string): string {
+  if (!raw) return "";
+  const trimmed = raw.trim();
+  try {
+    if (trimmed.includes("room=") || trimmed.includes("code=") || trimmed.includes("pin=")) {
+      const match = trimmed.match(/[?&](?:room|code|pin)=([a-zA-Z0-9_-]+)/i);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+      const url = new URL(trimmed);
+      const param = url.searchParams.get("room") || url.searchParams.get("code") || url.searchParams.get("pin");
+      if (param) return param;
+    }
+  } catch {
+    // Ignore URL parsing fallback
+  }
+  return trimmed;
+}
+
+/**
  * Normalizes user input by stripping spaces, hyphens, and non-alphanumeric characters.
+ * Automatically extracts room codes from pasted URLs or scanned QR links.
  */
 export function normalizeRoomCode(input: string): string {
   if (!input) return "";
-  return input.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+  const extracted = extractRoomCodeFromUrl(input);
+  return extracted.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
 }
 
 /**

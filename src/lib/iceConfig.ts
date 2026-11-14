@@ -13,28 +13,16 @@ export const PUBLIC_STUN_SERVERS: RTCIceServer[] = [
       "stun:stun3.l.google.com:19302",
       "stun:stun4.l.google.com:19302",
       "stun:stun.cloudflare.com:3478",
-      "stun:stun.services.mozilla.com",
+      "stun:global.stun.twilio.com:3478",
     ],
   },
 ];
 
 /**
- * Free community TURN relay servers (OpenRelay by Metered) for symmetric NAT & firewall traversal.
- * Resolves over TCP port 443 / TLS to bypass carrier CGNAT and restrictive corporate/school Wi-Fi.
+ * Optional default TURN relay servers pool.
+ * Kept empty by default to prevent non-routable blackholes (such as defunct openrelay endpoints).
  */
-export const PUBLIC_TURN_SERVERS: RTCIceServer[] = [
-  {
-    urls: [
-      "stun:openrelay.metered.ca:80",
-      "turn:openrelay.metered.ca:80",
-      "turn:openrelay.metered.ca:443",
-      "turn:openrelay.metered.ca:443?transport=tcp",
-      "turns:openrelay.metered.ca:443?transport=tcp",
-    ],
-    username: "openrelay",
-    credential: "openrelay",
-  },
-];
+export const PUBLIC_TURN_SERVERS: RTCIceServer[] = [];
 
 /**
  * Extracts optional TURN server configuration from environment variables if present.

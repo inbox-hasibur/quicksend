@@ -258,7 +258,8 @@ quicksend/
     │   ├── __tests__/
     │   │   ├── FileTypeBadge.test.tsx
     │   │   ├── SegmentedControl.test.tsx
-    │   │   └── SpeedIndicator.test.tsx
+    │   │   ├── SpeedIndicator.test.tsx
+    │   │   └── TransferModal.test.tsx
     │   ├── AppHeader.tsx
     │   ├── CameraStreamCard.tsx
     │   ├── Dropzone.tsx

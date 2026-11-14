@@ -88,6 +88,7 @@ export function SameNetworkCard() {
     cleanup();
     setTargetPeer(null);
     setErrorMsg(null);
+    clearIncomingBeam().catch(() => {});
   };
 
   // When sender connects to target peer, automatically transmit selected payload
