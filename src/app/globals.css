@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* Clean tactile neutral workspace theme (Light) */
   --bg: #ECEEF1;
@@ -26,16 +28,34 @@
   --card-subtle: var(--surface-subtle);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+.dark {
+  /* Clean tactile workspace theme (Dark) */
+  --bg: #0D0F14;
+  --surface: #151822;
+  --surface-glass: rgba(21, 24, 34, 0.96);
+  --surface-subtle: #1D212E;
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-hairline: #262B3A;
+  --text: #F3F4F6;
+  --text-muted: #9CA3AF;
+  --accent: #FFFFFF;
+  --accent-hover: #E5E7EB;
+  --accent-soft: rgba(255, 255, 255, 0.08);
+  --radius-frame: 28px;
+  --radius-card: 20px;
+  --radius-control: 12px;
+  --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.35);
+  --shadow-tile: 0 2px 8px rgba(0, 0, 0, 0.25);
+
+  /* System mapping */
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card-bg: var(--surface);
+  --card-subtle: var(--surface-subtle);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* Clean tactile workspace theme (Dark) */
+  :root:not(.light) {
     --bg: #0D0F14;
     --surface: #151822;
     --surface-glass: rgba(21, 24, 34, 0.96);
@@ -53,12 +73,18 @@
     --shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.35);
     --shadow-tile: 0 2px 8px rgba(0, 0, 0, 0.25);
 
-    /* System mapping */
     --background: var(--bg);
     --foreground: var(--text);
     --card-bg: var(--surface);
     --card-subtle: var(--surface-subtle);
   }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 }
 
 body {
@@ -91,10 +117,8 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-@media (prefers-color-scheme: dark) {
-  .tactile-tile:hover {
-    background: #232736;
-  }
+.dark .tactile-tile:hover {
+  background: #232736;
 }
 
 /* Squircle Icon Containers */

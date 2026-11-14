@@ -1,19 +1,19 @@
 import { Suspense } from "react";
-import { QrCode, Lock, Zap, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { ModeSelector } from "@/components/ModeSelector";
 import { AppHeader } from "@/components/AppHeader";
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-between p-3.5 sm:p-6 md:p-8 text-[var(--text)] overflow-x-hidden">
-      {/* Top Header */}
+      {/* Redesigned Minimal Clean Navbar */}
       <AppHeader />
 
       {/* Main Hub Content & Adaptive Workspace */}
       <div className="w-full max-w-4xl flex flex-col items-center flex-1 justify-center py-2 space-y-6">
-        {/* Hero Section */}
+        {/* Minimal Hero Section */}
         <div className="text-center max-w-xl">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-semibold bg-white dark:bg-neutral-800 text-[var(--text-muted)] mb-3 border border-[var(--border-hairline)] shadow-2xs">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full text-xs font-semibold bg-white dark:bg-[#151822] text-[var(--text-muted)] mb-3 border border-[var(--border-hairline)] shadow-2xs">
             <ShieldCheck className="h-3.5 w-3.5 text-neutral-800 dark:text-neutral-200" />
             <span>Zero Accounts • Direct P2P • No Cloud Retention</span>
           </div>
@@ -39,19 +39,21 @@ export default function Home() {
         </Suspense>
       </div>
 
-      {/* Trust & Guarantee Footer */}
-      <footer className="w-full max-w-4xl grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs text-[var(--text-muted)] pt-8 mt-10 border-t border-[var(--border-hairline)]">
-        <div className="flex items-center gap-2 justify-center sm:justify-start">
-          <Lock className="h-3.5 w-3.5 text-emerald-500" />
-          <span>Encrypted DTLS DataChannel</span>
+      {/* Redesigned Minimal Clean Footer */}
+      <footer className="w-full max-w-4xl pt-8 pb-4 mt-8 border-t border-[var(--border-hairline)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--text-muted)] font-mono">
+        <div className="flex items-center gap-3 text-[11px]">
+          <span className="flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            DTLS Encrypted
+          </span>
+          <span>•</span>
+          <span>Peer-to-Peer</span>
+          <span>•</span>
+          <span>Zero Server Storage</span>
         </div>
-        <div className="flex items-center gap-2 justify-center">
-          <QrCode className="h-3.5 w-3.5 text-neutral-700 dark:text-neutral-300" />
-          <span>Camera QR &amp; PIN Handshake</span>
-        </div>
-        <div className="flex items-center gap-2 justify-center sm:justify-end">
-          <Zap className="h-3.5 w-3.5 text-amber-500" />
-          <span>Offline Cached PWA</span>
+
+        <div className="text-[11px] text-[var(--text-muted)]">
+          QuickSend • Browser Beam
         </div>
       </footer>
     </main>

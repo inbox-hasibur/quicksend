@@ -151,7 +151,10 @@
 - [x] Add 1-click "Copy Text" snippet action and "Clear History" confirmation in `TransferHistoryModal.tsx`.
 - [x] Polish Mode 4 (`NearbyShareCard.tsx`) with multi-file Dropzone integration and clear jargon-free fallback card when Web Bluetooth is unsupported.
 - [x] Harden Service Worker (`public/sw.js`) to strictly bypass caching for `/api/*` endpoints (`NetworkOnly`) and configure `no-store` API headers in `vercel.json`.
+- [x] Redesign navbar into an ultra-minimal, clean header with brand mark, monospace subtitle, network status, history trigger, and tactile dark/light mode toggle (`src/components/AppHeader.tsx`, `src/components/ThemeToggle.tsx`).
+- [x] Implement interactive Dark Mode / Light Mode system (`src/hooks/useTheme.ts`, `globals.css` with `@custom-variant dark`, and anti-FOUC layout script in `src/app/layout.tsx`).
+- [x] Redesign footer into a minimal, clean monospace trust bar (`src/app/page.tsx`).
 - [x] **Sprint 4 Testing & Verification Gate:**
-  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, Health endpoint, SHA-256 chunker, DiskStream fallback, Multi-Frame Optical SDP Collector, and useTransferHistory store.
+  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, Health endpoint, SHA-256 chunker, DiskStream fallback, Multi-Frame Optical SDP Collector, useTransferHistory store, and useTheme hook.
   - Full end-to-end regression test suite passing across all components, APIs, and utilities.
-  - Verification that `npm test` (92/92 passed across 14 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
+  - Verification that `npm test` (95/95 passed across 15 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.

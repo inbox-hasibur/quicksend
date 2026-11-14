@@ -281,14 +281,17 @@ quicksend/
     │   ├── SameNetworkCard.tsx
     │   ├── SegmentedControl.tsx
     │   ├── ServiceWorkerRegister.tsx
+    │   ├── ThemeToggle.tsx
     │   ├── TransferHistoryModal.tsx
     │   └── TransferModal.tsx
     ├── hooks/
     │   ├── .gitkeep
     │   ├── __tests__/
+    │   │   ├── useTheme.test.tsx
     │   │   └── useTransferHistory.test.ts
     │   ├── useNearbyShare.ts
     │   ├── useNetworkStatus.ts
+    │   ├── useTheme.ts
     │   ├── useTransferHistory.ts
     │   └── useWebRTC.ts
     ├── lib/

@@ -28,7 +28,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS v4 (@tailwindcss/turbopack)"]
-        Vitest["Vitest v5 + happy-dom (92 Passing Tests across 14 Suites)"]
+        Vitest["Vitest v5 + happy-dom (95 Passing Tests across 15 Suites)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -57,6 +57,7 @@ flowchart TD
         HistoryMod["TransferHistoryModal.tsx (Ephemeral Session Transfer Drawer)"]
         FileTypeBdg["FileTypeBadge.tsx (Color-coded file type chips PDF, IMG, DOC, etc.)"]
         SegControl["SegmentedControl.tsx (Tactile Pill Track & Keyboard Navigation)"]
+        ThemeTgl["ThemeToggle.tsx (Tactile Dark/Light Mode Toggle)"]
     end
 
     subgraph Src_Hooks["src/hooks/ (Custom React Hooks)"]
@@ -64,6 +65,7 @@ flowchart TD
         UseRTC["useWebRTC.ts (useWebRTC: Peer Connection & Stream Controller)"]
         UseNearby["useNearbyShare.ts (useNearbyShare: Web Share & Web-BLE Client)"]
         UseHist["useTransferHistory.ts (useTransferHistory: Ephemeral Session Storage)"]
+        UseThm["useTheme.ts (useTheme: Light / Dark Mode Controller)"]
     end
 
     subgraph Src_Lib["src/lib/ (Protocols, Pure Logic & Utilities)"]
@@ -317,5 +319,5 @@ flowchart TD
 ---
 
 ## 4. Sprint Status: All Sprints Completed & Production Verified
-All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with tactile redesign, dual-mode signaling store, multi-file batch streaming, SHA-256 verification, disk streaming, multi-frame animated optical QR signaling with manual fallback, and unified reactive ephemeral session history are fully implemented, verified with 92 passing unit tests across 14 test suites, zero lint warnings, and production build ready.
+All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with tactile redesign, dual-mode signaling store, multi-file batch streaming, SHA-256 verification, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, and interactive dark/light mode are fully implemented, verified with 95 passing unit tests across 15 test suites, zero lint warnings, and production build ready.
 ```
