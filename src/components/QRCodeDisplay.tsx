@@ -59,17 +59,17 @@ export function QRCodeDisplay({ code, url }: QRCodeDisplayProps) {
             ? "Mobile Pairing Number"
             : "Secret Room Keyword"}
         </span>
-        <div className="inline-flex items-center justify-center gap-2 p-1.5 px-4 rounded-2xl bg-neutral-100 dark:bg-neutral-800">
-          <span className="font-mono text-2xl sm:text-3xl font-extrabold tracking-wider text-neutral-900 dark:text-neutral-100 break-all">
+        <div className="inline-flex items-center justify-center gap-3 p-2 px-6 rounded-2xl bg-neutral-100 dark:bg-neutral-800/80 shadow-2xs">
+          <span className="font-mono text-3xl sm:text-4xl font-extrabold tracking-widest text-[var(--accent)] tabular-nums break-all">
             {formatRoomCode(code)}
           </span>
           <button
             type="button"
             onClick={handleCopyCode}
-            className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-800 dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
+            className="p-2 rounded-full text-neutral-400 hover:text-neutral-800 dark:hover:text-white hover:bg-neutral-200 dark:hover:bg-neutral-700 transition-colors cursor-pointer"
             title="Copy Key"
           >
-            {copiedCode ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+            {copiedCode ? <Check className="h-5 w-5 text-emerald-500" /> : <Copy className="h-5 w-5" />}
           </button>
         </div>
       </div>

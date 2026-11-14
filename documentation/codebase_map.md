@@ -54,6 +54,7 @@ flowchart TD
         QRModal["QRScannerModal.tsx (Camera Viewport Scanner Dialog)"]
         TransferMod["TransferModal.tsx (Incoming Prompt, Speed, Progress Bar)"]
         HistoryMod["TransferHistoryModal.tsx (Ephemeral Session Transfer Drawer)"]
+        FileTypeBdg["FileTypeBadge.tsx (Color-coded file type chips PDF, IMG, DOC, etc.)"]
         SegControl["SegmentedControl.tsx (Glass Track & Keyboard Navigation)"]
         BtmNav["BottomNav.tsx (Mobile Glass Bottom Navigation)"]
     end
@@ -209,12 +210,16 @@ flowchart TD
   4. *Error / Declined:* Informative status feedback.
 - **Exports:** `TransferModal({ progress, onAccept, onReject, onClose }: TransferModalProps): JSX.Element | null`
 
+#### `src/components/FileTypeBadge.tsx`
+- **Purpose:** Color-coded visual file-type badge component categorizing payloads into distinct semantic visual tags (`PDF` in red, `IMG` in purple, `DOC` in blue, `ZIP` in amber, `VID` in rose, `AUD` in cyan, `TXT` in emerald, and `FILE` fallback in neutral).
+- **Exports:** `FileTypeBadge({ name, mimeType, className }: FileTypeBadgeProps): JSX.Element`
+
 #### `src/components/AppHeader.tsx`
-- **Purpose:** Soft glass header (`.glass-card`) displaying formatted client-side date (`useSyncExternalStore`), bold "QuickSend" title, session transfer history drawer toggle, and live network status badge.
+- **Purpose:** Soft glass header (`.glass-card`) displaying formatted client-side date (`useSyncExternalStore`), bold "QuickSend" title with Zap icon, session transfer history drawer toggle with counter badge, and live network status badge.
 - **Exports:** `AppHeader(): JSX.Element`
 
 #### `src/components/ModeSelector.tsx`
-- **Purpose:** Client component rendering the 4 mode tiles as `.glass-card` elements with accent-soft squircle icon boxes, title, summary, round arrow button, auto grey-out state when offline, focused dedicated mode workspace transitions with a top "All Modes" back pill navigation, role synchronization, and mobile bottom navigation integration.
+- **Purpose:** Desktop & mobile adaptive workspace coordinator. Features a sleek desktop left navigation rail (`hidden lg:flex w-64`) for 1-click mode switching, elevated main workspace card, tactile Home Hub tiles with colorful squircle containers and offline indicators, distraction-free mode transitions with "All Modes" return pill, and mobile bottom navigation.
 - **Exports:** `ModeSelector(): JSX.Element`
 
 #### `src/components/BottomNav.tsx`
@@ -296,6 +301,6 @@ flowchart TD
 
 ---
 
-## 4. Sprint Status: All Sprints Completed
-All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) are fully implemented, verified with 37 passing unit tests, and production build ready.
+## 4. Sprint Status: All Sprints Completed & Tactile Redesign Deployed
+All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with the tactile workspace & typography polish are fully implemented, verified with 45 passing unit tests, and production build ready.
 ```

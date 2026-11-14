@@ -3,7 +3,6 @@
 import { useState } from "react";
 import {
   FileText,
-  File,
   CheckCircle2,
   AlertCircle,
   Copy,
@@ -14,6 +13,7 @@ import {
 } from "lucide-react";
 import type { TransferProgressState } from "@/types/transfer";
 import { formatBytes, formatSpeed } from "@/lib/chunker";
+import { FileTypeBadge } from "@/components/FileTypeBadge";
 
 interface TransferModalProps {
   progress: TransferProgressState;
@@ -45,16 +45,16 @@ export function TransferModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-[#131622] border border-[var(--border-soft)] p-6 sm:p-7 shadow-2xl space-y-5">
         {/* Header */}
         <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+            <div className="h-10 w-10 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)]">
               <Zap className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-base text-neutral-900 dark:text-neutral-100">
+              <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
                 {progress.status === "waiting-acceptance"
                   ? "Incoming Transfer"
                   : progress.status === "transferring"
@@ -66,7 +66,7 @@ export function TransferModal({
                   : "Transfer Status"}
               </h3>
               <p className="text-xs text-neutral-400 font-mono">
-                {progress.itemType === "file" ? "Binary File Payload" : "Text Snippet Payload"}
+                {progress.itemType === "file" ? "Direct Peer File Stream" : "Text Snippet Stream"}
               </p>
             </div>
           </div>
@@ -77,7 +77,7 @@ export function TransferModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+              className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
             >
               <X className="h-5 w-5" />
             </button>
@@ -87,19 +87,19 @@ export function TransferModal({
         {/* Content Details */}
         <div className="space-y-4">
           {/* File or Text info card */}
-          <div className="flex items-start gap-3 p-3.5 rounded-xl border border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-800/40">
+          <div className="flex items-start gap-3 p-4 rounded-2xl border border-[var(--border-hairline)] dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-850/60">
             {progress.itemType === "file" ? (
-              <File className="h-6 w-6 text-indigo-500 shrink-0 mt-0.5" />
+              <FileTypeBadge fileName={progress.fileName} className="mt-0.5" />
             ) : (
-              <FileText className="h-6 w-6 text-violet-500 shrink-0 mt-0.5" />
+              <FileText className="h-6 w-6 text-[var(--accent)] shrink-0 mt-0.5" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm truncate text-neutral-900 dark:text-neutral-100">
+              <p className="font-bold text-sm truncate text-neutral-900 dark:text-neutral-100">
                 {progress.itemType === "file"
                   ? progress.fileName || "File Payload"
                   : "Text / Link Snippet"}
               </p>
-              <p className="text-xs text-neutral-500 mt-0.5 font-mono">
+              <p className="text-xs text-neutral-500 mt-0.5 font-mono tabular-nums">
                 {progress.itemType === "file"
                   ? formatBytes(progress.fileSize || progress.totalBytes)
                   : `${progress.totalBytes} characters`}
@@ -142,17 +142,17 @@ export function TransferModal({
           {progress.status === "transferring" && (
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs font-mono text-neutral-500">
-                  <span>{progress.progressPercentage}%</span>
-                  <span>{formatSpeed(progress.speedBps)}</span>
+                <div className="flex items-center justify-between text-xs font-mono text-neutral-500 tabular-nums">
+                  <span className="font-bold text-neutral-800 dark:text-neutral-200">{progress.progressPercentage}%</span>
+                  <span className="font-bold text-[var(--accent)]">{formatSpeed(progress.speedBps)}</span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
                   <div
-                    className="h-full bg-indigo-600 transition-all duration-150 ease-out rounded-full"
+                    className="h-full bg-[var(--accent)] transition-all duration-150 ease-out rounded-full"
                     style={{ width: `${progress.progressPercentage}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400">
+                <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400 tabular-nums">
                   <span>{formatBytes(progress.bytesTransferred)}</span>
                   <span>{formatBytes(progress.totalBytes)}</span>
                 </div>

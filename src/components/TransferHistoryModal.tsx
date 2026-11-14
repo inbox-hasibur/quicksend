@@ -3,6 +3,7 @@
 import { X, Clock, ArrowUpRight, ArrowDownLeft, File, FileText, Trash2 } from "lucide-react";
 import type { TransferHistoryItem } from "@/types/transfer";
 import { formatBytes } from "@/lib/chunker";
+import { FileTypeBadge } from "@/components/FileTypeBadge";
 
 interface TransferHistoryModalProps {
   isOpen: boolean;
@@ -86,14 +87,14 @@ export function TransferHistoryModal({
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200 truncate">
                       {item.itemType === "file" ? (
-                        <File className="h-3 w-3 shrink-0 text-neutral-400" />
+                        <FileTypeBadge fileName={item.name} />
                       ) : (
-                        <FileText className="h-3 w-3 shrink-0 text-neutral-400" />
+                        <FileText className="h-3 w-3 shrink-0 text-[var(--accent)]" />
                       )}
                       <span className="truncate">{item.name}</span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-[11px] text-neutral-400 font-mono mt-0.5">
+                    <div className="flex items-center gap-2 text-[11px] text-neutral-400 font-mono mt-0.5 tabular-nums">
                       <span>{item.direction === "sent" ? "Sent" : "Received"}</span>
                       {item.size ? <span>• {formatBytes(item.size)}</span> : null}
                       <span>• {new Date(item.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>

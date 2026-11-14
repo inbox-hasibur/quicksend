@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
-import { Clock } from "lucide-react";
+import { Clock, Zap } from "lucide-react";
 import { NetworkStatusBadge } from "@/components/NetworkStatusBadge";
 import { TransferHistoryModal } from "@/components/TransferHistoryModal";
 import { useTransferHistory } from "@/hooks/useTransferHistory";
@@ -10,9 +10,8 @@ const emptySubscribe = () => () => {};
 
 function getClientDateSnapshot(): string {
   return new Date().toLocaleDateString("en-US", {
-    month: "long",
+    month: "short",
     day: "numeric",
-    year: "numeric",
   });
 }
 
@@ -33,17 +32,22 @@ export function AppHeader() {
 
   return (
     <>
-      <header className="z-10 w-full max-w-4xl flex items-center justify-between p-4 sm:p-5 glass-card mb-6 sm:mb-10">
-        <div>
-          <p className="text-xs text-[var(--text-muted)] font-medium h-4">
-            {todayDate}
-          </p>
-          <h1 className="font-extrabold text-xl sm:text-2xl text-[var(--text)] tracking-tight">
-            QuickSend
-          </h1>
+      <header className="z-10 w-full max-w-5xl flex items-center justify-between p-3.5 sm:p-4 glass-card mb-6 sm:mb-8">
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-[var(--accent)] text-white shadow-sm flex items-center justify-center shrink-0">
+            <Zap className="h-5 w-5 fill-current" />
+          </div>
+          <div>
+            <h1 className="font-extrabold text-lg sm:text-xl text-[var(--text)] tracking-tight leading-tight">
+              QuickSend
+            </h1>
+            <p className="text-[11px] text-[var(--text-muted)] font-medium">
+              Zero-login direct transfer {todayDate ? `• ${todayDate}` : ""}
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             type="button"
             onClick={() => setIsHistoryOpen(true)}
@@ -53,7 +57,7 @@ export function AppHeader() {
             <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
             <span className="hidden sm:inline">History</span>
             {history.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-[var(--accent)] text-white text-[10px] font-bold">
+              <span className="px-1.5 py-0.2 rounded-full bg-[var(--accent)] text-white text-[10px] font-bold tabular-nums">
                 {history.length}
               </span>
             )}

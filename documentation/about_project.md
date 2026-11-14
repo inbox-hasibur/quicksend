@@ -254,10 +254,12 @@ quicksend/
     ├── components/
     │   ├── .gitkeep
     │   ├── __tests__/
+    │   │   ├── FileTypeBadge.test.tsx
     │   │   └── SegmentedControl.test.tsx
     │   ├── AppHeader.tsx
     │   ├── BottomNav.tsx
     │   ├── Dropzone.tsx
+    │   ├── FileTypeBadge.tsx
     │   ├── HotspotAssistantCard.tsx
     │   ├── InternetSharingCard.tsx
     │   ├── ModeSelector.tsx

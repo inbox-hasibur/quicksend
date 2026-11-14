@@ -132,7 +132,10 @@
 - [x] Integrate `SegmentedControl` in `InternetSharingCard` (Send/Receive and pairing method) and `Dropzone` (Files/Text tabs).
 - [x] Apply `.glass-card` soft glass styling to `AppHeader` (with date display) and `ModeSelector` (accent squircle icon boxes and round arrows).
 - [x] Create mobile glass bottom navigation bar (`src/components/BottomNav.tsx`) with Home, Send, Receive, History items, safe-area padding, and Mode 1 role preselection in `ModeSelector.tsx`.
+- [x] Create reusable `FileTypeBadge` component (`src/components/FileTypeBadge.tsx`) with color-coded badges for PDF, images, docs, archives, video, audio, and text.
+- [x] Integrate desktop left navigation rail in `ModeSelector.tsx` alongside main elevated workspace card for 1-click mode switching.
+- [x] Upgrade typography across all components (`Dropzone`, `QRCodeDisplay`, `TransferModal`, `TransferHistoryModal`) with oversized `tabular-nums` for PINs, file sizes, and transfer rates.
 - [x] **Sprint 4 Testing & Verification Gate:**
-  - Unit tests for Bluetooth/WebShare capability detection hooks and SegmentedControl (`src/components/__tests__/SegmentedControl.test.tsx`).
+  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, and FileTypeBadge (`src/components/__tests__/FileTypeBadge.test.tsx`).
   - Full end-to-end regression test suite passing across all components and utilities.
-  - Verification that `npm test` (40/40 passed), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
+  - Verification that `npm test` (45/45 passed), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
