@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { ModeSelector } from "@/components/ModeSelector";
 import { AppHeader } from "@/components/AppHeader";
+import { UltrasonicCard } from "@/components/UltrasonicCard";
 
 export default function Home() {
   return (
@@ -21,7 +22,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* 5 Transfer Modes Selector (Clean Options Grid / Focused Workspace) */}
+        {/* Transfer Channels Selector */}
         <Suspense
           fallback={
             <div className="h-40 flex items-center justify-center text-xs text-[var(--text-muted)] font-mono">
@@ -31,6 +32,9 @@ export default function Home() {
         >
           <ModeSelector />
         </Suspense>
+
+        {/* Ultrasonic Sound Data Transfer (Experimental) */}
+        <UltrasonicCard />
       </div>
 
       {/* Redesigned Minimal Clean Footer */}

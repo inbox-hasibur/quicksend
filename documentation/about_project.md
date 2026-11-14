@@ -93,18 +93,34 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 
 ---
 
+### Mode 6: Via Cable (Maximum Line-Speed Transfer)
+- **Primary Use Case:** Direct wired cable transfer via USB-C to USB-C, Ethernet, or USB tethering for massive multi-gigabyte files.
+- **Dual Capability:**
+  - **Direct Cable Link (1–10 Gbps):** WebRTC peer connection over direct link-local IP or USB network adapter with host candidate priority, bypassing wireless congestion and cloud limits.
+  - **WebUSB & Web Serial:** Direct hardware port streaming to microcontrollers and USB peripherals via W3C WebUSB and Web Serial APIs.
+
+---
+
+### Ultrasonic Sound Data Transfer (Experimental)
+- **Primary Use Case:** Out-of-band acoustic sound data transfer located at the bottom of the home hub.
+- **Mechanism:** Frequency Shift Keying (FSK) encoding hexadecimal nibbles into near-ultrasonic tones (18,000–19,800 Hz) emitted through device speakers and captured via microphone using a 4096-point FFT AnalyserNode with real-time canvas audio spectrum visualization.
+
+---
+
 ## 3. Zero-Login UX Flow
 
 ### Home Screen Hub (Compact Option Tiles & Focused Next-Step Workspace)
-Instead of overwhelming users with multi-column pricing-style cards, the interface features a clean, mobile-first design with 5 compact option tiles (`rounded-3xl` with soft squircle icons, subtle shadows, and arrow indicators). Tapping any tile cleanly transitions into that mode's dedicated workspace with a top "← All Channels" back navigation pill:
+Instead of overwhelming users with multi-column pricing-style cards, the interface features a clean, mobile-first design with compact option tiles (`rounded-3xl` with soft squircle icons, subtle shadows, and arrow indicators). Tapping any tile cleanly transitions into that mode's dedicated workspace with a top "← All Channels" back navigation pill:
 
 ```
 [ QuickSend Home Hub ]
    ├── [ Mode 1: Internet ] ────> Opens Dedicated Workspace ────> [ Send | Receive ]
    ├── [ Mode 2: Same Wi-Fi ] ───> Opens Dedicated Workspace ────> [ Radar Discovery & Beaming ]
-   ├── [ Mode 5: Via Camera ] ───> Opens Dedicated Workspace ────> [ Animated QR Stream ]
    ├── [ Mode 3: Hotspot ] ──────> Opens Dedicated Workspace ────> [ Host AP | Join AP ]
-   └── [ Mode 4: Bluetooth ] ────> Opens Dedicated Workspace ────> [ Native Share | BLE ]
+   ├── [ Mode 4: Bluetooth ] ────> Opens Dedicated Workspace ────> [ Native Share | BLE ]
+   ├── [ Mode 5: Via Camera ] ───> Opens Dedicated Workspace ────> [ Animated QR Stream ]
+   ├── [ Mode 6: Via Cable ] ────> Opens Dedicated Workspace ────> [ Direct Cable | WebUSB ]
+   └── [ Ultrasonic Audio ] ────> Standalone Bottom Workspace ───> [ Speaker | Microphone ]
 ```
 
 ### Sender Journey

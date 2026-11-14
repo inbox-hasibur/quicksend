@@ -8,6 +8,7 @@ import {
   Smartphone,
   Bluetooth,
   Camera,
+  Cable,
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import { SameNetworkCard } from "@/components/SameNetworkCard";
 import { HotspotAssistantCard } from "@/components/HotspotAssistantCard";
 import { NearbyShareCard } from "@/components/NearbyShareCard";
 import { CameraStreamCard } from "@/components/CameraStreamCard";
+import { CableTransferCard } from "@/components/CableTransferCard";
 import { SpeedIndicator } from "@/components/SpeedIndicator";
 
 export function ModeSelector() {
@@ -78,6 +80,14 @@ export function ModeSelector() {
           tag: "Air-Gapped",
           speedBars: 2,
           summary: "Stream files as animated QR codes scanned by the other device's camera.",
+        };
+      case "cable":
+        return {
+          displayName: "Via Cable",
+          icon: <Cable className="h-5 w-5" />,
+          tag: "Direct Cable",
+          speedBars: 5,
+          summary: "Maximum line-speed transfer over a direct USB-C, Ethernet, or USB tethering cable.",
         };
     }
   };
@@ -205,6 +215,8 @@ export function ModeSelector() {
               {selectedMode === "same-network" && <SameNetworkCard />}
 
               {selectedMode === "camera" && <CameraStreamCard />}
+
+              {selectedMode === "cable" && <CableTransferCard />}
 
               {selectedMode === "hotspot" && <HotspotAssistantCard />}
 

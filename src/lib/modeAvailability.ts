@@ -19,6 +19,9 @@ export function isModeAvailable(mode: TransferMode, capabilities: BrowserCapabil
     case "camera":
       // Always available: camera-to-screen optical transfer works completely offline without network
       return true;
+    case "cable":
+      // Always available: direct link-local Ethernet / USB-C link or WebUSB/WebSerial
+      return true;
     default:
       return false;
   }
@@ -101,6 +104,17 @@ export function getModeStatus(mode: TransferMode, capabilities: BrowserCapabilit
         isOfflineCompatible: true,
       };
     }
+    case "cable": {
+      return {
+        mode: "cable",
+        name: "Via Cable",
+        tagline: "Direct USB / Ethernet",
+        description: "Maximum line-speed transfer over a direct USB-C, Ethernet, or USB tethering cable.",
+        isAvailable: true,
+        badge: "Line Speed P2P",
+        isOfflineCompatible: true,
+      };
+    }
   }
 }
 
@@ -108,6 +122,6 @@ export function getModeStatus(mode: TransferMode, capabilities: BrowserCapabilit
  * Returns availability status for all transfer modes in display order.
  */
 export function getAllModesStatus(capabilities: BrowserCapabilities): ModeStatus[] {
-  const modes: TransferMode[] = ["internet", "same-network", "hotspot", "bluetooth", "camera"];
+  const modes: TransferMode[] = ["internet", "same-network", "hotspot", "bluetooth", "camera", "cable"];
   return modes.map((mode) => getModeStatus(mode, capabilities));
 }

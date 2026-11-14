@@ -46,6 +46,11 @@ describe("modeAvailability logic", () => {
       expect(isModeAvailable("camera", offlineCapabilities)).toBe(true);
     });
 
+    it("should always allow cable mode regardless of internet connectivity", () => {
+      expect(isModeAvailable("cable", onlineFullCapabilities)).toBe(true);
+      expect(isModeAvailable("cable", offlineCapabilities)).toBe(true);
+    });
+
     it("should allow bluetooth mode if either Web Share or Web Bluetooth is supported", () => {
       expect(
         isModeAvailable("bluetooth", { isOnline: true, hasWebShare: true, hasBluetooth: false })
@@ -110,18 +115,25 @@ describe("modeAvailability logic", () => {
       expect(status.isAvailable).toBe(true);
       expect(status.badge).toBe("100% Offline Optical");
     });
+
+    it("should provide line speed badge for cable mode", () => {
+      const status = getModeStatus("cable", offlineCapabilities);
+      expect(status.isAvailable).toBe(true);
+      expect(status.badge).toBe("Line Speed P2P");
+    });
   });
 
   describe("getAllModesStatus", () => {
-    it("should return all 5 transfer modes in expected order", () => {
+    it("should return all 6 transfer modes in expected order", () => {
       const allStatuses = getAllModesStatus(onlineFullCapabilities);
-      expect(allStatuses).toHaveLength(5);
+      expect(allStatuses).toHaveLength(6);
       expect(allStatuses.map((s) => s.mode)).toEqual([
         "internet",
         "same-network",
         "hotspot",
         "bluetooth",
         "camera",
+        "cable",
       ]);
     });
   });

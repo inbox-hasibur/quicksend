@@ -204,3 +204,11 @@
 - [x] Streamline Mode 4 (`NearbyShareCard.tsx`): remove confusing browser Bluetooth receive expectations; implement honest 1-tap Device Share (`navigator.share`) with automatic history logging, plain-English receiving instructions explaining OS Quick Share / AirDrop / Bluetooth settings, and a secondary collapsible BLE Hardware section for sensors and microcontrollers.
 - [x] Add automated component tests in `src/components/__tests__/HotspotAssistantCard.test.tsx` and `src/components/__tests__/NearbyShareCard.test.tsx`.
 - [x] **Sprint 10 Verification:** 132/132 unit tests passing across 23 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+### Sprint 11: Tab Title, Via Cable Mode & Ultrasonic Sound Data Transfer
+- [x] Clean browser tab title: simplified `src/app/layout.tsx` metadata title to pure `"QuickSend"` (removed extra descriptor suffixes).
+- [x] Add "Via Cable" Transfer Channel (`src/components/CableTransferCard.tsx`): 6th channel in ModeSelector with 5/5 line speed rating (1-10 Gbps), Android USB tethering deep-link shortcut, direct link-local WebRTC P2P PIN/QR pairing, and WebUSB/WebSerial direct port interface.
+- [x] Implement Ultrasonic Sound Data Transfer (`src/lib/ultrasonicStream.ts` & `src/components/UltrasonicCard.tsx`): standalone acoustic transfer section at the bottom of the home hub outside `ModeSelector`.
+- [x] Multi-tone FSK acoustic transmission via Web Audio API oscillators (18,000–19,800 Hz near-ultrasonic and 1,500–3,000 Hz audible chirp presets) with real-time microphone AnalyserNode (4096-point FFT) decoder and live spectrum canvas visualizer.
+- [x] Add unit tests in `src/lib/__tests__/ultrasonicStream.test.ts`, `src/components/__tests__/CableTransferCard.test.tsx`, and `src/components/__tests__/UltrasonicCard.test.tsx`.
+- [x] **Sprint 11 Verification:** 142/142 unit tests passing across 26 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.

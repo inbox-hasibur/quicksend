@@ -204,6 +204,14 @@ flowchart TD
 - **Purpose:** Mode 5 Controller (Via Camera Scan). Zero-network air-gapped file/text streaming via animated sequenced QR frames. Features React 19 lifecycle mutex protection, live webcam scanning with camera selector and multi-tier constraints fallback, compact 66-byte QR chunks (`QRCodeSVG` size 280, margin 3), live diagnostic frame indicator, and "Scan from Screenshot / Image" fallback.
 - **Exports:** `CameraStreamCard(): JSX.Element`
 
+#### `src/components/CableTransferCard.tsx`
+- **Purpose:** Mode 6 Controller (Via Cable). Direct gigabit line-speed transfer over USB-C to USB-C or Ethernet cable links. Features 1-tap Android USB tethering shortcut (`ANDROID_INTENTS.TETHER_SETTINGS`), direct link-local WebRTC P2P PIN/QR pairing, and WebUSB/WebSerial direct port interface.
+- **Exports:** `CableTransferCard(): JSX.Element`
+
+#### `src/components/UltrasonicCard.tsx`
+- **Purpose:** Standalone acoustic sound data transfer section situated at the bottom of the home hub. Emits and receives Frequency Shift Keying (FSK) audio over speaker and microphone (near-ultrasonic 18–20 kHz and audible 1.5–3 kHz presets) with live canvas FFT frequency spectrum visualization.
+- **Exports:** `UltrasonicCard(): JSX.Element`
+
 #### `src/components/HotspotAssistantCard.tsx`
 - **Purpose:** Mode 3 Controller (Wi-Fi Hotspot Transfer Engine). Dual-phase transfer architecture combining compact 1-tap Android Hotspot/Wi-Fi settings shortcuts, optional collapsible Wi-Fi QR code generator, live Hotspot Radar with 1-tap subnet beaming via `useLocalDiscovery(true)` + `useWebRTC("hotspot")`, and a collapsible offline 6-digit PIN / QR pairing backup for zero-cellular environments.
 - **Exports:** `HotspotAssistantCard(): JSX.Element`
@@ -309,6 +317,10 @@ flowchart TD
 #### `src/lib/diskStream.ts`
 - **Purpose:** Large-file streaming layer leveraging File System Access API (`showSaveFilePicker`) for browser files > 100MB, streaming chunks directly to user disk to prevent tab memory exhaustion while safely falling back to in-memory Blob reassembly when unsupported (Safari, Firefox, small files).
 - **Exports:** `DISK_STREAM_THRESHOLD`, `isFileSystemAccessSupported`, `createDiskStreamWriter`.
+
+#### `src/lib/ultrasonicStream.ts`
+- **Purpose:** Frequency Shift Keying (FSK) codec for acoustic sound data transfer. Converts text into hexadecimal nibbles, maps symbols to near-ultrasonic (18–20 kHz) or audible frequencies, and classifies start/stop/data tones.
+- **Exports:** `textToNibbles`, `nibblesToText`, `nibbleToFrequency`, `frequencyToNibble`, `classifyTone`, `ULTRASONIC_PRESETS`, `UltrasonicConfig`.
 
 #### `src/lib/signalingClient.ts`
 - **Purpose:** Client-side HTTP polling signaling engine coordinating with `/api/signal`. Manages message timestamps, room join notifications, and signal transmission.
