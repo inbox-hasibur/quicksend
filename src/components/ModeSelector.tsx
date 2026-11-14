@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Globe,
@@ -10,13 +10,17 @@ import {
   ChevronRight,
   ArrowLeft,
 } from "lucide-react";
-import type { TransferMode, ModeStatus } from "@/types/mode";
+import type { TransferMode, ModeStatus, TransferRole } from "@/types/mode";
+import { isValidRoomCode } from "@/lib/codeGenerator";
 import { useBrowserCapabilities } from "@/hooks/useNetworkStatus";
 import { getAllModesStatus } from "@/lib/modeAvailability";
 import { InternetSharingCard } from "@/components/InternetSharingCard";
 import { SameNetworkCard } from "@/components/SameNetworkCard";
 import { HotspotAssistantCard } from "@/components/HotspotAssistantCard";
 import { NearbyShareCard } from "@/components/NearbyShareCard";
+import { BottomNav, type BottomNavItem } from "@/components/BottomNav";
+import { TransferHistoryModal } from "@/components/TransferHistoryModal";
+import { useTransferHistory } from "@/hooks/useTransferHistory";
 
 export function ModeSelector() {
   const searchParams = useSearchParams();
@@ -27,6 +31,75 @@ export function ModeSelector() {
   const [selectedMode, setSelectedMode] = useState<TransferMode | null>(
     initialRoomCode ? "internet" : null
   );
+
+  const isInitialReceive = Boolean(initialRoomCode && isValidRoomCode(initialRoomCode));
+  const [activeRole, setActiveRole] = useState<TransferRole>(isInitialReceive ? "receive" : "send");
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+  const { history, clearHistory } = useTransferHistory();
+
+  // Navigation handlers
+  const handleHome = () => {
+    setSelectedMode(null);
+    setIsHistoryOpen(false);
+  };
+
+  const handleSend = () => {
+    setIsHistoryOpen(false);
+    setActiveRole("send");
+    setSelectedMode("internet");
+  };
+
+  const handleReceive = () => {
+    setIsHistoryOpen(false);
+    setActiveRole("receive");
+    setSelectedMode("internet");
+  };
+
+  const handleHistory = () => {
+    setIsHistoryOpen(true);
+  };
+
+  // Sync role selection with InternetSharingCard's SegmentedControl
+  useEffect(() => {
+    if (selectedMode !== "internet") return;
+
+    const roleContainer = document.querySelector('[aria-label="Transfer Role"]');
+    if (roleContainer) {
+      const buttons = roleContainer.querySelectorAll('button[role="tab"]');
+      buttons.forEach((btn) => {
+        const text = btn.textContent?.trim().toLowerCase();
+        if (text === activeRole && btn.getAttribute("aria-selected") !== "true") {
+          (btn as HTMLButtonElement).click();
+        }
+      });
+    }
+
+    const handleRoleTabClick = (e: MouseEvent) => {
+      const target = (e.target as HTMLElement).closest('button[role="tab"]');
+      if (!target) return;
+      const container = target.closest('[aria-label="Transfer Role"]');
+      if (!container) return;
+      const text = target.textContent?.trim().toLowerCase();
+      if (text === "send" || text === "receive") {
+        setActiveRole(text as TransferRole);
+      }
+    };
+
+    document.addEventListener("click", handleRoleTabClick);
+    return () => {
+      document.removeEventListener("click", handleRoleTabClick);
+    };
+  }, [selectedMode, activeRole]);
+
+  // Active item determination for BottomNav
+  let activeBottomItem: BottomNavItem | undefined = undefined;
+  if (isHistoryOpen) {
+    activeBottomItem = "history";
+  } else if (selectedMode === null) {
+    activeBottomItem = "home";
+  } else if (selectedMode === "internet") {
+    activeBottomItem = activeRole === "receive" ? "receive" : "send";
+  }
 
   const getModeTheme = (mode: TransferMode) => {
     switch (mode) {
@@ -68,7 +141,7 @@ export function ModeSelector() {
   const activeModeDetails = modes.find((m) => m.mode === selectedMode);
 
   return (
-    <div className="w-full max-w-4xl">
+    <div className="w-full max-w-4xl pb-24 lg:pb-0">
       {/* 1. COMPACT MODES SELECTION (Clean option tiles inspired by modern apps) */}
       {!selectedMode ? (
         <div className="space-y-4">
@@ -149,7 +222,7 @@ export function ModeSelector() {
             <div className="flex items-center justify-between pb-2 px-1">
               <button
                 type="button"
-                onClick={() => setSelectedMode(null)}
+                onClick={handleHome}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-[#14151B] border border-neutral-200/70 dark:border-neutral-800 text-xs font-semibold text-neutral-700 dark:text-neutral-200 shadow-xs hover:bg-neutral-50 dark:hover:bg-neutral-800 transition-all cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-neutral-500" />
@@ -182,6 +255,23 @@ export function ModeSelector() {
           </div>
         )
       )}
+
+      {/* Mobile Bottom Navigation */}
+      <BottomNav
+        activeItem={activeBottomItem}
+        onHome={handleHome}
+        onSend={handleSend}
+        onReceive={handleReceive}
+        onHistory={handleHistory}
+      />
+
+      {/* Transfer History Modal */}
+      <TransferHistoryModal
+        isOpen={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        history={history}
+        onClear={clearHistory}
+      />
     </div>
   );
 }

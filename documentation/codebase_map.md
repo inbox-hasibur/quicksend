@@ -55,6 +55,7 @@ flowchart TD
         TransferMod["TransferModal.tsx (Incoming Prompt, Speed, Progress Bar)"]
         HistoryMod["TransferHistoryModal.tsx (Ephemeral Session Transfer Drawer)"]
         SegControl["SegmentedControl.tsx (Glass Track & Keyboard Navigation)"]
+        BtmNav["BottomNav.tsx (Mobile Glass Bottom Navigation)"]
     end
 
     subgraph Src_Hooks["src/hooks/ (Custom React Hooks)"]
@@ -90,6 +91,7 @@ flowchart TD
     ModeSel --> InternetCard
     ModeSel --> SameNetCard
     ModeSel --> HotspotCard
+    ModeSel --> BtmNav
 
     InternetCard --> UseRTC
     InternetCard --> DropzoneComp
@@ -212,8 +214,12 @@ flowchart TD
 - **Exports:** `AppHeader(): JSX.Element`
 
 #### `src/components/ModeSelector.tsx`
-- **Purpose:** Client component rendering the 4 mode tiles as `.glass-card` elements with accent-soft squircle icon boxes, title, summary, round arrow button, auto grey-out state when offline, and focused dedicated mode workspace transitions with a top "All Modes" back pill navigation.
+- **Purpose:** Client component rendering the 4 mode tiles as `.glass-card` elements with accent-soft squircle icon boxes, title, summary, round arrow button, auto grey-out state when offline, focused dedicated mode workspace transitions with a top "All Modes" back pill navigation, role synchronization, and mobile bottom navigation integration.
 - **Exports:** `ModeSelector(): JSX.Element`
+
+#### `src/components/BottomNav.tsx`
+- **Purpose:** Mobile-first floating bottom navigation bar visible only below `lg` breakpoint. Renders Home, Send, Receive, and History tabs with safe-area padding and accent active indicators.
+- **Exports:** `BottomNav({ activeItem, onHome, onSend, onReceive, onHistory }: BottomNavProps): JSX.Element`
 
 #### `src/components/SegmentedControl.tsx`
 - **Purpose:** Reusable segmented option switch with a soft glass pill track (`.pill`), `.pill-active` highlight, `role="tablist"` accessibility, and keyboard arrow key navigation.

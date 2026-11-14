@@ -131,6 +131,7 @@
 - [x] Create reusable `SegmentedControl` component with glass track and keyboard arrow navigation (`src/components/SegmentedControl.tsx`).
 - [x] Integrate `SegmentedControl` in `InternetSharingCard` (Send/Receive and pairing method) and `Dropzone` (Files/Text tabs).
 - [x] Apply `.glass-card` soft glass styling to `AppHeader` (with date display) and `ModeSelector` (accent squircle icon boxes and round arrows).
+- [x] Create mobile glass bottom navigation bar (`src/components/BottomNav.tsx`) with Home, Send, Receive, History items, safe-area padding, and Mode 1 role preselection in `ModeSelector.tsx`.
 - [x] **Sprint 4 Testing & Verification Gate:**
   - Unit tests for Bluetooth/WebShare capability detection hooks and SegmentedControl (`src/components/__tests__/SegmentedControl.test.tsx`).
   - Full end-to-end regression test suite passing across all components and utilities.
