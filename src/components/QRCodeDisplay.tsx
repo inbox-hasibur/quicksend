@@ -50,13 +50,17 @@ export function QRCodeDisplay({ code, url }: QRCodeDisplayProps) {
         />
       </div>
 
-      {/* 6-Digit Code Display */}
-      <div className="space-y-1">
+      {/* Room Key Display */}
+      <div className="space-y-1 max-w-sm">
         <span className="text-xs font-medium text-neutral-400 uppercase tracking-wider">
-          Room PIN Code
+          {code.length === 6
+            ? "Room PIN Code"
+            : /^\d{9,15}$/.test(code)
+            ? "Mobile Pairing Number"
+            : "Custom Room Keyword"}
         </span>
         <div className="flex items-center justify-center gap-2">
-          <span className="font-mono text-3xl font-extrabold tracking-widest text-indigo-600 dark:text-indigo-400">
+          <span className="font-mono text-2xl sm:text-3xl font-extrabold tracking-wider text-indigo-600 dark:text-indigo-400 break-all px-2">
             {formatRoomCode(code)}
           </span>
           <button

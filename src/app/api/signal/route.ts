@@ -90,9 +90,26 @@ export async function POST(request: Request) {
 
     switch (action) {
       case "create-room": {
-        let code = generateRoomCode();
-        while (store.codeToRoomId.has(code)) {
+        let code = "";
+        if (body.customCode) {
+          code = normalizeRoomCode(body.customCode);
+          if (code.length < 4 || code.length > 20) {
+            return NextResponse.json(
+              { success: false, error: "Custom key must be between 4 and 20 characters" },
+              { status: 400 }
+            );
+          }
+          if (store.codeToRoomId.has(code)) {
+            return NextResponse.json(
+              { success: false, error: `Room key "${code}" is currently in use. Please choose another.` },
+              { status: 409 }
+            );
+          }
+        } else {
           code = generateRoomCode();
+          while (store.codeToRoomId.has(code)) {
+            code = generateRoomCode();
+          }
         }
 
         const roomId = `room_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

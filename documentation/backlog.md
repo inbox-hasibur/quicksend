@@ -18,13 +18,17 @@
 - **Dark / Light Theme Support:** Automatically respects OS color scheme with manual override toggle.
 - **Device & Connection Status Pill:** Real-time indicator displaying network state (Online / Offline / Local Only) and active device profile.
 
-### 2. Mode 1: Internet Sharing (Unique Short Code + Dynamic QR)
-- **Format Selection:** User selects **Unique Code** (6-digit PIN) or **QR Code** (dynamic URL).
+### 2. Mode 1: Internet Sharing (PIN, Mobile Number, Custom Keyword & QR)
+- **Format Selection:** User selects **Code Entry** (PIN, Mobile Number, or Custom Keyword) or **QR Code** (dynamic URL).
+- **Flexible Pairing Key Support:**
+  - *Auto 6-digit PIN:* Fast random numeric PIN for immediate single-session sharing.
+  - *Mobile Number:* Use sender's memorized phone number (no need to memorize a new PIN).
+  - *Custom Keyword / Secret:* Type a familiar unique secret phrase (e.g., `HR998877`).
+  - *4–20 Character Length:* Receiver input accepts any valid PIN, phone number, or custom keyword without rigid length restrictions.
 - **Action Selection:** User chooses **Send** (upload files/paste text, generate room code/QR) or **Receive** (enter room code or scan QR with camera).
-- **Ephemeral 6-Digit Room Code:** Unique, human-readable numeric/alphanumeric code for easy typing on keyboards.
 - **Dynamic Scannable QR Code:** Instantly generated QR code containing the direct URL to the ephemeral session room.
 - **Camera QR Scanner:** Built-in mobile and desktop camera scanner utilizing `html5-qrcode`.
-- **WebRTC Signaling Relay:** Ephemeral session signaling exchange via lightweight WebSocket / serverless signaling channel.
+- **WebRTC Signaling Relay:** Ephemeral session signaling exchange via lightweight serverless signaling channel.
 - **RTCDataChannel File & Text Streaming:** Direct encrypted browser-to-browser data transfer using DTLS/SCTP.
 - **NAT Traversal:** Public Google STUN servers with fallback timeout guidance for restrictive symmetric enterprise firewalls.
 

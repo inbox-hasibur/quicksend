@@ -173,7 +173,7 @@ flowchart TD
 - **Exports:** `OpticalHandshakeModal({ isOpen, role, localPayloadQr, onOfferScanned, onAnswerScanned, onClose }: OpticalHandshakeModalProps): JSX.Element | null`
 
 #### `src/components/InternetSharingCard.tsx`
-- **Purpose:** Mode 1 Interactive Controller. Manages Format (`6-Digit PIN` or `QR Code`) and Role (`Send` or `Receive`). Coordinates WebRTC session initiation, dropzone payload selection, peer connection status, and transfer modal trigger.
+- **Purpose:** Mode 1 Interactive Controller. Manages Format (`PIN / Mobile / Keyword` or `QR Code`) and Role (`Send` or `Receive`). Offers flexible sender strategies (Auto 6-digit PIN, memorized Mobile Number, or Custom Keyword), dynamic room code lookup, dropzone payload selection, peer connection status, and transfer modal trigger.
 - **Exports:** `InternetSharingCard({ initialRoomCode }: InternetSharingCardProps): JSX.Element`
 
 #### `src/components/Dropzone.tsx`
@@ -231,7 +231,7 @@ flowchart TD
 - **Exports:** `compactSdp`, `encodeOpticalSdp`, `decodeOpticalSdp`, `isOpticalSdp`.
 
 #### `src/lib/codeGenerator.ts`
-- **Purpose:** Cryptographically secure 6-digit room PIN generation, formatting (`834291` -> `834-291`), normalization, and validation.
+- **Purpose:** Cryptographically secure 6-digit room PIN generation, custom key/mobile number preservation, normalization, and flexible 4–20 character room key validation.
 - **Exports:** `generateRoomCode`, `formatRoomCode`, `normalizeRoomCode`, `isValidRoomCode`.
 
 #### `src/lib/chunker.ts`

@@ -98,4 +98,35 @@ describe("Signaling API Route Handler", () => {
     const leaveRes = await POST(leaveReq);
     expect(leaveRes.status).toBe(200);
   });
+
+  it("should create room with custom keyword or mobile number", async () => {
+    const customCode = "HR998877";
+    const createReq = new Request("http://localhost:3000/api/signal", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "create-room", customCode }),
+    });
+    const createRes = await POST(createReq);
+    const createData = await createRes.json();
+
+    expect(createRes.status).toBe(200);
+    expect(createData.success).toBe(true);
+    expect(createData.code).toBe(customCode);
+
+    // Verify lookup by custom keyword
+    const getReq = new Request(`http://localhost:3000/api/signal?code=${customCode}`);
+    const getRes = await GET(getReq);
+    const getData = await getRes.json();
+    expect(getData.success).toBe(true);
+    expect(getData.roomId).toBe(createData.roomId);
+
+    // Clean up
+    await POST(
+      new Request("http://localhost:3000/api/signal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "leave-room", roomId: createData.roomId }),
+      })
+    );
+  });
 });

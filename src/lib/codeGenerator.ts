@@ -8,12 +8,16 @@ export function generateRoomCode(): string {
 }
 
 /**
- * Formats a 6-character room code with a human-readable hyphen: e.g. 834291 -> 834-291
+ * Formats a room code:
+ * - 6-digit PIN: 834291 -> 834-291
+ * - Mobile numbers or custom keywords (e.g. HR998877, 01712345678): preserved cleanly
  */
 export function formatRoomCode(code: string): string {
   const clean = normalizeRoomCode(code);
-  if (clean.length <= 3) return clean;
-  return `${clean.slice(0, 3)}-${clean.slice(3, 6)}`;
+  if (/^\d{6}$/.test(clean)) {
+    return `${clean.slice(0, 3)}-${clean.slice(3, 6)}`;
+  }
+  return clean;
 }
 
 /**
@@ -25,9 +29,10 @@ export function normalizeRoomCode(input: string): string {
 }
 
 /**
- * Validates whether an input represents a valid 6-character room PIN.
+ * Validates whether an input represents a valid room key (PIN, Mobile Number, or Keyword).
+ * Accepts any alphanumeric string between 4 and 20 characters.
  */
 export function isValidRoomCode(input: string): boolean {
   const clean = normalizeRoomCode(input);
-  return clean.length === 6;
+  return clean.length >= 4 && clean.length <= 20;
 }

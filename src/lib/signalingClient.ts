@@ -7,11 +7,11 @@ export class SignalingClient {
   private lastTimestamp = 0;
   private isPolling = false;
 
-  async createRoom(): Promise<{ roomId: string; code: string }> {
+  async createRoom(customCode?: string): Promise<{ roomId: string; code: string }> {
     const res = await fetch("/api/signal", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "create-room" }),
+      body: JSON.stringify({ action: "create-room", customCode }),
     });
 
     const data = await res.json();

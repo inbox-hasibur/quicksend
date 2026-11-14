@@ -327,7 +327,7 @@ export function useWebRTC() {
   );
 
   // Sender starts a session
-  const startSender = useCallback(async (): Promise<{ roomId: string; code: string }> => {
+  const startSender = useCallback(async (customCode?: string): Promise<{ roomId: string; code: string }> => {
     cleanup();
     setRole("sender");
     setProgress({
@@ -340,7 +340,7 @@ export function useWebRTC() {
     });
 
     createPeerConnection("sender");
-    const { roomId: newRoomId, code: newCode } = await signalingRef.current.createRoom();
+    const { roomId: newRoomId, code: newCode } = await signalingRef.current.createRoom(customCode);
     setRoomId(newRoomId);
     setRoomCode(newCode);
 

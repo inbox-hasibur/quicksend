@@ -43,12 +43,16 @@ Immediately upon opening the app, users are presented with **4 upfront transfer 
 
 ---
 
-### Mode 1: Share via Internet (WebRTC P2P via Short Code or QR)
+### Mode 1: Share via Internet (WebRTC P2P via PIN, Mobile Number, Keyword, or QR)
 - **Primary Use Case:** When both the lab PC and mobile device have general internet access, but cannot discover each other on a local subnet due to campus AP client isolation.
-- **Workflow Selection:**
-  1. **Format Selection:** User selects **Unique Code** (6-character numeric/alphanumeric PIN) or **QR Code** (dynamic scannable URL).
-  2. **Role Selection:** User chooses **Send** (upload files/paste text, generate room code/QR) or **Receive** (enter room code or scan QR with camera).
-- **Protocol:** WebRTC Data Channel (`RTCDataChannel`) with lightweight serverless/WebSocket signaling.
+- **Workflow & Key Strategy Options:**
+  1. **Flexible Pairing Key:** Users can pair via multiple memorable methods (4–20 alphanumeric chars supported across both devices):
+     - **Auto PIN:** Fast 6-digit auto-generated numeric PIN (e.g. `834-291`).
+     - **Mobile Number:** Enter your own memorized phone number (e.g. `01712345678`) so you don't need to memorize a new PIN.
+     - **Custom Keyword / Secret:** Type a familiar unique keyword or code phrase (e.g. `HR998877`).
+     - **QR Code:** Instant one-click camera scanning bypassing all manual typing.
+  2. **Role Selection:** User chooses **Send** (upload files/paste text, select pairing strategy, generate room code/QR) or **Receive** (enter PIN, phone number, keyword, or scan QR with camera).
+- **Protocol:** WebRTC Data Channel (`RTCDataChannel`) with lightweight serverless signaling.
 - **Handshake Mechanism:**
   - Signaling coordinates SDP offer, answer, and ICE candidates via public STUN servers.
   - Once peers connect via DTLS/SCTP, the signaling channel is released.

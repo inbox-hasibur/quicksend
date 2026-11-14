@@ -15,24 +15,38 @@ describe("codeGenerator utilities", () => {
     expect(num).toBeLessThanOrEqual(999999);
   });
 
-  it("should format a 6-digit code with hyphen in the center", () => {
+  it("should format a 6-digit code with hyphen and preserve mobile numbers or keywords", () => {
     expect(formatRoomCode("834291")).toBe("834-291");
     expect(formatRoomCode("834-291")).toBe("834-291");
+    expect(formatRoomCode("01712345678")).toBe("01712345678");
+    expect(formatRoomCode("HR998877")).toBe("HR998877");
     expect(formatRoomCode("12")).toBe("12");
   });
 
   it("should normalize room code input by removing non-alphanumeric chars", () => {
     expect(normalizeRoomCode(" 834 - 291 ")).toBe("834291");
     expect(normalizeRoomCode("abc-def")).toBe("ABCDEF");
+    expect(normalizeRoomCode("+880 1712-345678")).toBe("8801712345678");
+    expect(normalizeRoomCode("hr-998877")).toBe("HR998877");
     expect(normalizeRoomCode("")).toBe("");
   });
 
   it("should validate room code length and characters", () => {
+    // 6-digit numeric PIN
     expect(isValidRoomCode("834291")).toBe(true);
     expect(isValidRoomCode("834-291")).toBe(true);
+    // Custom alphanumeric keywords
     expect(isValidRoomCode("ABC-DEF")).toBe(true);
-    expect(isValidRoomCode("12345")).toBe(false);
-    expect(isValidRoomCode("1234567")).toBe(false);
+    expect(isValidRoomCode("HR998877")).toBe(true);
+    // Mobile numbers
+    expect(isValidRoomCode("01712345678")).toBe(true);
+    expect(isValidRoomCode("+880 1712-345678")).toBe(true);
+    // Minimum 4 chars
+    expect(isValidRoomCode("ABCD")).toBe(true);
+    expect(isValidRoomCode("123")).toBe(false);
+    // Maximum 20 chars
+    expect(isValidRoomCode("A".repeat(20))).toBe(true);
+    expect(isValidRoomCode("A".repeat(21))).toBe(false);
     expect(isValidRoomCode("")).toBe(false);
   });
 });
