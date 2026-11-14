@@ -29,10 +29,24 @@ export function SameNetworkCard() {
 
   const {
     progress,
+    sendFiles,
+    sendPayload,
     acceptIncomingTransfer,
     rejectIncomingTransfer,
     cleanup,
   } = useWebRTC("same-network");
+
+  const handleTransferSelected = () => {
+    if (selectedPayload.files.length > 0) {
+      sendFiles(selectedPayload.files).catch((err) => {
+        setErrorMsg(err.message);
+      });
+    } else if (selectedPayload.text.trim()) {
+      sendPayload({ text: selectedPayload.text }).catch((err) => {
+        setErrorMsg(err.message);
+      });
+    }
+  };
 
   const handleStartOpticalSender = async () => {
     if (selectedPayload.files.length === 0 && !selectedPayload.text.trim()) {
@@ -142,7 +156,7 @@ export function SameNetworkCard() {
             </button>
             <button
               type="button"
-              onClick={() => alert("LAN signaling broadcast active. Scanning local peers on subnet...")}
+              onClick={handleTransferSelected}
               className="py-3.5 px-6 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-800 dark:text-neutral-200 transition-colors flex items-center justify-center gap-2 cursor-pointer"
             >
               <Wifi className="h-4 w-4 text-emerald-500" />
@@ -186,6 +200,7 @@ export function SameNetworkCard() {
         }}
         onAnswerScanned={(decoded) => {
           console.log("Answer decoded:", decoded);
+          handleTransferSelected();
         }}
         onClose={() => setIsOpticalOpen(false)}
       />

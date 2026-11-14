@@ -140,7 +140,10 @@
 - [x] Build resilient multi-provider public STUN pool (`src/lib/iceConfig.ts`) with Google and Cloudflare STUN servers, plus optional TURN server injection (`NEXT_PUBLIC_TURN_URL`).
 - [x] Add 10-second ICE connection timeout watchdog and restrictive firewall/symmetric NAT fallback diagnostic prompt.
 - [x] Implement health check endpoint `GET /api/health` returning app identifier, storage mode, and server timestamp.
+- [x] Implement sequential multi-file batch queue (`useWebRTC.ts`, `TransferModal.tsx`, `Dropzone.tsx`) beaming multi-file selections sequentially without dropping connection.
+- [x] Add SHA-256 file integrity checksum generation and receiver verification (`src/lib/chunker.ts`) with `"Verified ✓"` visual badge.
+- [x] Add large-file disk streaming fallback (`src/lib/diskStream.ts`) leveraging `window.showSaveFilePicker` for files > 100MB to prevent browser RAM overflow.
 - [x] **Sprint 4 Testing & Verification Gate:**
-  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, and Health endpoint.
+  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, Health endpoint, SHA-256 chunker, and DiskStream fallback.
   - Full end-to-end regression test suite passing across all components, APIs, and utilities.
-  - Verification that `npm test` (70/70 passed across 12 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
+  - Verification that `npm test` (78/78 passed across 13 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.

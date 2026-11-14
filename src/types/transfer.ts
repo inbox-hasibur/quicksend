@@ -20,6 +20,13 @@ export interface TransferPayloadHeader {
   text?: TextMetadata;
   totalChunks: number;
   chunkSize: number;
+  // Batch queue metadata
+  batchId?: string;
+  fileIndex?: number;
+  totalFiles?: number;
+  totalBatchBytes?: number;
+  // Integrity checksum
+  sha256?: string;
 }
 
 export type TransferStatus =
@@ -43,6 +50,15 @@ export interface TransferProgressState {
   progressPercentage: number;
   speedBps: number;
   errorMessage?: string;
+  // Batch queue progress
+  batchId?: string;
+  fileIndex?: number;
+  totalFiles?: number;
+  totalBatchBytes?: number;
+  batchBytesTransferred?: number;
+  // Integrity verification
+  sha256?: string;
+  isVerified?: boolean;
 }
 
 export interface TransferHistoryItem {

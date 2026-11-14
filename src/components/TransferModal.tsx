@@ -10,6 +10,7 @@ import {
   X,
   ArrowDownToLine,
   Zap,
+  ShieldCheck,
 } from "lucide-react";
 import type { TransferProgressState } from "@/types/transfer";
 import { formatBytes, formatSpeed } from "@/lib/chunker";
@@ -30,47 +31,53 @@ export function TransferModal({
 }: TransferModalProps) {
   const [copied, setCopied] = useState(false);
 
-  if (progress.status === "idle") return null;
+  // Modal is only visible when transfer is active or completed/rejected
+  if (progress.status === "idle" || progress.status === "connecting") {
+    return null;
+  }
 
   const handleCopyText = async () => {
     if (progress.textContent) {
-      try {
-        await navigator.clipboard.writeText(progress.textContent);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      } catch {
-        // Fallback
-      }
+      await navigator.clipboard.writeText(progress.textContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const getTitle = () => {
+    switch (progress.status) {
+      case "waiting-acceptance":
+        return "Incoming Transfer Beam";
+      case "transferring":
+        return progress.totalFiles && progress.totalFiles > 1
+          ? `Beaming File ${progress.fileIndex || 1} of ${progress.totalFiles}...`
+          : "Beaming In Progress...";
+      case "completed":
+        return progress.totalFiles && progress.totalFiles > 1
+          ? `Batch Transfer Complete (${progress.totalFiles} Files)`
+          : "Transfer Complete!";
+      case "rejected":
+        return "Transfer Declined";
+      case "error":
+        return "Transfer Error";
+      default:
+        return "QuickSend P2P";
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md rounded-3xl bg-white dark:bg-[#131622] border border-[var(--border-soft)] p-6 sm:p-7 shadow-2xl space-y-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="w-full max-w-sm rounded-3xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-[var(--shadow-card)] p-6 space-y-5 animate-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
-          <div className="flex items-center gap-2.5">
-            <div className="h-10 w-10 rounded-2xl bg-[var(--accent-soft)] flex items-center justify-center text-[var(--accent)]">
-              <Zap className="h-5 w-5" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="h-8 w-8 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-[var(--accent)] flex items-center justify-center">
+              <Zap className="h-4 w-4" />
             </div>
-            <div>
-              <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
-                {progress.status === "waiting-acceptance"
-                  ? "Incoming Transfer"
-                  : progress.status === "transferring"
-                  ? "Transferring Data..."
-                  : progress.status === "completed"
-                  ? "Transfer Complete!"
-                  : progress.status === "rejected"
-                  ? "Transfer Declined"
-                  : "Transfer Status"}
-              </h3>
-              <p className="text-xs text-neutral-400 font-mono">
-                {progress.itemType === "file" ? "Direct Peer File Stream" : "Text Snippet Stream"}
-              </p>
-            </div>
+            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+              {getTitle()}
+            </h3>
           </div>
-
           {(progress.status === "completed" ||
             progress.status === "rejected" ||
             progress.status === "error") && (
@@ -94,16 +101,34 @@ export function TransferModal({
               <FileText className="h-6 w-6 text-[var(--accent)] shrink-0 mt-0.5" />
             )}
             <div className="min-w-0 flex-1">
-              <p className="font-bold text-sm truncate text-neutral-900 dark:text-neutral-100">
-                {progress.itemType === "file"
-                  ? progress.fileName || "File Payload"
-                  : "Text / Link Snippet"}
-              </p>
-              <p className="text-xs text-neutral-500 mt-0.5 font-mono tabular-nums">
-                {progress.itemType === "file"
-                  ? formatBytes(progress.fileSize || progress.totalBytes)
-                  : `${progress.totalBytes} characters`}
-              </p>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <p className="font-bold text-sm truncate text-neutral-900 dark:text-neutral-100">
+                  {progress.itemType === "file"
+                    ? progress.fileName || "File Payload"
+                    : "Text / Link Snippet"}
+                </p>
+                {progress.isVerified && (
+                  <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold">
+                    <ShieldCheck className="h-3 w-3" />
+                    Verified ✓
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <p className="text-xs text-neutral-500 font-mono tabular-nums">
+                  {progress.itemType === "file"
+                    ? formatBytes(progress.fileSize || progress.totalBytes)
+                    : `${progress.totalBytes} characters`}
+                </p>
+
+                {progress.totalFiles && progress.totalFiles > 1 && (
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-mono text-[10px] font-bold">
+                    File {progress.fileIndex || 1} of {progress.totalFiles}
+                  </span>
+                )}
+              </div>
+
               {progress.itemType === "text" && progress.textPreview && (
                 <p className="text-xs text-neutral-400 mt-1 italic line-clamp-2">
                   &ldquo;{progress.textPreview}&rdquo;
@@ -116,7 +141,9 @@ export function TransferModal({
           {progress.status === "waiting-acceptance" && (
             <div className="space-y-3 pt-2">
               <p className="text-xs text-neutral-500 text-center">
-                A connected peer wants to beam this {progress.itemType} directly to your device.
+                {progress.totalFiles && progress.totalFiles > 1
+                  ? `A connected peer wants to beam a batch of ${progress.totalFiles} files directly to your device.`
+                  : `A connected peer wants to beam this ${progress.itemType} directly to your device.`}
               </p>
               <div className="flex gap-2.5">
                 <button
@@ -125,7 +152,11 @@ export function TransferModal({
                   className="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2"
                 >
                   <ArrowDownToLine className="h-4 w-4" />
-                  <span>Accept &amp; Download</span>
+                  <span>
+                    {progress.totalFiles && progress.totalFiles > 1
+                      ? `Accept All ${progress.totalFiles} Files`
+                      : "Accept & Download"}
+                  </span>
                 </button>
                 <button
                   type="button"
@@ -143,8 +174,12 @@ export function TransferModal({
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs font-mono text-neutral-500 tabular-nums">
-                  <span className="font-bold text-neutral-800 dark:text-neutral-200">{progress.progressPercentage}%</span>
-                  <span className="font-bold text-[var(--accent)]">{formatSpeed(progress.speedBps)}</span>
+                  <span className="font-bold text-neutral-800 dark:text-neutral-200">
+                    {progress.progressPercentage}%
+                  </span>
+                  <span className="font-bold text-[var(--accent)]">
+                    {formatSpeed(progress.speedBps)}
+                  </span>
                 </div>
                 <div className="w-full h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
                   <div
@@ -157,6 +192,15 @@ export function TransferModal({
                   <span>{formatBytes(progress.totalBytes)}</span>
                 </div>
               </div>
+
+              {progress.totalFiles && progress.totalFiles > 1 && progress.totalBatchBytes && (
+                <div className="p-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-indigo-700 dark:text-indigo-300 font-mono flex items-center justify-between">
+                  <span>Batch Progress:</span>
+                  <span className="font-bold">
+                    File {progress.fileIndex || 1} of {progress.totalFiles} ({formatBytes(progress.totalBatchBytes)})
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -165,11 +209,21 @@ export function TransferModal({
             <div className="space-y-3">
               <div className="flex items-center gap-2 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 text-emerald-800 dark:text-emerald-300 text-xs">
                 <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-500" />
-                <span>
-                  {progress.itemType === "file"
-                    ? "File successfully beamed and saved to your downloads!"
-                    : "Text snippet received successfully!"}
-                </span>
+                <div className="flex-1">
+                  <span>
+                    {progress.totalFiles && progress.totalFiles > 1
+                      ? `All ${progress.totalFiles} files successfully beamed and saved to your downloads!`
+                      : progress.itemType === "file"
+                        ? "File successfully beamed and saved to your downloads!"
+                        : "Text snippet received successfully!"}
+                  </span>
+                  {progress.isVerified && (
+                    <p className="mt-1 font-mono text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      SHA-256 Bit-Perfect Integrity Verified ✓
+                    </p>
+                  )}
+                </div>
               </div>
 
               {progress.itemType === "text" && progress.textContent && (

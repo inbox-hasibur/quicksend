@@ -60,6 +60,9 @@ Immediately upon opening the app, users are presented with **4 upfront transfer 
     - **In-Memory TTL Fallback:** Zero-config single-node fallback with stale room pruning and max capacity guard.
   - Automatic 10-second ICE timeout watchdog detecting symmetric NAT / corporate firewall blockage and suggesting Mode 2 (Same Wi-Fi) or Mode 3 (Hotspot) fallbacks.
   - Once peers connect via DTLS/SCTP, the signaling channel is released.
+  - **Sequential Multi-File Batch Queue:** Seamlessly beams multiple files sequentially over an open `RTCDataChannel` without dropping connection, tracking both item and batch progress.
+  - **SHA-256 Bit-Perfect Integrity:** Computes and verifies SHA-256 checksums on payloads using the browser's Web Crypto API with `"Verified ✓"` visual confirmation.
+  - **Large-File Disk Streaming Fallback:** Automatically leverages the File System Access API (`showSaveFilePicker`) for files > 100MB to stream chunks directly to disk, preventing RAM overflow while falling back safely to in-memory Blob assembly on Safari/Firefox.
   - Files and text are streamed directly peer-to-peer with end-to-end encryption.
 
 ---
@@ -291,6 +294,7 @@ quicksend/
     │   ├── __tests__/
     │   │   ├── chunker.test.ts
     │   │   ├── codeGenerator.test.ts
+    │   │   ├── diskStream.test.ts
     │   │   ├── iceConfig.test.ts
     │   │   ├── modeAvailability.test.ts
     │   │   ├── nearbyShare.test.ts
@@ -300,6 +304,7 @@ quicksend/
     │   ├── .gitkeep
     │   ├── chunker.ts
     │   ├── codeGenerator.ts
+    │   ├── diskStream.ts
     │   ├── iceConfig.ts
     │   ├── modeAvailability.ts
     │   ├── opticalSdp.ts

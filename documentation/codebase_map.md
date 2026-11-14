@@ -28,7 +28,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS v4 (@tailwindcss/turbopack)"]
-        Vitest["Vitest v5 + happy-dom (70 Passing Tests)"]
+        Vitest["Vitest v5 + happy-dom (78 Passing Tests)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -74,6 +74,7 @@ flowchart TD
         SigClient["signalingClient.ts (SignalingClient: Room & Signal Polling Engine)"]
         SignalStore["signalStore.ts (Dual-Mode: Upstash Redis REST + Memory TTL)"]
         IceConfig["iceConfig.ts (Multi-Provider STUN Pool + TURN Config)"]
+        DiskStream["diskStream.ts (File System Access Disk Streaming Fallback)"]
         WifiQr["wifiQr.ts (buildWifiQrString, parseWifiQrString, ANDROID_INTENTS)"]
         OpticalSdp["opticalSdp.ts (encodeOpticalSdp, decodeOpticalSdp, compactSdp)"]
     end
@@ -283,6 +284,10 @@ flowchart TD
 - **Purpose:** Resilient WebRTC ICE / STUN configuration providing multi-provider public STUN pool (Google + Cloudflare), optional TURN relay injection (`NEXT_PUBLIC_TURN_URL`), mode-specific RTCConfiguration generator (`getRtcConfig`), and 10-second ICE connection timeout watchdog.
 - **Exports:** `PUBLIC_STUN_SERVERS`, `getTurnServers`, `getRtcConfig`, `ICE_CONNECTION_TIMEOUT_MS`, `FIREWALL_FALLBACK_MESSAGE`.
 
+#### `src/lib/diskStream.ts`
+- **Purpose:** Large-file streaming layer leveraging File System Access API (`showSaveFilePicker`) for browser files > 100MB, streaming chunks directly to user disk to prevent tab memory exhaustion while safely falling back to in-memory Blob reassembly when unsupported (Safari, Firefox, small files).
+- **Exports:** `DISK_STREAM_THRESHOLD`, `isFileSystemAccessSupported`, `createDiskStreamWriter`.
+
 #### `src/lib/signalingClient.ts`
 - **Purpose:** Client-side HTTP polling signaling engine coordinating with `/api/signal`. Manages message timestamps, room join notifications, and signal transmission.
 - **Exports:** `SignalingClient` class.
@@ -316,6 +321,6 @@ flowchart TD
 
 ---
 
-## 4. Sprint Status: All Sprints Completed & WebRTC Backend Hardened
-All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with the tactile workspace redesign and dual-mode signaling store (Redis REST + Memory TTL) are fully implemented, verified with 70 passing unit tests across 12 test suites, and production build ready.
+## 4. Sprint Status: All Sprints Completed & P2P Engine Upgraded
+All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with tactile redesign, dual-mode signaling store, sequential multi-file batch streaming, SHA-256 integrity verification, and large-file disk streaming fallback are fully implemented, verified with 78 passing unit tests across 13 test suites, and production build ready.
 ```

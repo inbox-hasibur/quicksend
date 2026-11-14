@@ -1,11 +1,46 @@
 import type { FileMetadata, TextMetadata, TransferPayloadHeader } from "@/types/transfer";
 
 export const DEFAULT_CHUNK_SIZE = 64 * 1024; // 64 KB
+export const MAX_CHECKSUM_FILE_SIZE = 150 * 1024 * 1024; // 150 MB threshold for real-time SHA-256
+
+export interface BatchFileOptions {
+  batchId?: string;
+  fileIndex?: number;
+  totalFiles?: number;
+  totalBatchBytes?: number;
+  sha256?: string;
+}
 
 /**
- * Creates header metadata for a file transfer payload.
+ * Computes a SHA-256 hex digest for a Blob/File using Web Crypto API.
+ * Returns null gracefully if Web Crypto is unavailable (e.g. non-secure contexts).
  */
-export function createFileHeader(file: File, chunkSize = DEFAULT_CHUNK_SIZE): TransferPayloadHeader {
+export async function computeSha256(blob: Blob): Promise<string | null> {
+  try {
+    if (
+      typeof crypto !== "undefined" &&
+      crypto.subtle &&
+      typeof crypto.subtle.digest === "function"
+    ) {
+      const buffer = await blob.arrayBuffer();
+      const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Creates header metadata for a file transfer payload with optional batch and checksum info.
+ */
+export function createFileHeader(
+  file: File,
+  chunkSize = DEFAULT_CHUNK_SIZE,
+  batchOptions?: BatchFileOptions
+): TransferPayloadHeader {
   const totalChunks = Math.ceil(file.size / chunkSize) || 1;
   const metadata: FileMetadata = {
     id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -20,6 +55,7 @@ export function createFileHeader(file: File, chunkSize = DEFAULT_CHUNK_SIZE): Tr
     file: metadata,
     totalChunks,
     chunkSize,
+    ...(batchOptions || {}),
   };
 }
 

@@ -37,6 +37,8 @@ export function HotspotAssistantCard() {
 
   const {
     progress,
+    sendFiles,
+    sendPayload,
     acceptIncomingTransfer,
     rejectIncomingTransfer,
     cleanup,
@@ -47,6 +49,18 @@ export function HotspotAssistantCard() {
     password,
     encryption: password ? "WPA" : "nopass",
   });
+
+  const handleTransferSelected = () => {
+    if (selectedPayload.files.length > 0) {
+      sendFiles(selectedPayload.files).catch((err) => {
+        setErrorMsg(err.message);
+      });
+    } else if (selectedPayload.text.trim()) {
+      sendPayload({ text: selectedPayload.text }).catch((err) => {
+        setErrorMsg(err.message);
+      });
+    }
+  };
 
   const handleStartOpticalSender = async () => {
     if (selectedPayload.files.length === 0 && !selectedPayload.text.trim()) {
@@ -256,6 +270,7 @@ export function HotspotAssistantCard() {
         }}
         onAnswerScanned={(decoded) => {
           console.log("Answer decoded:", decoded);
+          handleTransferSelected();
         }}
         onClose={() => setIsOpticalOpen(false)}
       />

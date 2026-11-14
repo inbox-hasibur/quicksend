@@ -7,6 +7,7 @@ import {
   sliceBlobIntoChunks,
   reassembleChunksToBlob,
   reassembleChunksToText,
+  computeSha256,
 } from "@/lib/chunker";
 
 describe("chunker & stream reassembly utilities", () => {
@@ -20,6 +21,46 @@ describe("chunker & stream reassembly utilities", () => {
     expect(header.file?.size).toBe(19);
     expect(header.totalChunks).toBe(4);
     expect(header.chunkSize).toBe(5);
+  });
+
+  it("should create accurate batch file headers with batch metadata", () => {
+    const file = new File(["Batch file data"], "file2.pdf", {
+      type: "application/pdf",
+    });
+    const header = createFileHeader(file, 64 * 1024, {
+      batchId: "batch_abc123",
+      fileIndex: 2,
+      totalFiles: 5,
+      totalBatchBytes: 1048576,
+      sha256: "dummy-hash-hex",
+    });
+
+    expect(header.batchId).toBe("batch_abc123");
+    expect(header.fileIndex).toBe(2);
+    expect(header.totalFiles).toBe(5);
+    expect(header.totalBatchBytes).toBe(1048576);
+    expect(header.sha256).toBe("dummy-hash-hex");
+  });
+
+  it("should compute accurate SHA-256 hex digest for blob payloads", async () => {
+    const blob = new Blob(["hello world"], { type: "text/plain" });
+    const hash = await computeSha256(blob);
+
+    // Known SHA-256 digest of "hello world"
+    expect(hash).toBe("b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
+  });
+
+  it("should return null gracefully if crypto.subtle is unavailable", async () => {
+    const originalCrypto = globalThis.crypto;
+    try {
+      // @ts-expect-error simulating non-secure context
+      delete globalThis.crypto;
+      const blob = new Blob(["test"], { type: "text/plain" });
+      const hash = await computeSha256(blob);
+      expect(hash).toBeNull();
+    } finally {
+      globalThis.crypto = originalCrypto;
+    }
   });
 
   it("should create accurate text header with preview and lengths", () => {

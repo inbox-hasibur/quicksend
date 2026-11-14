@@ -9,7 +9,15 @@ import {
   createFileHeader,
   createTextHeader,
   DEFAULT_CHUNK_SIZE,
+  computeSha256,
+  MAX_CHECKSUM_FILE_SIZE,
 } from "@/lib/chunker";
+import {
+  createDiskStreamWriter,
+  DISK_STREAM_THRESHOLD,
+  isFileSystemAccessSupported,
+  type DiskStreamWriter,
+} from "@/lib/diskStream";
 import {
   getRtcConfig,
   ICE_CONNECTION_TIMEOUT_MS,
@@ -50,6 +58,13 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const iceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isConnectedRef = useRef<boolean>(false);
 
+  // Batch queue & disk streaming refs
+  const diskWriterRef = useRef<DiskStreamWriter | null>(null);
+  const hasReceiverAcceptedBatchRef = useRef<string | null>(null);
+  const hasAcceptedRef = useRef<boolean>(false);
+  const acceptedResolverRef = useRef<(() => void) | null>(null);
+  const receivedChunkCountRef = useRef<number>(0);
+
   const clearIceTimeout = useCallback(() => {
     if (iceTimerRef.current) {
       clearTimeout(iceTimerRef.current);
@@ -79,6 +94,16 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const cleanup = useCallback(() => {
     clearIceTimeout();
     isConnectedRef.current = false;
+    hasAcceptedRef.current = false;
+    hasReceiverAcceptedBatchRef.current = null;
+    if (acceptedResolverRef.current) {
+      acceptedResolverRef.current = null;
+    }
+    if (diskWriterRef.current) {
+      diskWriterRef.current.abort().catch(() => {});
+      diskWriterRef.current = null;
+    }
+
     signalingRef.current.leaveRoom();
     if (dcRef.current) {
       dcRef.current.close();
@@ -89,6 +114,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       pcRef.current = null;
     }
     receivedChunksRef.current = [];
+    receivedChunkCountRef.current = 0;
     currentHeaderRef.current = null;
     candidateQueueRef.current = [];
     setIsConnected(false);
@@ -101,8 +127,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
     };
   }, [cleanup]);
 
-  // Receiver handling incoming chunks
-  const handleIncomingData = useCallback((data: unknown) => {
+  // Receiver handling incoming chunks & headers
+  const handleIncomingData = useCallback(async (data: unknown) => {
     if (typeof data === "string") {
       try {
         const msg = JSON.parse(data);
@@ -111,38 +137,79 @@ export function useWebRTC(mode: TransferMode = "internet") {
           currentHeaderRef.current = header;
           setPendingHeader(header);
           receivedChunksRef.current = [];
+          receivedChunkCountRef.current = 0;
           startTimeRef.current = Date.now();
 
           const totalBytes =
             header.type === "file" ? header.file?.size || 0 : header.text?.length || 0;
 
-          setProgress({
-            status: "waiting-acceptance",
-            itemType: header.type,
-            fileName: header.file?.name,
-            fileSize: header.file?.size,
-            textPreview: header.text?.preview,
-            bytesTransferred: 0,
-            totalBytes,
-            progressPercentage: 0,
-            speedBps: 0,
-          });
+          // If this is part of a previously accepted batch (e.g. file 2 of 5), don't block on modal
+          const isAutoAcceptedBatch = Boolean(
+            header.batchId &&
+              hasReceiverAcceptedBatchRef.current === header.batchId &&
+              header.fileIndex &&
+              header.fileIndex > 1
+          );
+
+          if (isAutoAcceptedBatch) {
+            setProgress({
+              status: "transferring",
+              itemType: header.type,
+              fileName: header.file?.name,
+              fileSize: header.file?.size,
+              textPreview: header.text?.preview,
+              bytesTransferred: 0,
+              totalBytes,
+              progressPercentage: 0,
+              speedBps: 0,
+              batchId: header.batchId,
+              fileIndex: header.fileIndex,
+              totalFiles: header.totalFiles,
+              totalBatchBytes: header.totalBatchBytes,
+              sha256: header.sha256,
+              isVerified: false,
+            });
+          } else {
+            setProgress({
+              status: "waiting-acceptance",
+              itemType: header.type,
+              fileName: header.file?.name,
+              fileSize: header.file?.size,
+              textPreview: header.text?.preview,
+              bytesTransferred: 0,
+              totalBytes,
+              progressPercentage: 0,
+              speedBps: 0,
+              batchId: header.batchId,
+              fileIndex: header.fileIndex,
+              totalFiles: header.totalFiles,
+              totalBatchBytes: header.totalBatchBytes,
+              sha256: header.sha256,
+              isVerified: false,
+            });
+          }
         }
       } catch {
         // Non-json string, ignore
       }
     } else if (data instanceof ArrayBuffer) {
-      receivedChunksRef.current.push(data);
       const header = currentHeaderRef.current;
       if (!header) return;
+
+      receivedChunkCountRef.current++;
+
+      if (diskWriterRef.current) {
+        await diskWriterRef.current.writeChunk(data);
+      } else {
+        receivedChunksRef.current.push(data);
+      }
 
       const totalBytes =
         header.type === "file" ? header.file?.size || 0 : header.text?.length || 0;
 
-      const currentBytes = receivedChunksRef.current.reduce(
-        (acc, chunk) => acc + chunk.byteLength,
-        0
-      );
+      const currentBytes = diskWriterRef.current
+        ? Math.min(totalBytes, receivedChunkCountRef.current * DEFAULT_CHUNK_SIZE)
+        : receivedChunksRef.current.reduce((acc, chunk) => acc + chunk.byteLength, 0);
 
       const progressPercent = Math.min(100, Math.round((currentBytes / totalBytes) * 100));
       const elapsedSec = (Date.now() - startTimeRef.current) / 1000 || 0.1;
@@ -156,10 +223,25 @@ export function useWebRTC(mode: TransferMode = "internet") {
         speedBps: speed,
       }));
 
-      // Check if all chunks received
-      if (receivedChunksRef.current.length >= header.totalChunks) {
-        if (header.type === "file" && header.file) {
+      // Check if all chunks received for this item
+      if (receivedChunkCountRef.current >= header.totalChunks) {
+        let isVerified = false;
+
+        if (diskWriterRef.current) {
+          await diskWriterRef.current.close();
+          diskWriterRef.current = null;
+          isVerified = true;
+        } else if (header.type === "file" && header.file) {
           const blob = reassembleChunksToBlob(receivedChunksRef.current, header.file.type);
+
+          // Verify SHA-256 checksum if provided and file size <= 150MB
+          if (header.sha256 && header.file.size <= MAX_CHECKSUM_FILE_SIZE) {
+            const computedHash = await computeSha256(blob);
+            isVerified = computedHash === header.sha256;
+          } else {
+            isVerified = Boolean(header.sha256);
+          }
+
           const url = URL.createObjectURL(blob);
           const a = document.createElement("a");
           a.href = url;
@@ -175,12 +257,18 @@ export function useWebRTC(mode: TransferMode = "internet") {
           fullText = reassembleChunksToText(receivedChunksRef.current);
         }
 
+        const isLastInBatch =
+          !header.totalFiles ||
+          !header.fileIndex ||
+          header.fileIndex >= header.totalFiles;
+
         setProgress((prev) => ({
           ...prev,
-          status: "completed",
+          status: isLastInBatch ? "completed" : "transferring",
           textContent: fullText,
           progressPercentage: 100,
           speedBps: 0,
+          isVerified,
         }));
       }
     }
@@ -220,7 +308,11 @@ export function useWebRTC(mode: TransferMode = "internet") {
             try {
               const msg = JSON.parse(event.data);
               if (msg.type === "transfer-accepted") {
-                // Receiver accepted, transmission begins
+                hasAcceptedRef.current = true;
+                if (acceptedResolverRef.current) {
+                  acceptedResolverRef.current();
+                  acceptedResolverRef.current = null;
+                }
               }
             } catch {
               // Ignore non-json
@@ -308,7 +400,6 @@ export function useWebRTC(mode: TransferMode = "internet") {
       switch (message.type) {
         case "peer-joined": {
           if (currentRole === "sender" && pc) {
-            // Receiver joined! Sender creates DataChannel and offer
             const dc = pc.createDataChannel("share-channel", { ordered: true });
             dcRef.current = dc;
             setupDataChannel(dc, "sender");
@@ -327,7 +418,6 @@ export function useWebRTC(mode: TransferMode = "internet") {
               new RTCSessionDescription(message.payload as RTCSessionDescriptionInit)
             );
 
-            // Drain queued ICE candidates
             while (candidateQueueRef.current.length > 0) {
               const cand = candidateQueueRef.current.shift();
               if (cand) await pcInstance.addIceCandidate(new RTCIceCandidate(cand));
@@ -367,11 +457,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
         }
 
         case "transfer-accepted": {
-          // Sender notified of receiver acceptance
+          hasAcceptedRef.current = true;
+          if (acceptedResolverRef.current) {
+            acceptedResolverRef.current();
+            acceptedResolverRef.current = null;
+          }
           break;
         }
 
         case "transfer-rejected": {
+          hasAcceptedRef.current = false;
+          if (acceptedResolverRef.current) {
+            acceptedResolverRef.current = null;
+          }
           setProgress((prev) => ({
             ...prev,
             status: "rejected",
@@ -436,33 +534,119 @@ export function useWebRTC(mode: TransferMode = "internet") {
     [cleanup, createPeerConnection, handleSignalMessage, startIceTimeout]
   );
 
-  // Sender sends payload (File or Text)
-  const sendPayload = useCallback(async (payload: { file?: File; text?: string }) => {
+  // Sequential Multi-File Batch Queue Sender
+  const sendFiles = useCallback(async (files: File[]) => {
+    const dc = dcRef.current;
+    if (!dc || dc.readyState !== "open") {
+      throw new Error("WebRTC DataChannel is not open for transfer");
+    }
+    if (files.length === 0) return;
+
+    const totalBatchBytes = files.reduce((acc, f) => acc + f.size, 0);
+    const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    let accumulatedBatchBytes = 0;
+
+    for (let i = 0; i < files.length; i++) {
+      const currentFile = files[i];
+
+      // Calculate SHA-256 checksum for integrity check
+      let sha256: string | null = null;
+      if (currentFile.size <= MAX_CHECKSUM_FILE_SIZE) {
+        sha256 = await computeSha256(currentFile);
+      }
+
+      const header = createFileHeader(currentFile, DEFAULT_CHUNK_SIZE, {
+        batchId,
+        fileIndex: i + 1,
+        totalFiles: files.length,
+        totalBatchBytes,
+        sha256: sha256 || undefined,
+      });
+
+      setProgress({
+        status: "transferring",
+        itemType: "file",
+        fileName: currentFile.name,
+        fileSize: currentFile.size,
+        bytesTransferred: 0,
+        totalBytes: currentFile.size,
+        progressPercentage: 0,
+        speedBps: 0,
+        batchId,
+        fileIndex: i + 1,
+        totalFiles: files.length,
+        totalBatchBytes,
+        batchBytesTransferred: accumulatedBatchBytes,
+        sha256: sha256 || undefined,
+        isVerified: Boolean(sha256),
+      });
+
+      // 1. Send header JSON
+      dc.send(JSON.stringify({ type: "header", header }));
+
+      // 2. Wait for receiver acceptance on the first file
+      if (i === 0 && !hasAcceptedRef.current) {
+        await new Promise<void>((resolve) => {
+          acceptedResolverRef.current = resolve;
+        });
+        hasAcceptedRef.current = true;
+      }
+
+      // 3. Stream binary chunks with backpressure
+      startTimeRef.current = Date.now();
+      let sentFileBytes = 0;
+
+      for await (const chunkInfo of sliceBlobIntoChunks(currentFile, DEFAULT_CHUNK_SIZE)) {
+        while (dc.bufferedAmount > BUFFER_THRESHOLD) {
+          await new Promise((resolve) => setTimeout(resolve, 30));
+        }
+
+        dc.send(chunkInfo.chunk);
+        sentFileBytes += chunkInfo.chunk.byteLength;
+
+        const progressPercent = Math.min(100, Math.round((sentFileBytes / currentFile.size) * 100));
+        const elapsedSec = (Date.now() - startTimeRef.current) / 1000 || 0.1;
+        const speed = Math.round(sentFileBytes / elapsedSec);
+
+        setProgress((prev) => ({
+          ...prev,
+          bytesTransferred: sentFileBytes,
+          progressPercentage: progressPercent,
+          speedBps: speed,
+          batchBytesTransferred: accumulatedBatchBytes + sentFileBytes,
+        }));
+      }
+
+      accumulatedBatchBytes += currentFile.size;
+
+      // Small pause between sequential files to allow receiver to flush and trigger download
+      if (i < files.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      }
+    }
+
+    setProgress((prev) => ({
+      ...prev,
+      status: "completed",
+      progressPercentage: 100,
+      speedBps: 0,
+    }));
+  }, []);
+
+  // Text snippet sender
+  const sendText = useCallback(async (text: string) => {
     const dc = dcRef.current;
     if (!dc || dc.readyState !== "open") {
       throw new Error("WebRTC DataChannel is not open for transfer");
     }
 
-    const { file, text } = payload;
-    let header: TransferPayloadHeader;
-    let blobToSend: Blob;
-
-    if (file) {
-      header = createFileHeader(file);
-      blobToSend = file;
-    } else if (text) {
-      header = createTextHeader(text);
-      blobToSend = new Blob([text], { type: "text/plain;charset=utf-8" });
-    } else {
-      throw new Error("No file or text provided to transfer");
-    }
-
+    const header = createTextHeader(text);
+    const blobToSend = new Blob([text], { type: "text/plain;charset=utf-8" });
     const totalBytes = blobToSend.size;
+
     setProgress({
       status: "transferring",
-      itemType: header.type,
-      fileName: file?.name,
-      fileSize: file?.size,
+      itemType: "text",
       textPreview: header.text?.preview,
       bytesTransferred: 0,
       totalBytes,
@@ -470,15 +654,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
       speedBps: 0,
     });
 
-    // 1. Send header JSON
     dc.send(JSON.stringify({ type: "header", header }));
 
-    // 2. Stream binary chunks with backpressure
+    if (!hasAcceptedRef.current) {
+      await new Promise<void>((resolve) => {
+        acceptedResolverRef.current = resolve;
+      });
+      hasAcceptedRef.current = true;
+    }
+
     startTimeRef.current = Date.now();
     let sentBytes = 0;
 
     for await (const chunkInfo of sliceBlobIntoChunks(blobToSend, DEFAULT_CHUNK_SIZE)) {
-      // Manage buffer backpressure
       while (dc.bufferedAmount > BUFFER_THRESHOLD) {
         await new Promise((resolve) => setTimeout(resolve, 30));
       }
@@ -506,9 +694,47 @@ export function useWebRTC(mode: TransferMode = "internet") {
     }));
   }, []);
 
-  // Receiver accepts incoming payload
-  const acceptIncomingTransfer = useCallback(() => {
+  // Universal payload sender
+  const sendPayload = useCallback(
+    async (payload: { files?: File[]; file?: File; text?: string }) => {
+      if (payload.files && payload.files.length > 0) {
+        await sendFiles(payload.files);
+      } else if (payload.file) {
+        await sendFiles([payload.file]);
+      } else if (payload.text) {
+        await sendText(payload.text);
+      } else {
+        throw new Error("No file or text provided to transfer");
+      }
+    },
+    [sendFiles, sendText]
+  );
+
+  // Receiver accepts incoming payload (with disk streaming support for files > 100MB)
+  const acceptIncomingTransfer = useCallback(async () => {
     const dc = dcRef.current;
+    const header = currentHeaderRef.current;
+
+    // Check if large-file disk streaming applies
+    if (
+      header?.file &&
+      header.file.size > DISK_STREAM_THRESHOLD &&
+      isFileSystemAccessSupported()
+    ) {
+      try {
+        const writer = await createDiskStreamWriter(header.file.name);
+        if (writer) {
+          diskWriterRef.current = writer;
+        }
+      } catch {
+        // Fall back gracefully to in-memory Blob
+      }
+    }
+
+    if (header?.batchId) {
+      hasReceiverAcceptedBatchRef.current = header.batchId;
+    }
+
     if (dc && dc.readyState === "open") {
       dc.send(JSON.stringify({ type: "transfer-accepted" }));
     }
@@ -520,6 +746,10 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   // Receiver rejects incoming payload
   const rejectIncomingTransfer = useCallback(() => {
+    const dc = dcRef.current;
+    if (dc && dc.readyState === "open") {
+      dc.send(JSON.stringify({ type: "transfer-rejected" }));
+    }
     signalingRef.current.sendSignal("transfer-rejected").catch(() => {});
     setProgress((prev) => ({
       ...prev,
@@ -537,6 +767,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
     pendingHeader,
     startSender,
     startReceiver,
+    sendFiles,
+    sendText,
     sendPayload,
     acceptIncomingTransfer,
     rejectIncomingTransfer,

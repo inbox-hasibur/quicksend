@@ -47,6 +47,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     progress,
     startSender,
     startReceiver,
+    sendFiles,
     sendPayload,
     acceptIncomingTransfer,
     rejectIncomingTransfer,
@@ -88,7 +89,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
   // When sender dataChannel connects to receiver, automatically stream payload
   if (rtcRole === "sender" && isConnected && progress.status === "connecting") {
     if (selectedPayload.files.length > 0) {
-      sendPayload({ file: selectedPayload.files[0] }).catch((err) => {
+      sendFiles(selectedPayload.files).catch((err) => {
         setErrorMsg(err.message);
       });
     } else if (selectedPayload.text.trim()) {
