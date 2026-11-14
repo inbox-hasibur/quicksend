@@ -154,6 +154,9 @@ flowchart TD
 - **Purpose:** Primary landing hub for "QuickSend". Wraps `<ModeSelector />` in `<Suspense>` so dynamic search params (`?room=123456`) hydrate cleanly while maintaining static prerendering.
 - **Exports:** `default Home(): JSX.Element`
 
+#### `src/app/globals.css`
+- **Purpose:** Global styling, theme tokens (light & dark mode soft glass variables: `--bg`, `--surface`, `--surface-glass`, `--border-soft`, `--text`, `--text-muted`, `--accent`, `--accent-soft`, `--radius-card`, `--shadow-soft`), and utility classes (`.glass-card`, `.pill`, `.pill-active`).
+
 #### `src/app/api/signal/route.ts`
 - **Purpose:** Next.js Route Handler (`GET`, `POST`) for ephemeral room coordination, SDP offer/answer exchange, and ICE candidate delivery. Automatically cleans up expired rooms (>15 mins).
 - **Exports:** `GET(request: Request)`, `POST(request: Request)`
