@@ -40,7 +40,7 @@ export function HotspotAssistantCard() {
     acceptIncomingTransfer,
     rejectIncomingTransfer,
     cleanup,
-  } = useWebRTC();
+  } = useWebRTC("hotspot");
 
   const wifiQrString = buildWifiQrString({
     ssid,

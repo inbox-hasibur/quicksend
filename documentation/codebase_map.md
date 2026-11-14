@@ -28,13 +28,14 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS v4 (@tailwindcss/turbopack)"]
-        Vitest["Vitest v5 + happy-dom (40 Passing Tests)"]
+        Vitest["Vitest v5 + happy-dom (70 Passing Tests)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
         Layout["layout.tsx (Root Shell, Font Injection)"]
         Page["page.tsx (4-Mode Home Hub & URL Param Receiver)"]
         Manifest["manifest.ts (PWA Web App Manifest)"]
+        HealthAPI["api/health/route.ts (Health Check & Runtime Telemetry)"]
         SignalAPI["api/signal/route.ts (Room Signaling & Ephemeral Relay)"]
         SignalAPITests["api/signal/__tests__/route.test.ts (API Route Tests)"]
     end
@@ -71,6 +72,8 @@ flowchart TD
         CodeGen["codeGenerator.ts (generateRoomCode, formatRoomCode, normalizeRoomCode)"]
         Chunker["chunker.ts (sliceBlobIntoChunks, reassembly, formatBytes, formatSpeed)"]
         SigClient["signalingClient.ts (SignalingClient: Room & Signal Polling Engine)"]
+        SignalStore["signalStore.ts (Dual-Mode: Upstash Redis REST + Memory TTL)"]
+        IceConfig["iceConfig.ts (Multi-Provider STUN Pool + TURN Config)"]
         WifiQr["wifiQr.ts (buildWifiQrString, parseWifiQrString, ANDROID_INTENTS)"]
         OpticalSdp["opticalSdp.ts (encodeOpticalSdp, decodeOpticalSdp, compactSdp)"]
     end
@@ -163,12 +166,16 @@ flowchart TD
 #### `src/app/globals.css`
 - **Purpose:** Global styling, theme tokens (light & dark mode soft glass variables: `--bg`, `--surface`, `--surface-glass`, `--border-soft`, `--text`, `--text-muted`, `--accent`, `--accent-soft`, `--radius-card`, `--shadow-soft`), and utility classes (`.glass-card`, `.pill`, `.pill-active`).
 
+#### `src/app/api/health/route.ts`
+- **Purpose:** Public operational health endpoint returning `{ ok: true, app: "quicksend", storage: "redis" | "memory", timestamp }`.
+- **Exports:** `GET(): Promise<NextResponse>`
+
 #### `src/app/api/signal/route.ts`
-- **Purpose:** Next.js Route Handler (`GET`, `POST`) for ephemeral room coordination, SDP offer/answer exchange, and ICE candidate delivery. Automatically cleans up expired rooms (>15 mins).
+- **Purpose:** Next.js Route Handler (`GET`, `POST`) for ephemeral room coordination, SDP offer/answer exchange, and ICE candidate delivery. Backed by `signalStore` adapter with clean HTTP status codes (`400`, `404`, `409`, `200`).
 - **Exports:** `GET(request: Request)`, `POST(request: Request)`
 
 #### `src/app/api/signal/__tests__/route.test.ts`
-- **Purpose:** Integration test suite verifying room creation, room query by code, peer joining, signaling delivery, and cleanup.
+- **Purpose:** Integration test suite verifying room creation, room query by code, peer joining, signaling delivery, error codes, and cleanup.
 
 ---
 
@@ -268,6 +275,14 @@ flowchart TD
 - **Purpose:** ArrayBuffer slicing (64KB chunks), async chunk generator, stream reassembly to Blob or UTF-8 text, and byte/speed formatting.
 - **Exports:** `createFileHeader`, `createTextHeader`, `formatBytes`, `formatSpeed`, `sliceBlobIntoChunks`, `reassembleChunksToBlob`, `reassembleChunksToText`.
 
+#### `src/lib/signalStore.ts`
+- **Purpose:** Dual-mode storage adapter for ephemeral signaling rooms. Seamlessly switches between zero-dependency Redis REST mode (using native `fetch` with Upstash Redis / Vercel KV REST API) and in-memory TTL mode with capacity guard and automatic 15-minute pruning.
+- **Exports:** `signalStore`, `MemorySignalStore`, `RedisSignalStore`, `isRedisConfigured`, `getSignalStore`.
+
+#### `src/lib/iceConfig.ts`
+- **Purpose:** Resilient WebRTC ICE / STUN configuration providing multi-provider public STUN pool (Google + Cloudflare), optional TURN relay injection (`NEXT_PUBLIC_TURN_URL`), mode-specific RTCConfiguration generator (`getRtcConfig`), and 10-second ICE connection timeout watchdog.
+- **Exports:** `PUBLIC_STUN_SERVERS`, `getTurnServers`, `getRtcConfig`, `ICE_CONNECTION_TIMEOUT_MS`, `FIREWALL_FALLBACK_MESSAGE`.
+
 #### `src/lib/signalingClient.ts`
 - **Purpose:** Client-side HTTP polling signaling engine coordinating with `/api/signal`. Manages message timestamps, room join notifications, and signal transmission.
 - **Exports:** `SignalingClient` class.
@@ -301,6 +316,6 @@ flowchart TD
 
 ---
 
-## 4. Sprint Status: All Sprints Completed & Tactile Redesign Deployed
-All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with the tactile workspace & typography polish are fully implemented, verified with 45 passing unit tests, and production build ready.
+## 4. Sprint Status: All Sprints Completed & WebRTC Backend Hardened
+All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with the tactile workspace redesign and dual-mode signaling store (Redis REST + Memory TTL) are fully implemented, verified with 70 passing unit tests across 12 test suites, and production build ready.
 ```

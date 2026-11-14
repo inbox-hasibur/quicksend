@@ -135,7 +135,12 @@
 - [x] Create reusable `FileTypeBadge` component (`src/components/FileTypeBadge.tsx`) with color-coded badges for PDF, images, docs, archives, video, audio, and text.
 - [x] Integrate desktop left navigation rail in `ModeSelector.tsx` alongside main elevated workspace card for 1-click mode switching.
 - [x] Upgrade typography across all components (`Dropzone`, `QRCodeDisplay`, `TransferModal`, `TransferHistoryModal`) with oversized `tabular-nums` for PINs, file sizes, and transfer rates.
+- [x] Harden WebRTC signaling backend with dual-mode store (`src/lib/signalStore.ts`): zero-dependency Redis REST mode (`UPSTASH_REDIS_REST_URL` / `KV_REST_API_URL`) and in-memory fallback with TTL pruning and capacity guard.
+- [x] Refactor `/api/signal` route handler to return clean standard HTTP status codes (`400`, `404`, `409`, `200`).
+- [x] Build resilient multi-provider public STUN pool (`src/lib/iceConfig.ts`) with Google and Cloudflare STUN servers, plus optional TURN server injection (`NEXT_PUBLIC_TURN_URL`).
+- [x] Add 10-second ICE connection timeout watchdog and restrictive firewall/symmetric NAT fallback diagnostic prompt.
+- [x] Implement health check endpoint `GET /api/health` returning app identifier, storage mode, and server timestamp.
 - [x] **Sprint 4 Testing & Verification Gate:**
-  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, and FileTypeBadge (`src/components/__tests__/FileTypeBadge.test.tsx`).
-  - Full end-to-end regression test suite passing across all components and utilities.
-  - Verification that `npm test` (45/45 passed), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
+  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, and Health endpoint.
+  - Full end-to-end regression test suite passing across all components, APIs, and utilities.
+  - Verification that `npm test` (70/70 passed across 12 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.

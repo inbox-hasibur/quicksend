@@ -10,21 +10,21 @@ import {
   createTextHeader,
   DEFAULT_CHUNK_SIZE,
 } from "@/lib/chunker";
+import {
+  getRtcConfig,
+  ICE_CONNECTION_TIMEOUT_MS,
+  FIREWALL_FALLBACK_MESSAGE,
+} from "@/lib/iceConfig";
 import type { PeerRole, SignalMessage } from "@/types/signaling";
+import type { TransferMode } from "@/types/mode";
 import type {
   TransferProgressState,
   TransferPayloadHeader,
 } from "@/types/transfer";
 
-const RTC_CONFIG: RTCConfiguration = {
-  iceServers: [
-    { urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] },
-  ],
-};
-
 const BUFFER_THRESHOLD = 1024 * 1024; // 1 MB backpressure threshold
 
-export function useWebRTC() {
+export function useWebRTC(mode: TransferMode = "internet") {
   const [role, setRole] = useState<PeerRole | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
   const [roomCode, setRoomCode] = useState<string | null>(null);
@@ -47,9 +47,38 @@ export function useWebRTC() {
   const currentHeaderRef = useRef<TransferPayloadHeader | null>(null);
   const startTimeRef = useRef<number>(0);
   const candidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
+  const iceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isConnectedRef = useRef<boolean>(false);
+
+  const clearIceTimeout = useCallback(() => {
+    if (iceTimerRef.current) {
+      clearTimeout(iceTimerRef.current);
+      iceTimerRef.current = null;
+    }
+  }, []);
+
+  const startIceTimeout = useCallback(() => {
+    clearIceTimeout();
+    iceTimerRef.current = setTimeout(() => {
+      if (!isConnectedRef.current) {
+        setProgress((prev) => {
+          if (prev.status === "connecting") {
+            return {
+              ...prev,
+              status: "error",
+              errorMessage: FIREWALL_FALLBACK_MESSAGE,
+            };
+          }
+          return prev;
+        });
+      }
+    }, ICE_CONNECTION_TIMEOUT_MS);
+  }, [clearIceTimeout]);
 
   // Cleanup helper
   const cleanup = useCallback(() => {
+    clearIceTimeout();
+    isConnectedRef.current = false;
     signalingRef.current.leaveRoom();
     if (dcRef.current) {
       dcRef.current.close();
@@ -64,7 +93,7 @@ export function useWebRTC() {
     candidateQueueRef.current = [];
     setIsConnected(false);
     setPendingHeader(null);
-  }, []);
+  }, [clearIceTimeout]);
 
   useEffect(() => {
     return () => {
@@ -100,37 +129,34 @@ export function useWebRTC() {
           });
         }
       } catch {
-        // Ignore non-json
+        // Non-json string, ignore
       }
-      return;
-    }
-
-    if (data instanceof ArrayBuffer) {
+    } else if (data instanceof ArrayBuffer) {
+      receivedChunksRef.current.push(data);
       const header = currentHeaderRef.current;
       if (!header) return;
 
-      receivedChunksRef.current.push(data);
       const totalBytes =
         header.type === "file" ? header.file?.size || 0 : header.text?.length || 0;
 
-      const receivedBytes = receivedChunksRef.current.reduce(
-        (sum, chunk) => sum + chunk.byteLength,
+      const currentBytes = receivedChunksRef.current.reduce(
+        (acc, chunk) => acc + chunk.byteLength,
         0
       );
-      const progressPercent =
-        totalBytes > 0 ? Math.min(100, Math.round((receivedBytes / totalBytes) * 100)) : 100;
+
+      const progressPercent = Math.min(100, Math.round((currentBytes / totalBytes) * 100));
       const elapsedSec = (Date.now() - startTimeRef.current) / 1000 || 0.1;
-      const speed = Math.round(receivedBytes / elapsedSec);
+      const speed = Math.round(currentBytes / elapsedSec);
 
       setProgress((prev) => ({
         ...prev,
         status: "transferring",
-        bytesTransferred: receivedBytes,
+        bytesTransferred: currentBytes,
         progressPercentage: progressPercent,
         speedBps: speed,
       }));
 
-      // Check completion
+      // Check if all chunks received
       if (receivedChunksRef.current.length >= header.totalChunks) {
         if (header.type === "file" && header.file) {
           const blob = reassembleChunksToBlob(receivedChunksRef.current, header.file.type);
@@ -166,10 +192,13 @@ export function useWebRTC() {
       dc.binaryType = "arraybuffer";
 
       dc.onopen = () => {
+        clearIceTimeout();
+        isConnectedRef.current = true;
         setIsConnected(true);
       };
 
       dc.onclose = () => {
+        isConnectedRef.current = false;
         setIsConnected(false);
       };
 
@@ -200,7 +229,7 @@ export function useWebRTC() {
         };
       }
     },
-    [handleIncomingData]
+    [handleIncomingData, clearIceTimeout]
   );
 
   // Setup Peer Connection
@@ -210,7 +239,8 @@ export function useWebRTC() {
         pcRef.current.close();
       }
 
-      const pc = new RTCPeerConnection(RTC_CONFIG);
+      const config = getRtcConfig(mode);
+      const pc = new RTCPeerConnection(config);
       pcRef.current = pc;
 
       pc.onicecandidate = (event) => {
@@ -221,15 +251,39 @@ export function useWebRTC() {
         }
       };
 
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === "failed") {
+          clearIceTimeout();
+          isConnectedRef.current = false;
+          setIsConnected(false);
+          setProgress((prev) => ({
+            ...prev,
+            status: "error",
+            errorMessage: FIREWALL_FALLBACK_MESSAGE,
+          }));
+        }
+      };
+
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === "connected") {
+          clearIceTimeout();
+          isConnectedRef.current = true;
           setIsConnected(true);
         } else if (
           pc.connectionState === "failed" ||
           pc.connectionState === "disconnected" ||
           pc.connectionState === "closed"
         ) {
+          isConnectedRef.current = false;
           setIsConnected(false);
+          if (pc.connectionState === "failed") {
+            clearIceTimeout();
+            setProgress((prev) => ({
+              ...prev,
+              status: "error",
+              errorMessage: FIREWALL_FALLBACK_MESSAGE,
+            }));
+          }
         }
       };
 
@@ -243,7 +297,7 @@ export function useWebRTC() {
 
       return pc;
     },
-    [setupDataChannel]
+    [mode, setupDataChannel, clearIceTimeout]
   );
 
   // Process incoming signaling messages
@@ -269,7 +323,9 @@ export function useWebRTC() {
         case "offer": {
           if (currentRole === "receiver") {
             const pcInstance = pc || createPeerConnection("receiver");
-            await pcInstance.setRemoteDescription(new RTCSessionDescription(message.payload as RTCSessionDescriptionInit));
+            await pcInstance.setRemoteDescription(
+              new RTCSessionDescription(message.payload as RTCSessionDescriptionInit)
+            );
 
             // Drain queued ICE candidates
             while (candidateQueueRef.current.length > 0) {
@@ -286,7 +342,9 @@ export function useWebRTC() {
 
         case "answer": {
           if (currentRole === "sender" && pc) {
-            await pc.setRemoteDescription(new RTCSessionDescription(message.payload as RTCSessionDescriptionInit));
+            await pc.setRemoteDescription(
+              new RTCSessionDescription(message.payload as RTCSessionDescriptionInit)
+            );
             while (candidateQueueRef.current.length > 0) {
               const cand = candidateQueueRef.current.shift();
               if (cand) await pc.addIceCandidate(new RTCIceCandidate(cand));
@@ -327,27 +385,31 @@ export function useWebRTC() {
   );
 
   // Sender starts a session
-  const startSender = useCallback(async (customCode?: string): Promise<{ roomId: string; code: string }> => {
-    cleanup();
-    setRole("sender");
-    setProgress({
-      status: "connecting",
-      itemType: "file",
-      bytesTransferred: 0,
-      totalBytes: 0,
-      progressPercentage: 0,
-      speedBps: 0,
-    });
+  const startSender = useCallback(
+    async (customCode?: string): Promise<{ roomId: string; code: string }> => {
+      cleanup();
+      setRole("sender");
+      setProgress({
+        status: "connecting",
+        itemType: "file",
+        bytesTransferred: 0,
+        totalBytes: 0,
+        progressPercentage: 0,
+        speedBps: 0,
+      });
 
-    createPeerConnection("sender");
-    const { roomId: newRoomId, code: newCode } = await signalingRef.current.createRoom(customCode);
-    setRoomId(newRoomId);
-    setRoomCode(newCode);
+      startIceTimeout();
+      createPeerConnection("sender");
+      const { roomId: newRoomId, code: newCode } = await signalingRef.current.createRoom(customCode);
+      setRoomId(newRoomId);
+      setRoomCode(newCode);
 
-    signalingRef.current.startPolling((msg) => handleSignalMessage(msg, "sender"));
+      signalingRef.current.startPolling((msg) => handleSignalMessage(msg, "sender"));
 
-    return { roomId: newRoomId, code: newCode };
-  }, [cleanup, createPeerConnection, handleSignalMessage]);
+      return { roomId: newRoomId, code: newCode };
+    },
+    [cleanup, createPeerConnection, handleSignalMessage, startIceTimeout]
+  );
 
   // Receiver joins a session
   const startReceiver = useCallback(
@@ -363,6 +425,7 @@ export function useWebRTC() {
         speedBps: 0,
       });
 
+      startIceTimeout();
       createPeerConnection("receiver");
       const { roomId: joinedRoomId, code: verifiedCode } = await signalingRef.current.joinRoom(code);
       setRoomId(joinedRoomId);
@@ -370,7 +433,7 @@ export function useWebRTC() {
 
       signalingRef.current.startPolling((msg) => handleSignalMessage(msg, "receiver"));
     },
-    [cleanup, createPeerConnection, handleSignalMessage]
+    [cleanup, createPeerConnection, handleSignalMessage, startIceTimeout]
   );
 
   // Sender sends payload (File or Text)

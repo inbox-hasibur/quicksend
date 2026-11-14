@@ -51,7 +51,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     acceptIncomingTransfer,
     rejectIncomingTransfer,
     cleanup,
-  } = useWebRTC();
+  } = useWebRTC("internet");
 
   // Sender session start
   const handleStartSender = async () => {

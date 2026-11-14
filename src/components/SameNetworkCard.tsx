@@ -32,7 +32,7 @@ export function SameNetworkCard() {
     acceptIncomingTransfer,
     rejectIncomingTransfer,
     cleanup,
-  } = useWebRTC();
+  } = useWebRTC("same-network");
 
   const handleStartOpticalSender = async () => {
     if (selectedPayload.files.length === 0 && !selectedPayload.text.trim()) {

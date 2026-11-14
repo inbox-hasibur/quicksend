@@ -54,7 +54,11 @@ Immediately upon opening the app, users are presented with **4 upfront transfer 
   2. **Role Selection:** User chooses **Send** (upload files/paste text, select pairing strategy, generate room code/QR) or **Receive** (enter PIN, phone number, keyword, or scan QR with camera).
 - **Protocol:** WebRTC Data Channel (`RTCDataChannel`) with lightweight serverless signaling.
 - **Handshake Mechanism:**
-  - Signaling coordinates SDP offer, answer, and ICE candidates via public STUN servers.
+  - Signaling coordinates SDP offer, answer, and ICE candidates via a multi-provider public STUN pool (Google + Cloudflare) with optional TURN server relay (`NEXT_PUBLIC_TURN_URL`).
+  - Dual-mode serverless signaling store (`signalStore.ts`):
+    - **Redis REST Mode:** Automatically activates with `UPSTASH_REDIS_REST_URL/TOKEN` or `KV_REST_API_URL/TOKEN` using zero npm dependencies via native `fetch`, enforcing 15-minute TTL expiration.
+    - **In-Memory TTL Fallback:** Zero-config single-node fallback with stale room pruning and max capacity guard.
+  - Automatic 10-second ICE timeout watchdog detecting symmetric NAT / corporate firewall blockage and suggesting Mode 2 (Same Wi-Fi) or Mode 3 (Hotspot) fallbacks.
   - Once peers connect via DTLS/SCTP, the signaling channel is released.
   - Files and text are streamed directly peer-to-peer with end-to-end encryption.
 
@@ -242,6 +246,10 @@ quicksend/
 └── src/
     ├── app/
     │   ├── api/
+    │   │   ├── health/
+    │   │   │   ├── __tests__/
+    │   │   │   │   └── route.test.ts
+    │   │   │   └── route.ts
     │   │   └── signal/
     │   │       ├── __tests__/
     │   │       │   └── route.test.ts
@@ -283,15 +291,19 @@ quicksend/
     │   ├── __tests__/
     │   │   ├── chunker.test.ts
     │   │   ├── codeGenerator.test.ts
+    │   │   ├── iceConfig.test.ts
     │   │   ├── modeAvailability.test.ts
     │   │   ├── nearbyShare.test.ts
     │   │   ├── opticalSdp.test.ts
+    │   │   ├── signalStore.test.ts
     │   │   └── wifiQr.test.ts
     │   ├── .gitkeep
     │   ├── chunker.ts
     │   ├── codeGenerator.ts
+    │   ├── iceConfig.ts
     │   ├── modeAvailability.ts
     │   ├── opticalSdp.ts
+    │   ├── signalStore.ts
     │   ├── signalingClient.ts
     │   └── wifiQr.ts
     └── types/
