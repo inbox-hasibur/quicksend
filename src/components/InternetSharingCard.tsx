@@ -5,12 +5,9 @@ import {
   KeyRound,
   Phone,
   Sparkles,
-  QrCode,
   ArrowRight,
   Camera,
   RefreshCw,
-  Send,
-  Download,
   AlertCircle,
   Users,
 } from "lucide-react";
@@ -18,6 +15,7 @@ import { Dropzone } from "@/components/Dropzone";
 import { QRCodeDisplay } from "@/components/QRCodeDisplay";
 import { QRScannerModal } from "@/components/QRScannerModal";
 import { TransferModal } from "@/components/TransferModal";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
 import type { TransferRole } from "@/types/mode";
@@ -145,33 +143,16 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
             </p>
           </div>
 
-          {/* Segmented Pill Selector (Enrolled / Active style) */}
-          <div className="inline-flex items-center p-1 rounded-full bg-neutral-100 dark:bg-neutral-800/80">
-            <button
-              type="button"
-              onClick={() => setRole("send")}
-              className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                role === "send"
-                  ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
-                  : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              <Send className="h-3.5 w-3.5 text-indigo-500" />
-              <span>Send</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setRole("receive")}
-              className={`flex items-center gap-1.5 px-5 py-2 rounded-full text-xs font-semibold transition-all cursor-pointer ${
-                role === "receive"
-                  ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs"
-                  : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-              }`}
-            >
-              <Download className="h-3.5 w-3.5 text-emerald-500" />
-              <span>Receive</span>
-            </button>
-          </div>
+          {/* Role selector */}
+          <SegmentedControl
+            ariaLabel="Transfer Role"
+            value={role}
+            onChange={(val) => setRole(val as TransferRole)}
+            options={[
+              { value: "send", label: "Send" },
+              { value: "receive", label: "Receive" },
+            ]}
+          />
         </div>
       )}
 
@@ -205,59 +186,18 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                   </span>
                 </div>
 
-                <div className="flex flex-wrap gap-1.5 p-1 rounded-2xl bg-neutral-100/80 dark:bg-neutral-850">
-                  <button
-                    type="button"
-                    onClick={() => setKeyStrategy("auto")}
-                    className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                      keyStrategy === "auto"
-                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-semibold"
-                        : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                    }`}
-                  >
-                    <KeyRound className="h-3.5 w-3.5 text-indigo-500" />
-                    <span>Auto PIN</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setKeyStrategy("phone")}
-                    className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                      keyStrategy === "phone"
-                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-semibold"
-                        : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                    }`}
-                  >
-                    <Phone className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Mobile No.</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setKeyStrategy("keyword")}
-                    className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                      keyStrategy === "keyword"
-                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-semibold"
-                        : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                    }`}
-                  >
-                    <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                    <span>Keyword</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setKeyStrategy("qr")}
-                    className={`flex-1 min-w-[80px] flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all cursor-pointer ${
-                      keyStrategy === "qr"
-                        ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white shadow-xs font-semibold"
-                        : "text-neutral-500 hover:text-neutral-900 dark:hover:text-white"
-                    }`}
-                  >
-                    <QrCode className="h-3.5 w-3.5 text-violet-500" />
-                    <span>QR Code</span>
-                  </button>
-                </div>
+                {/* Pairing method selector */}
+                <SegmentedControl
+                  ariaLabel="Pairing Method"
+                  value={keyStrategy}
+                  onChange={(val) => setKeyStrategy(val as KeyStrategy)}
+                  options={[
+                    { value: "auto", label: "Auto PIN" },
+                    { value: "phone", label: "Mobile No." },
+                    { value: "keyword", label: "Keyword" },
+                    { value: "qr", label: "QR Code" },
+                  ]}
+                />
 
                 {/* Sub-input for Mobile Number */}
                 {keyStrategy === "phone" && (

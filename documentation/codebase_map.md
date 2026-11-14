@@ -97,6 +97,7 @@ flowchart TD
     InternetCard --> QRModal
     InternetCard --> TransferMod
     InternetCard --> CodeGen
+    InternetCard --> SegControl
 
     SameNetCard --> UseRTC
     SameNetCard --> DropzoneComp
@@ -121,6 +122,7 @@ flowchart TD
     QRModal --> QRScan
     QRModal --> CodeGen
     DropzoneComp --> Chunker
+    DropzoneComp --> SegControl
     TransferMod --> Chunker
     UseRTC --> SigClient
     UseRTC --> Chunker

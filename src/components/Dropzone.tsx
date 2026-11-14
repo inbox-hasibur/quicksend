@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, ChangeEvent, DragEvent } from "react";
-import { UploadCloud, File, X, FileText } from "lucide-react";
+import { UploadCloud, File, X } from "lucide-react";
 import { formatBytes } from "@/lib/chunker";
+import { SegmentedControl } from "@/components/SegmentedControl";
 
 interface DropzoneProps {
   onSelectionChange: (payload: { files: File[]; text: string }) => void;
@@ -54,33 +55,16 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
 
   return (
     <div className="w-full space-y-4">
-      {/* Tabs: Files vs Text (Segmented Pill Style) */}
-      <div className="inline-flex rounded-full bg-neutral-100 dark:bg-neutral-850 p-1 text-xs font-semibold">
-        <button
-          type="button"
-          onClick={() => setActiveTab("files")}
-          className={`flex items-center gap-2 px-5 py-2 rounded-full transition-all cursor-pointer ${
-            activeTab === "files"
-              ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-xs"
-              : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
-          }`}
-        >
-          <UploadCloud className="h-4 w-4 text-indigo-500" />
-          <span>Files {files.length > 0 && `(${files.length})`}</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab("text")}
-          className={`flex items-center gap-2 px-5 py-2 rounded-full transition-all cursor-pointer ${
-            activeTab === "text"
-              ? "bg-white dark:bg-neutral-700 text-neutral-900 dark:text-neutral-100 shadow-xs"
-              : "text-neutral-500 hover:text-neutral-900 dark:hover:text-neutral-100"
-          }`}
-        >
-          <FileText className="h-4 w-4 text-amber-500" />
-          <span>Text / Link {text.trim() && "(Ready)"}</span>
-        </button>
-      </div>
+      {/* Tabs: Files vs Text */}
+      <SegmentedControl
+        ariaLabel="Payload Type"
+        value={activeTab}
+        onChange={(val) => setActiveTab(val as "files" | "text")}
+        options={[
+          { value: "files", label: `Files ${files.length > 0 ? `(${files.length})` : ""}`.trim() },
+          { value: "text", label: `Text / Link ${text.trim() ? "(Ready)" : ""}`.trim() },
+        ]}
+      />
 
       {activeTab === "files" ? (
         <div className="space-y-3">
