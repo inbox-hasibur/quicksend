@@ -73,7 +73,7 @@ Immediately upon opening the app, users are presented with **4 upfront transfer 
 - **Handshake Mechanism:**
   - Signaling prioritizes `host` ICE candidates (RFC 1918 private IPv4 addresses: `192.168.x.x`, `10.x.x.x`, `172.16.x.x` or link-local IPv6).
   - Keeps data traffic strictly within the local switch/router, bypassing external WAN bandwidth caps and campus firewall throttling.
-  - **No-Internet LAN Fallback:** If the local Wi-Fi router does not have WAN/internet access to reach the public signaling relay, the UI seamlessly falls back to the **Camera-to-Camera Optical QR Handshake** (Mode 3 engine) to exchange SDP offers/answers offline across the room while streaming data over the local LAN.
+  - **No-Internet LAN Fallback:** If the local Wi-Fi router does not have WAN/internet access to reach the public signaling relay, the UI seamlessly falls back to the **Camera-to-Camera Optical QR Handshake** (Mode 3 engine) to exchange SDP offers/answers offline across the room while streaming data over the local LAN. Features an automated offline network banner and animated QR carousel.
 
 ---
 
@@ -82,15 +82,15 @@ Immediately upon opening the app, users are presented with **4 upfront transfer 
 - **Architectural Reality:** Browsers **cannot** run background HTTP web servers or WebSocket servers due to browser sandbox security models. Therefore, Mode 3 acts as an interactive transfer orchestration interface powered by the cached PWA and optical WebRTC signaling:
   - **Sender Flow:**
     1. Assists user in toggling on their mobile or laptop Wi-Fi Hotspot (provides direct OS settings deep-links where supported on Android, e.g. `intent:#Intent;action=android.settings.WIRELESS_SETTINGS;end`).
-    2. Inputs Hotspot SSID and password to generate a standard Wi-Fi configuration QR code:
+    2. Inputs Hotspot SSID and password (with 1-click random strong password generation) to generate a standard Wi-Fi configuration QR code:
        ```text
        WIFI:T:WPA;S:<SSID>;P:<Password>;;
        ```
-    3. Renders the offline WebRTC SDP offer as an animated/compressed QR code for optical pairing.
+    3. Renders the offline WebRTC SDP offer as an animated sequenced multi-frame QR carousel (`QS1|<index>/<total>|<hash>|<chunk>`) for low-res camera scannability.
   - **Receiver Flow:**
     1. Scans the Wi-Fi QR code with native phone camera or opens Wi-Fi settings (with Android settings shortcuts) to join the hotspot.
     2. Once connected to the sender's hotspot, opens the cached PWA app shell.
-    3. Scans the sender's SDP offer QR code and displays the SDP answer QR code back to the sender's camera.
+    3. Scans the sender's animated SDP offer QR code (with live frame collection progress `Captured X of Y frames`) or pastes code manually if camera is absent, then displays the SDP answer QR code back to the sender's camera.
   - **Data Transfer:** WebRTC `RTCDataChannel` connects over the local hotspot subnet without any internet connection.
 
 ---

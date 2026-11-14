@@ -12,6 +12,7 @@ import {
   Send,
   Download,
   ArrowRight,
+  Sparkles,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Dropzone } from "@/components/Dropzone";
@@ -49,6 +50,15 @@ export function HotspotAssistantCard() {
     password,
     encryption: password ? "WPA" : "nopass",
   });
+
+  const handleGeneratePassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+    let generated = "";
+    for (let i = 0; i < 10; i++) {
+      generated += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setPassword(generated);
+  };
 
   const handleTransferSelected = () => {
     if (selectedPayload.files.length > 0) {
@@ -170,9 +180,19 @@ export function HotspotAssistantCard() {
                 />
               </div>
               <div>
-                <label className="text-[11px] font-semibold text-neutral-500 block mb-1">
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-semibold text-neutral-500">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleGeneratePassword}
+                    className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 hover:underline inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <Sparkles className="h-3 w-3" />
+                    <span>Generate Strong</span>
+                  </button>
+                </div>
                 <input
                   type="text"
                   value={password}

@@ -143,7 +143,11 @@
 - [x] Implement sequential multi-file batch queue (`useWebRTC.ts`, `TransferModal.tsx`, `Dropzone.tsx`) beaming multi-file selections sequentially without dropping connection.
 - [x] Add SHA-256 file integrity checksum generation and receiver verification (`src/lib/chunker.ts`) with `"Verified ✓"` visual badge.
 - [x] Add large-file disk streaming fallback (`src/lib/diskStream.ts`) leveraging `window.showSaveFilePicker` for files > 100MB to prevent browser RAM overflow.
+- [x] Implement multi-frame sequenced optical SDP protocol (`splitOpticalFrames`, `OpticalFrameCollector`) with `QS1|<index>/<total>|<hash>|<chunk>` format for low-res camera scanning.
+- [x] Build animated QR carousel in `OpticalHandshakeModal.tsx` with ~350ms/700ms speed toggles, play/pause controls, frame progress pills, and live incremental collection counter.
+- [x] Add webcam-free manual code fallback (copy/paste compact `OPTSDP:...` strings) for PCs without cameras.
+- [x] Add 1-click strong password generator in `HotspotAssistantCard.tsx` and offline detection banner in `SameNetworkCard.tsx`.
 - [x] **Sprint 4 Testing & Verification Gate:**
-  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, Health endpoint, SHA-256 chunker, and DiskStream fallback.
+  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, Health endpoint, SHA-256 chunker, DiskStream fallback, and Multi-Frame Optical SDP Collector.
   - Full end-to-end regression test suite passing across all components, APIs, and utilities.
-  - Verification that `npm test` (78/78 passed across 13 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
+  - Verification that `npm test` (85/85 passed across 13 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.

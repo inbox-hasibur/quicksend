@@ -4,14 +4,21 @@ import { useEffect, useRef, useState } from "react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Camera, X, AlertCircle, RefreshCw } from "lucide-react";
 import { normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
+import { isOpticalSdp } from "@/lib/opticalSdp";
 
 interface QRScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScanSuccess: (code: string) => void;
+  keepOpenOnScan?: boolean;
 }
 
-export function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRScannerModalProps) {
+export function QRScannerModal({
+  isOpen,
+  onClose,
+  onScanSuccess,
+  keepOpenOnScan = false,
+}: QRScannerModalProps) {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isStarting, setIsStarting] = useState(true);
   const scannerRef = useRef<Html5Qrcode | null>(null);
@@ -40,6 +47,16 @@ export function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRScannerModa
           config,
           (decodedText) => {
             if (!isSubscribed) return;
+
+            // Check if scanned text is an optical SDP frame or package
+            if (isOpticalSdp(decodedText)) {
+              onScanSuccess(decodedText);
+              if (!keepOpenOnScan) {
+                scanner.stop().catch(() => {});
+                onClose();
+              }
+              return;
+            }
 
             // Check if scanned text contains a room query param (e.g. https://.../?room=834291)
             let extractedCode = "";
@@ -96,7 +113,7 @@ export function QRScannerModal({ isOpen, onClose, onScanSuccess }: QRScannerModa
           });
       }
     };
-  }, [isOpen, onClose, onScanSuccess]);
+  }, [isOpen, onClose, onScanSuccess, keepOpenOnScan]);
 
   if (!isOpen) return null;
 

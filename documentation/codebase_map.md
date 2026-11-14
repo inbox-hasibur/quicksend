@@ -28,7 +28,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS v4 (@tailwindcss/turbopack)"]
-        Vitest["Vitest v5 + happy-dom (78 Passing Tests)"]
+        Vitest["Vitest v5 + happy-dom (85 Passing Tests)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -265,8 +265,8 @@ flowchart TD
 - **Exports:** `buildWifiQrString`, `parseWifiQrString`, `ANDROID_INTENTS`.
 
 #### `src/lib/opticalSdp.ts`
-- **Purpose:** WebRTC SDP compressor, host candidate filter, and base64 encoder/decoder for camera-to-camera optical signaling (`OPTSDP:...`).
-- **Exports:** `compactSdp`, `encodeOpticalSdp`, `decodeOpticalSdp`, `isOpticalSdp`.
+- **Purpose:** WebRTC SDP compressor, host candidate filter, multi-frame sequenced QR frame splitter (`splitOpticalFrames`), and incremental stream collector (`OpticalFrameCollector`) supporting animated QR carousels, out-of-order frame reassembly, and camera-free manual copy/paste.
+- **Exports:** `compactSdp`, `encodeOpticalSdp`, `decodeOpticalSdp`, `isOpticalSdp`, `isOpticalFrame`, `splitOpticalFrames`, `computeShortHash`, `OpticalFrameCollector`.
 
 #### `src/lib/codeGenerator.ts`
 - **Purpose:** Cryptographically secure 6-digit room PIN generation, custom key/mobile number preservation, normalization, and flexible 4–20 character room key validation.
@@ -321,6 +321,6 @@ flowchart TD
 
 ---
 
-## 4. Sprint Status: All Sprints Completed & P2P Engine Upgraded
-All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with tactile redesign, dual-mode signaling store, sequential multi-file batch streaming, SHA-256 integrity verification, and large-file disk streaming fallback are fully implemented, verified with 78 passing unit tests across 13 test suites, and production build ready.
+## 4. Sprint Status: All Sprints Completed & Offline Optical Engine Hardened
+All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with tactile redesign, dual-mode signaling store, multi-file batch streaming, SHA-256 verification, disk streaming, and multi-frame animated optical QR signaling with manual camera-free fallback are fully implemented, verified with 85 passing unit tests across 13 test suites, and production build ready.
 ```

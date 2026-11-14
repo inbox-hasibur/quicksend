@@ -14,6 +14,7 @@ import { Dropzone } from "@/components/Dropzone";
 import { TransferModal } from "@/components/TransferModal";
 import { OpticalHandshakeModal } from "@/components/OpticalHandshakeModal";
 import { useWebRTC } from "@/hooks/useWebRTC";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { encodeOpticalSdp } from "@/lib/opticalSdp";
 import type { TransferRole } from "@/types/mode";
 
@@ -26,6 +27,7 @@ export function SameNetworkCard() {
   const [isOpticalOpen, setIsOpticalOpen] = useState(false);
   const [opticalPayloadQr, setOpticalPayloadQr] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const isOnline = useNetworkStatus();
 
   const {
     progress,
@@ -129,6 +131,17 @@ export function SameNetworkCard() {
         <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Offline Alert when No Internet is Present */}
+      {!isOnline && (
+        <div className="flex items-start gap-3 p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-800/60 text-xs text-amber-800 dark:text-amber-300">
+          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
+          <div className="leading-relaxed">
+            <span className="font-semibold">Offline Network Detected: </span>
+            External internet is unreachable on this Wi-Fi. The camera-to-camera optical handshake below enables 100% offline peer connection over your local router subnet.
+          </div>
         </div>
       )}
 
