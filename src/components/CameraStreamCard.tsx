@@ -72,7 +72,8 @@ export function CameraStreamCard() {
       }
       setFrames(encoded);
       setCurrentFrameIndex(0);
-      setIsPlaying(true);
+      // Keep stream initially paused so the user has time to frame the receiver camera
+      setIsPlaying(false);
     } catch (err) {
       console.error("Failed to encode payload to optical frames:", err);
     } finally {
@@ -116,76 +117,94 @@ export function CameraStreamCard() {
         } catch {
           // Ignore stop errors
         }
+        scannerRef.current = null;
       }
 
       const scanner = new Html5Qrcode(readerElementId);
       scannerRef.current = scanner;
 
-      await scanner.start(
-        { facingMode: "environment" },
-        { fps: 15, qrbox: { width: 260, height: 260 }, aspectRatio: 1.0 },
-        async (decodedText) => {
-          if (!isOpticalDataFrame(decodedText)) return;
+      const qrConfig = {
+        fps: 15,
+        qrbox: { width: 260, height: 260 },
+        aspectRatio: 1.0,
+      };
 
-          const res = await collectorRef.current.ingestFrame(decodedText);
-          if (res.status === "collecting") {
-            setScanProgress({
-              fileName: res.fileName,
-              fileSize: res.fileSize,
-              totalChunks: res.totalChunks,
-              receivedCount: res.receivedCount,
-              percentage: res.percentage,
-              missingIndices: res.missingIndices,
-            });
-          } else if (res.status === "completed") {
-            setReceivedPayload(res.payload);
-            setScanProgress(null);
+      const handleScanSuccess = async (decodedText: string) => {
+        if (!isOpticalDataFrame(decodedText)) return;
 
-            // Record to session history
-            addHistoryItem({
-              direction: "received",
-              mode: "Via Camera",
-              itemType: res.payload.text ? "text" : "file",
-              name: res.payload.fileName,
-              size: res.payload.fileSize,
-              status: "completed",
-              textSnippet: res.payload.text?.substring(0, 100),
-            });
+        const res = await collectorRef.current.ingestFrame(decodedText);
+        if (res.status === "collecting") {
+          setScanProgress({
+            fileName: res.fileName,
+            fileSize: res.fileSize,
+            totalChunks: res.totalChunks,
+            receivedCount: res.receivedCount,
+            percentage: res.percentage,
+            missingIndices: res.missingIndices,
+          });
+        } else if (res.status === "completed") {
+          setReceivedPayload(res.payload);
+          setScanProgress(null);
 
-            // Stop scanner cleanly
-            try {
-              await scanner.stop();
-              setIsCameraActive(false);
-            } catch {
-              // Ignore
-            }
+          // Record to session history
+          addHistoryItem({
+            direction: "received",
+            mode: "Via Camera",
+            itemType: res.payload.text ? "text" : "file",
+            name: res.payload.fileName,
+            size: res.payload.fileSize,
+            status: "completed",
+            textSnippet: res.payload.text?.substring(0, 100),
+          });
 
-            // Auto-trigger download for files
-            if (!res.payload.text) {
-              const url = URL.createObjectURL(res.payload.blob);
-              const a = document.createElement("a");
-              a.href = url;
-              a.download = res.payload.fileName;
-              document.body.appendChild(a);
-              a.click();
-              document.body.removeChild(a);
-              setTimeout(() => URL.revokeObjectURL(url), 10000);
-            }
+          // Stop scanner cleanly
+          try {
+            await scanner.stop();
+            setIsCameraActive(false);
+          } catch {
+            // Ignore
           }
-        },
-        () => {
-          // Frame failure (normal when scanning continuous stream)
+
+          // Auto-trigger download for files
+          if (!res.payload.text) {
+            const url = URL.createObjectURL(res.payload.blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = res.payload.fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 10000);
+          }
         }
-      );
+      };
+
+      // Try environment/back camera first (mobile phones)
+      // Fallback to front camera or default webcam (laptops/desktops)
+      try {
+        await scanner.start(
+          { facingMode: "environment" },
+          qrConfig,
+          handleScanSuccess,
+          () => {}
+        );
+      } catch {
+        await scanner.start(
+          { facingMode: "user" },
+          qrConfig,
+          handleScanSuccess,
+          () => {}
+        );
+      }
 
       setIsCameraActive(true);
     } catch (err) {
+      setIsCameraActive(false);
       setCameraError(
         err instanceof Error
           ? err.message
           : "Camera access was denied or is not available. Please allow camera permissions."
       );
-      setIsCameraActive(false);
     }
   }, [addHistoryItem]);
 
@@ -200,6 +219,16 @@ export function CameraStreamCard() {
     }
     setIsCameraActive(false);
   }, []);
+
+  // Auto-start camera when switching to receive mode
+  useEffect(() => {
+    if (role === "receive" && !isCameraActive && !receivedPayload) {
+      const timer = setTimeout(() => {
+        startCamera().catch(() => {});
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [role, isCameraActive, receivedPayload, startCamera]);
 
   // Cleanup camera when component unmounts
   useEffect(() => {
@@ -279,6 +308,47 @@ export function CameraStreamCard() {
             </div>
           ) : (
             <div className="space-y-5">
+              {/* Ready / Streaming Status Notice */}
+              <div
+                className={`p-3 rounded-2xl border text-xs flex flex-col sm:flex-row items-center justify-between gap-3 ${
+                  isPlaying
+                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-300"
+                    : "bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-300"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+                      isPlaying ? "bg-emerald-500 animate-ping" : "bg-amber-500"
+                    }`}
+                  />
+                  <span className="font-semibold text-center sm:text-left">
+                    {isPlaying
+                      ? `Streaming QR Frames (${speedMs}ms/frame)`
+                      : "Stream Paused • Place receiver camera at QR code, then tap Start"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsPlaying((prev) => !prev)}
+                  className={`w-full sm:w-auto px-4 py-2 rounded-xl font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-xs ${
+                    isPlaying
+                      ? "bg-neutral-800 hover:bg-neutral-700 text-white"
+                      : "bg-emerald-600 hover:bg-emerald-500 text-white animate-pulse"
+                  }`}
+                >
+                  {isPlaying ? (
+                    <>
+                      <Pause className="w-3.5 h-3.5 fill-current" /> Pause
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5 fill-current" /> Start QR Stream
+                    </>
+                  )}
+                </button>
+              </div>
+
               {/* QR Display Card */}
               <div className="flex flex-col items-center justify-center p-6 sm:p-8 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl">
                 <div className="p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
@@ -318,7 +388,7 @@ export function CameraStreamCard() {
                     onClick={() =>
                       setCurrentFrameIndex((prev) => (prev - 1 + frames.length) % frames.length)
                     }
-                    className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors"
+                    className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
                     title="Previous Frame"
                     aria-label="Previous Frame"
                   >
@@ -327,7 +397,7 @@ export function CameraStreamCard() {
 
                   <button
                     onClick={() => setIsPlaying((prev) => !prev)}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
                   >
                     {isPlaying ? (
                       <>
@@ -335,14 +405,14 @@ export function CameraStreamCard() {
                       </>
                     ) : (
                       <>
-                        <Play className="w-3.5 h-3.5" /> Play
+                        <Play className="w-3.5 h-3.5" /> Start
                       </>
                     )}
                   </button>
 
                   <button
                     onClick={() => setCurrentFrameIndex((prev) => (prev + 1) % frames.length)}
-                    className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors"
+                    className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
                     title="Next Frame"
                     aria-label="Next Frame"
                   >
@@ -355,7 +425,7 @@ export function CameraStreamCard() {
                   <div className="flex items-center gap-1 bg-[var(--surface)] p-1 rounded-xl border border-[var(--border-hairline)]">
                     <button
                       onClick={() => setSpeedMs(500)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
                         speedMs === 500
                           ? "bg-[var(--text)] text-[var(--surface)]"
                           : "text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -365,7 +435,7 @@ export function CameraStreamCard() {
                     </button>
                     <button
                       onClick={() => setSpeedMs(320)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
                         speedMs === 320
                           ? "bg-[var(--text)] text-[var(--surface)]"
                           : "text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -375,7 +445,7 @@ export function CameraStreamCard() {
                     </button>
                     <button
                       onClick={() => setSpeedMs(220)}
-                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors ${
+                      className={`px-2 py-1 rounded-lg text-[10px] font-semibold transition-colors cursor-pointer ${
                         speedMs === 220
                           ? "bg-[var(--text)] text-[var(--surface)]"
                           : "text-[var(--text-muted)] hover:text-[var(--text)]"
@@ -393,7 +463,7 @@ export function CameraStreamCard() {
                   onClick={() => {
                     setFrames([]);
                   }}
-                  className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors font-medium"
+                  className="flex items-center gap-1.5 text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-colors font-medium cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
                   Choose another file or text
@@ -410,34 +480,32 @@ export function CameraStreamCard() {
           {!receivedPayload ? (
             <div className="space-y-4">
               {/* Viewfinder or Camera Trigger */}
-              <div className="relative flex flex-col items-center justify-center p-6 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl min-h-[320px]">
-                <div
-                  id={readerElementId}
-                  className={`w-full max-w-[320px] aspect-square rounded-2xl overflow-hidden bg-black/5 dark:bg-black/30 border border-[var(--border-hairline)] ${
-                    isCameraActive ? "block" : "hidden"
-                  }`}
-                />
+              <div className="relative flex flex-col items-center justify-center p-6 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl min-h-[340px]">
+                {/* HTML5 QR Code Video Container: Always sized and accessible in DOM for Html5Qrcode */}
+                <div className="relative w-full max-w-[320px] aspect-square rounded-2xl overflow-hidden bg-black/5 dark:bg-black/30 border border-[var(--border-hairline)] flex items-center justify-center shadow-inner">
+                  <div id={readerElementId} className="w-full h-full" />
+                  {!isCameraActive && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-[var(--surface-subtle)] p-6 text-center space-y-3 z-10">
+                      <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shadow-xs">
+                        <Camera className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold text-xs text-[var(--text)]">Point Camera at QR Stream</h4>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-[220px]">
+                          Position your camera in front of the sender&apos;s animated QR code.
+                        </p>
+                      </div>
 
-                {!isCameraActive && (
-                  <div className="flex flex-col items-center text-center max-w-xs space-y-4">
-                    <div className="w-14 h-14 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shadow-sm">
-                      <Camera className="w-7 h-7" />
+                      <button
+                        type="button"
+                        onClick={startCamera}
+                        className="px-4 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold shadow-xs transition-opacity cursor-pointer flex items-center gap-2"
+                      >
+                        <Camera className="w-4 h-4" /> Start Camera Scanner
+                      </button>
                     </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-[var(--text)]">Point Camera at QR Stream</h4>
-                      <p className="text-xs text-[var(--text-muted)] mt-1">
-                        Opens your device camera to continuously capture sequenced QR frames until the file is fully assembled.
-                      </p>
-                    </div>
-
-                    <button
-                      onClick={startCamera}
-                      className="px-5 py-2.5 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity flex items-center gap-2"
-                    >
-                      <Camera className="w-4 h-4" /> Start Camera Scanner
-                    </button>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 {cameraError && (
                   <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs text-center max-w-sm">
@@ -521,24 +589,27 @@ export function CameraStreamCard() {
               <div className="flex flex-wrap justify-center gap-3 pt-2">
                 {receivedPayload.text ? (
                   <button
+                    type="button"
                     onClick={handleCopyText}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
                   >
                     {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                     {copied ? "Copied!" : "Copy Text"}
                   </button>
                 ) : (
                   <button
+                    type="button"
                     onClick={handleDownloadReceived}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] font-medium text-xs shadow-sm hover:opacity-90 transition-opacity cursor-pointer"
                   >
                     <Download className="w-4 h-4" /> Download File
                   </button>
                 )}
 
                 <button
+                  type="button"
                   onClick={startCamera}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] font-medium text-xs hover:bg-[var(--surface-subtle)] transition-colors"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] font-medium text-xs hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
                 >
                   <RotateCcw className="w-3.5 h-3.5" /> Scan Another File
                 </button>
