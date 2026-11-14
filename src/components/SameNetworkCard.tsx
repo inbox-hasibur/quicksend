@@ -1,35 +1,54 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
-  Wifi,
-  CheckCircle2,
+  Smartphone,
+  Laptop,
+  Monitor,
+  Tablet,
+  Edit2,
+  Check,
+  Send,
+  Radio,
+  ChevronDown,
+  ChevronUp,
+  QrCode,
   AlertCircle,
-  Eye,
-  ArrowRight,
 } from "lucide-react";
 import { Dropzone } from "@/components/Dropzone";
 import { TransferModal } from "@/components/TransferModal";
 import { OpticalHandshakeModal } from "@/components/OpticalHandshakeModal";
-import { SegmentedControl } from "@/components/SegmentedControl";
 import { useWebRTC } from "@/hooks/useWebRTC";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { useLocalDiscovery, type NearbyPeer } from "@/hooks/useLocalDiscovery";
 import { encodeOpticalSdp } from "@/lib/opticalSdp";
-import type { TransferRole } from "@/types/mode";
 
 export function SameNetworkCard() {
-  const [role, setRole] = useState<TransferRole>("send");
   const [selectedPayload, setSelectedPayload] = useState<{ files: File[]; text: string }>({
     files: [],
     text: "",
   });
+  const [targetPeer, setTargetPeer] = useState<NearbyPeer | null>(null);
+  const [isEditingName, setIsEditingName] = useState(false);
+  const {
+    profile,
+    peers,
+    networkId,
+    updateName,
+  } = useLocalDiscovery(true);
+
+  const [customNameInput, setCustomNameInput] = useState(profile.name);
+  const [isManualExpanded, setIsManualExpanded] = useState(false);
+  const [manualCode, setManualCode] = useState("");
   const [isOpticalOpen, setIsOpticalOpen] = useState(false);
   const [opticalPayloadQr, setOpticalPayloadQr] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const isOnline = useNetworkStatus();
 
   const {
+    role: rtcRole,
+    isConnected,
     progress,
+    startSender,
+    startReceiver,
     sendFiles,
     sendPayload,
     acceptIncomingTransfer,
@@ -37,15 +56,62 @@ export function SameNetworkCard() {
     cleanup,
   } = useWebRTC("same-network");
 
-  const handleTransferSelected = () => {
-    if (selectedPayload.files.length > 0) {
-      sendFiles(selectedPayload.files).catch((err) => {
-        setErrorMsg(err.message);
-      });
-    } else if (selectedPayload.text.trim()) {
-      sendPayload({ text: selectedPayload.text }).catch((err) => {
-        setErrorMsg(err.message);
-      });
+  // Keep receiver listening on local device room code so peers can beam files to it
+  useEffect(() => {
+    if (!isConnected && progress.status === "idle" && profile.id) {
+      const roomCode = profile.id.replace(/[^a-zA-Z0-9]/g, "").substring(0, 10);
+      startReceiver(roomCode).catch(() => {});
+    }
+  }, [isConnected, progress.status, profile.id, startReceiver]);
+
+  // When sender connects to target peer, automatically transmit selected payload
+  useEffect(() => {
+    if (rtcRole === "sender" && isConnected && progress.status === "connecting") {
+      if (selectedPayload.files.length > 0) {
+        sendFiles(selectedPayload.files).catch((err) => {
+          setErrorMsg(err.message);
+        });
+      } else if (selectedPayload.text.trim()) {
+        sendPayload({ text: selectedPayload.text }).catch((err) => {
+          setErrorMsg(err.message);
+        });
+      }
+    }
+  }, [rtcRole, isConnected, progress.status, selectedPayload, sendFiles, sendPayload]);
+
+  const handleSendToPeer = async (peer: NearbyPeer) => {
+    if (selectedPayload.files.length === 0 && !selectedPayload.text.trim()) {
+      setErrorMsg(`Please select a file or enter text in the dropzone above to send to ${peer.name}.`);
+      return;
+    }
+
+    try {
+      setErrorMsg(null);
+      setTargetPeer(peer);
+      const roomCode = peer.id.replace(/[^a-zA-Z0-9]/g, "").substring(0, 10);
+      await startSender(roomCode);
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : "Failed to connect to target device.");
+    }
+  };
+
+  const handleSaveName = () => {
+    if (customNameInput.trim()) {
+      updateName(customNameInput.trim());
+    }
+    setIsEditingName(false);
+  };
+
+  const getDeviceIcon = (formFactor: string, className = "w-5 h-5") => {
+    switch (formFactor) {
+      case "mobile":
+        return <Smartphone className={className} />;
+      case "tablet":
+        return <Tablet className={className} />;
+      case "desktop":
+        return <Monitor className={className} />;
+      default:
+        return <Laptop className={className} />;
     }
   };
 
@@ -57,21 +123,18 @@ export function SameNetworkCard() {
 
     try {
       setErrorMsg(null);
-      const pc = new RTCPeerConnection({ iceServers: [] }); // Local LAN only
+      const pc = new RTCPeerConnection({ iceServers: [] });
       pc.createDataChannel("lan-share", { ordered: true });
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      // Collect host candidates
       const candidates: RTCIceCandidateInit[] = [];
       pc.onicecandidate = (e) => {
         if (e.candidate) candidates.push(e.candidate.toJSON());
       };
 
-      // Wait a moment for local host candidate gathering
       await new Promise((res) => setTimeout(res, 300));
-
       const qrString = encodeOpticalSdp(offer, candidates);
       setOpticalPayloadQr(qrString);
       setIsOpticalOpen(true);
@@ -80,127 +143,256 @@ export function SameNetworkCard() {
     }
   };
 
-  const handleStartOpticalReceiver = () => {
-    setErrorMsg(null);
-    setIsOpticalOpen(true);
-  };
-
   return (
     <div className="space-y-6">
-      {/* Role Switcher */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-[var(--border-hairline)]">
+      {/* Network & Local Device Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-hairline)]">
         <div>
-          <h3 className="font-bold text-base text-[var(--text)]">
-            Same Network (Local Wi-Fi LAN)
-          </h3>
+          <div className="flex items-center gap-2">
+            <h3 className="font-bold text-base text-[var(--text)]">Same Wi-Fi (Local Radar)</h3>
+            <span className="flex items-center gap-1 text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <Radio className="w-3 h-3 animate-pulse" /> Live Radar
+            </span>
+          </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Host ICE candidates prioritized for fast router-only routing
+            Automatic zero-config local discovery. Tap any discovered device on the radar to beam files directly over Wi-Fi.
           </p>
         </div>
 
-        <SegmentedControl
-          ariaLabel="Transfer Role"
-          value={role}
-          onChange={(val) => setRole(val as TransferRole)}
-          options={[
-            { value: "send", label: "Send" },
-            { value: "receive", label: "Receive" },
-          ]}
-        />
+        {/* Local Device Identity Badge */}
+        <div className="flex items-center gap-2 bg-[var(--surface-subtle)] px-3 py-1.5 rounded-2xl border border-[var(--border-hairline)]">
+          <div className="text-[var(--accent)]">{getDeviceIcon(profile.formFactor, "w-4 h-4")}</div>
+          {isEditingName ? (
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={customNameInput}
+                onChange={(e) => setCustomNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSaveName()}
+                className="text-xs bg-[var(--surface)] text-[var(--text)] px-2 py-0.5 rounded-lg border border-[var(--border-hairline)] focus:outline-none w-32"
+                autoFocus
+              />
+              <button
+                onClick={handleSaveName}
+                className="p-1 rounded-md text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+              >
+                <Check className="w-3 h-3" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-medium text-[var(--text)] truncate max-w-[140px]">
+                {profile.name}
+              </span>
+              <button
+                onClick={() => setIsEditingName(true)}
+                className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+                title="Edit Device Name"
+              >
+                <Edit2 className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {errorMsg && (
-        <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
+        <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{errorMsg}</span>
         </div>
       )}
 
-      {/* Offline Alert when No Internet is Present */}
-      {!isOnline && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-xs text-[var(--text)]">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-500" />
-          <div className="leading-relaxed">
-            <span className="font-semibold">Offline Network Detected: </span>
-            External internet is unreachable on this Wi-Fi. The camera-to-camera optical handshake below enables 100% offline peer connection over your local router subnet.
-          </div>
-        </div>
-      )}
+      {/* File Dropzone */}
+      <div className="space-y-2">
+        <label className="text-xs font-semibold text-[var(--text)] flex items-center justify-between">
+          <span>1. Select Files or Text to Share</span>
+          {selectedPayload.files.length > 0 && (
+            <span className="text-[11px] text-[var(--text-muted)]">
+              {selectedPayload.files.length} file(s) selected — Tap a device below to send
+            </span>
+          )}
+        </label>
+        <Dropzone
+          onSelectionChange={(payload: { files: File[]; text: string }) => {
+            setSelectedPayload(payload);
+            setErrorMsg(null);
+          }}
+        />
+      </div>
 
-      {/* Network Requirements Banner */}
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-xs text-[var(--text)]">
-        <CheckCircle2 className="h-4 w-4 shrink-0 mt-0.5 text-neutral-600 dark:text-neutral-400" />
-        <div className="leading-relaxed">
-          <span className="font-semibold">Local Router Subnet: </span>
-          Both devices must be connected to the same Wi-Fi router or Ethernet LAN. Transfers stream locally without consuming internet data.
+      {/* RADAR DISCOVERY SCREEN */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold text-[var(--text)]">
+            2. Nearby Devices on this Wi-Fi ({peers.length})
+          </label>
+          <span className="text-[11px] font-mono text-[var(--text-muted)]">
+            {networkId ? `Subnet: ${networkId}` : "Detecting router..."}
+          </span>
+        </div>
+
+        <div className="relative w-full aspect-[4/3] sm:aspect-[16/9] min-h-[300px] max-h-[420px] bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-3xl overflow-hidden flex items-center justify-center p-6 shadow-inner">
+          {/* Radar Concentric Rings */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="w-[180px] sm:w-[220px] h-[180px] sm:h-[220px] rounded-full border border-neutral-300/80 dark:border-neutral-700/60" />
+            <div className="absolute w-[290px] sm:w-[350px] h-[290px] sm:h-[350px] rounded-full border border-neutral-300/50 dark:border-neutral-700/40" />
+            <div className="absolute w-[400px] sm:w-[480px] h-[400px] sm:h-[480px] rounded-full border border-neutral-300/30 dark:border-neutral-700/20" />
+          </div>
+
+          {/* Sweeping Radar Scanner Line */}
+          <div className="absolute w-[400px] sm:w-[480px] h-[400px] sm:h-[480px] rounded-full pointer-events-none animate-radar-sweep overflow-hidden">
+            <div
+              className="w-1/2 h-1/2 origin-bottom-right"
+              style={{
+                background:
+                  "conic-gradient(from 0deg at 100% 100%, rgba(99, 102, 241, 0.22) 0deg, transparent 70deg)",
+              }}
+            />
+          </div>
+
+          {/* Center Node (This Device) */}
+          <div className="relative z-10 flex flex-col items-center text-center">
+            <div className="relative flex items-center justify-center">
+              <div className="absolute w-12 h-12 rounded-full bg-[var(--accent)]/15 animate-radar-ping pointer-events-none" />
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-md text-white border-2 border-white dark:border-neutral-800"
+                style={{ backgroundColor: profile.avatarColor }}
+              >
+                {getDeviceIcon(profile.formFactor, "w-5 h-5")}
+              </div>
+            </div>
+            <div className="mt-2">
+              <span className="text-[11px] font-bold text-[var(--text)] block truncate max-w-[130px]">
+                {profile.name}
+              </span>
+              <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                You (Discoverable)
+              </span>
+            </div>
+          </div>
+
+          {/* Discovered Nearby Devices Placed Around Radar */}
+          {peers.length > 0 ? (
+            <div className="absolute inset-0 p-4 sm:p-6 pointer-events-none flex flex-wrap items-center justify-around gap-4">
+              {peers.map((peer, idx) => {
+                const isSelected = targetPeer?.id === peer.id;
+                return (
+                  <button
+                    key={peer.id}
+                    onClick={() => handleSendToPeer(peer)}
+                    className={`pointer-events-auto group relative flex items-center gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer shadow-sm hover:scale-105 ${
+                      isSelected
+                        ? "bg-[var(--accent)] text-[var(--surface)] border-[var(--accent)] shadow-md"
+                        : "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hairline)] hover:border-neutral-400 dark:hover:border-neutral-600"
+                    }`}
+                    style={{
+                      // Slight radial stagger
+                      transform: `rotate(${idx * 75}deg) translateY(-85px) rotate(-${idx * 75}deg)`,
+                    }}
+                    title={`Send payload to ${peer.name}`}
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--accent)] group-hover:bg-neutral-200 dark:group-hover:bg-neutral-700 transition-colors">
+                      {getDeviceIcon(peer.formFactor, "w-4 h-4")}
+                    </div>
+                    <div className="text-left">
+                      <div className="text-xs font-bold truncate max-w-[110px]">{peer.name}</div>
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        Tap to Beam
+                      </div>
+                    </div>
+                    <Send className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 transition-opacity ml-1" />
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            /* Empty State hint inside radar */
+            <div className="absolute bottom-4 inset-x-4 text-center pointer-events-none">
+              <p className="text-[11px] text-[var(--text-muted)] bg-[var(--surface)]/90 backdrop-blur-xs py-1.5 px-3 rounded-full border border-[var(--border-hairline)] inline-block shadow-xs">
+                Scanning local Wi-Fi... Open QuickSend on another device connected to this Wi-Fi to appear.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
-      {role === "send" ? (
-        <div className="space-y-4">
-          <Dropzone onSelectionChange={setSelectedPayload} />
+      {/* Direct PIN / Optical Fallback Accordion */}
+      <div className="border border-[var(--border-hairline)] rounded-2xl overflow-hidden bg-[var(--surface-subtle)]">
+        <button
+          onClick={() => setIsManualExpanded((prev) => !prev)}
+          className="w-full flex items-center justify-between p-4 text-xs font-semibold text-[var(--text)] hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors"
+        >
+          <span>Can&apos;t find device on radar? Use 6-Digit PIN or Camera Optical QR</span>
+          {isManualExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-            <button
-              type="button"
-              onClick={handleStartOpticalSender}
-              className="py-3 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer"
-            >
-              <Eye className="h-4 w-4" />
-              <span>Offline Camera QR Handshake</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleTransferSelected}
-              className="py-3 px-5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] hover:bg-neutral-200/60 dark:hover:bg-neutral-750 font-semibold text-xs text-[var(--text)] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
-            >
-              <Wifi className="h-4 w-4" />
-              <span>Broadcast Over Subnet</span>
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-center space-y-4 max-w-md mx-auto">
-          <div className="h-11 w-11 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs text-neutral-800 dark:text-neutral-200 flex items-center justify-center mx-auto">
-            <Wifi className="h-5 w-5 animate-pulse" />
-          </div>
-          <div>
-            <h4 className="font-bold text-sm text-[var(--text)]">
-              Ready to Ingest LAN Payload
-            </h4>
-            <p className="text-xs text-[var(--text-muted)] mt-1">
-              Ensure this device is connected to the same Wi-Fi as the sender.
+        {isManualExpanded && (
+          <div className="p-4 pt-2 border-t border-[var(--border-hairline)] space-y-4 bg-[var(--surface)]">
+            <p className="text-xs text-[var(--text-muted)]">
+              If your Wi-Fi router has Client Isolation enabled (common in public or guest Wi-Fi), devices cannot discover each other automatically. Use direct PIN or Optical Handshake below:
             </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <div className="space-y-2">
+                <label className="text-[11px] font-semibold text-[var(--text-muted)] block">
+                  Connect by 6-Digit PIN
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Enter PIN"
+                    value={manualCode}
+                    onChange={(e) => setManualCode(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-xs text-[var(--text)] focus:outline-none"
+                  />
+                  <button
+                    onClick={() => {
+                      if (manualCode.trim()) {
+                        startSender(manualCode.trim()).catch((err) => setErrorMsg(err.message));
+                      }
+                    }}
+                    className="px-4 py-2 rounded-xl bg-[var(--text)] text-[var(--surface)] text-xs font-semibold hover:opacity-90 transition-opacity"
+                  >
+                    Connect
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[11px] font-semibold text-[var(--text-muted)] block">
+                  Offline Camera Handshake
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleStartOpticalSender}
+                    className="flex-1 px-3 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--text)] hover:bg-neutral-200/60 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <QrCode className="w-3.5 h-3.5" /> Show QR
+                  </button>
+                  <button
+                    onClick={() => setIsOpticalOpen(true)}
+                    className="flex-1 px-3 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-xs font-semibold text-[var(--text)] hover:bg-neutral-200/60 transition-colors flex items-center justify-center gap-1.5"
+                  >
+                    <QrCode className="w-3.5 h-3.5" /> Scan QR
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
+        )}
+      </div>
 
-          <button
-            type="button"
-            onClick={handleStartOpticalReceiver}
-            className="w-full py-3 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs inline-flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <Eye className="h-4 w-4" />
-            <span>Scan Sender&apos;s Optical QR</span>
-            <ArrowRight className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Optical Handshake Modal */}
+      {/* Optical Handshake Modal for fallback */}
       <OpticalHandshakeModal
         isOpen={isOpticalOpen}
-        role={role === "send" ? "sender" : "receiver"}
-        localPayloadQr={opticalPayloadQr}
-        onOfferScanned={(decoded) => {
-          console.log("Offer decoded:", decoded);
-        }}
-        onAnswerScanned={(decoded) => {
-          console.log("Answer decoded:", decoded);
-          handleTransferSelected();
-        }}
         onClose={() => setIsOpticalOpen(false)}
+        role="sender"
+        localPayloadQr={opticalPayloadQr}
       />
 
-      {/* Transfer Progress Modal */}
+      {/* Live WebRTC Transfer Modal */}
       <TransferModal
         progress={progress}
         onAccept={acceptIncomingTransfer}

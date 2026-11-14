@@ -10,7 +10,10 @@ export const PUBLIC_STUN_SERVERS: RTCIceServer[] = [
       "stun:stun.l.google.com:19302",
       "stun:stun1.l.google.com:19302",
       "stun:stun2.l.google.com:19302",
+      "stun:stun3.l.google.com:19302",
+      "stun:stun4.l.google.com:19302",
       "stun:stun.cloudflare.com:3478",
+      "stun:stun.services.mozilla.com",
     ],
   },
 ];
@@ -46,7 +49,7 @@ export function getTurnServers(): RTCIceServer[] {
  * - Internet: Full multi-provider STUN pool + optional TURN relay.
  */
 export function getRtcConfig(mode: TransferMode = "internet"): RTCConfiguration {
-  if (mode === "same-network" || mode === "hotspot") {
+  if (mode === "same-network" || mode === "hotspot" || mode === "camera") {
     return {
       iceServers: [],
       iceCandidatePoolSize: 0,
@@ -59,7 +62,7 @@ export function getRtcConfig(mode: TransferMode = "internet"): RTCConfiguration 
   };
 }
 
-export const ICE_CONNECTION_TIMEOUT_MS = 10000;
+export const ICE_CONNECTION_TIMEOUT_MS = 30000;
 
 export const FIREWALL_FALLBACK_MESSAGE =
   "Direct P2P connection timed out or blocked by restrictive firewall/symmetric NAT. Ensure both devices are online, or try Mode 2 (Same Wi-Fi) or Mode 3 (Hotspot) for direct transfer.";

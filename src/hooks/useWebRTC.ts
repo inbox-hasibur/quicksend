@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { SignalingClient } from "@/lib/signalingClient";
+import { generateRoomCode, normalizeRoomCode } from "@/lib/codeGenerator";
 import {
   sliceBlobIntoChunks,
   reassembleChunksToBlob,
@@ -61,6 +62,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   // Batch queue & disk streaming refs
   const diskWriterRef = useRef<DiskStreamWriter | null>(null);
+  const peerInstanceRef = useRef<unknown>(null);
+  const dataConnRef = useRef<unknown>(null);
   const hasReceiverAcceptedBatchRef = useRef<string | null>(null);
   const hasAcceptedRef = useRef<boolean>(false);
   const acceptedResolverRef = useRef<(() => void) | null>(null);
@@ -103,6 +106,23 @@ export function useWebRTC(mode: TransferMode = "internet") {
     if (diskWriterRef.current) {
       diskWriterRef.current.abort().catch(() => { });
       diskWriterRef.current = null;
+    }
+
+    if (dataConnRef.current) {
+      try {
+        (dataConnRef.current as { close: () => void }).close();
+      } catch {
+        // Ignore
+      }
+      dataConnRef.current = null;
+    }
+    if (peerInstanceRef.current) {
+      try {
+        (peerInstanceRef.current as { destroy: () => void }).destroy();
+      } catch {
+        // Ignore
+      }
+      peerInstanceRef.current = null;
     }
 
     signalingRef.current.leaveRoom();
@@ -507,7 +527,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     [createPeerConnection, setupDataChannel]
   );
 
-  // Sender starts a session
+  // Sender starts a session with dual PeerJS cloud broker + signaling fallback
   const startSender = useCallback(
     async (customCode?: string): Promise<{ roomId: string; code: string }> => {
       cleanup();
@@ -523,18 +543,68 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       startIceTimeout();
       createPeerConnection("sender");
-      const { roomId: newRoomId, code: newCode } = await signalingRef.current.createRoom(customCode);
+
+      const generatedCode = customCode ? normalizeRoomCode(customCode) : generateRoomCode();
+      const newRoomId = `room_${generatedCode}`;
       setRoomId(newRoomId);
-      setRoomCode(newCode);
+      setRoomCode(generatedCode);
 
-      signalingRef.current.startPolling((msg) => handleSignalMessage(msg, "sender"));
+      // 1. Direct PeerJS WebSocket broker on 0.peerjs.com
+      if (typeof window !== "undefined" && mode !== "hotspot") {
+        import("peerjs")
+          .then(({ Peer }) => {
+            if (isConnectedRef.current) return;
+            const peerId = `qs-${generatedCode.toLowerCase()}`;
+            const peer = new Peer(peerId, {
+              config: getRtcConfig(mode),
+            });
+            peerInstanceRef.current = peer;
 
-      return { roomId: newRoomId, code: newCode };
+            peer.on("connection", (conn) => {
+              dataConnRef.current = conn;
+              conn.on("open", () => {
+                clearIceTimeout();
+                if (conn.dataChannel) {
+                  dcRef.current = conn.dataChannel;
+                  setupDataChannel(conn.dataChannel, "sender");
+                }
+                isConnectedRef.current = true;
+                setIsConnected(true);
+              });
+
+              conn.on("data", (data) => {
+                handleIncomingData(data);
+              });
+
+              conn.on("close", () => {
+                isConnectedRef.current = false;
+                setIsConnected(false);
+              });
+            });
+
+            peer.on("error", (err) => {
+              console.debug("PeerJS notice (fallback active):", err.type);
+            });
+          })
+          .catch(() => {});
+      }
+
+      // 2. Concurrently initiate HTTP signal store fallback
+      signalingRef.current
+        .createRoom(customCode)
+        .then(({ roomId: sigRoomId, code: sigCode }) => {
+          setRoomId(sigRoomId);
+          setRoomCode(sigCode);
+          signalingRef.current.startPolling((msg) => handleSignalMessage(msg, "sender"));
+        })
+        .catch(() => {});
+
+      return { roomId: newRoomId, code: generatedCode };
     },
-    [cleanup, createPeerConnection, handleSignalMessage, startIceTimeout]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, setupDataChannel, startIceTimeout, clearIceTimeout, mode]
   );
 
-  // Receiver joins a session
+  // Receiver joins a session with dual PeerJS cloud broker + signaling fallback
   const startReceiver = useCallback(
     async (code: string): Promise<void> => {
       cleanup();
@@ -550,13 +620,65 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       startIceTimeout();
       createPeerConnection("receiver");
-      const { roomId: joinedRoomId, code: verifiedCode } = await signalingRef.current.joinRoom(code);
-      setRoomId(joinedRoomId);
-      setRoomCode(verifiedCode);
 
-      signalingRef.current.startPolling((msg) => handleSignalMessage(msg, "receiver"));
+      const cleanCode = normalizeRoomCode(code);
+      const joinedRoomId = `room_${cleanCode}`;
+      setRoomId(joinedRoomId);
+      setRoomCode(cleanCode);
+
+      // 1. Direct PeerJS WebSocket broker
+      if (typeof window !== "undefined" && mode !== "hotspot") {
+        import("peerjs")
+          .then(({ Peer }) => {
+            if (isConnectedRef.current) return;
+            const peer = new Peer({
+              config: getRtcConfig(mode),
+            });
+            peerInstanceRef.current = peer;
+
+            peer.on("open", () => {
+              const targetId = `qs-${cleanCode.toLowerCase()}`;
+              const conn = peer.connect(targetId, { reliable: true });
+              dataConnRef.current = conn;
+
+              conn.on("open", () => {
+                clearIceTimeout();
+                if (conn.dataChannel) {
+                  dcRef.current = conn.dataChannel;
+                  setupDataChannel(conn.dataChannel, "receiver");
+                }
+                isConnectedRef.current = true;
+                setIsConnected(true);
+              });
+
+              conn.on("data", (data) => {
+                handleIncomingData(data);
+              });
+
+              conn.on("close", () => {
+                isConnectedRef.current = false;
+                setIsConnected(false);
+              });
+            });
+
+            peer.on("error", (err) => {
+              console.debug("PeerJS receiver notice (fallback active):", err.type);
+            });
+          })
+          .catch(() => {});
+      }
+
+      // 2. Concurrently initiate HTTP signal store fallback
+      signalingRef.current
+        .joinRoom(code)
+        .then(({ roomId: sigRoomId, code: sigCode }) => {
+          setRoomId(sigRoomId);
+          setRoomCode(sigCode);
+          signalingRef.current.startPolling((msg) => handleSignalMessage(msg, "receiver"));
+        })
+        .catch(() => {});
     },
-    [cleanup, createPeerConnection, handleSignalMessage, startIceTimeout]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, setupDataChannel, startIceTimeout, clearIceTimeout, mode]
   );
 
   // Sequential Multi-File Batch Queue Sender
@@ -785,6 +907,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
     if (dc && dc.readyState === "open") {
       dc.send(JSON.stringify({ type: "transfer-accepted" }));
+    } else if (dataConnRef.current) {
+      try {
+        (dataConnRef.current as { send: (data: unknown) => void }).send(
+          JSON.stringify({ type: "transfer-accepted" })
+        );
+      } catch {
+        // Ignore
+      }
     }
     setProgress((prev) => ({
       ...prev,
@@ -797,6 +927,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
     const dc = dcRef.current;
     if (dc && dc.readyState === "open") {
       dc.send(JSON.stringify({ type: "transfer-rejected" }));
+    } else if (dataConnRef.current) {
+      try {
+        (dataConnRef.current as { send: (data: unknown) => void }).send(
+          JSON.stringify({ type: "transfer-rejected" })
+        );
+      } catch {
+        // Ignore
+      }
     }
     signalingRef.current.sendSignal("transfer-rejected").catch(() => { });
     setProgress((prev) => ({

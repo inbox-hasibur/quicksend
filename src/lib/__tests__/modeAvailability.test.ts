@@ -41,6 +41,11 @@ describe("modeAvailability logic", () => {
       expect(isModeAvailable("hotspot", offlineCapabilities)).toBe(true);
     });
 
+    it("should always allow camera mode regardless of internet connectivity", () => {
+      expect(isModeAvailable("camera", onlineFullCapabilities)).toBe(true);
+      expect(isModeAvailable("camera", offlineCapabilities)).toBe(true);
+    });
+
     it("should allow bluetooth mode if either Web Share or Web Bluetooth is supported", () => {
       expect(
         isModeAvailable("bluetooth", { isOnline: true, hasWebShare: true, hasBluetooth: false })
@@ -99,15 +104,22 @@ describe("modeAvailability logic", () => {
       });
       expect(bleOnly.badge).toBe("Web Bluetooth BLE");
     });
+
+    it("should provide optical stream badge for camera mode", () => {
+      const status = getModeStatus("camera", offlineCapabilities);
+      expect(status.isAvailable).toBe(true);
+      expect(status.badge).toBe("100% Offline Optical");
+    });
   });
 
   describe("getAllModesStatus", () => {
-    it("should return all 4 transfer modes in expected order", () => {
+    it("should return all 5 transfer modes in expected order", () => {
       const allStatuses = getAllModesStatus(onlineFullCapabilities);
-      expect(allStatuses).toHaveLength(4);
+      expect(allStatuses).toHaveLength(5);
       expect(allStatuses.map((s) => s.mode)).toEqual([
         "internet",
         "same-network",
+        "camera",
         "hotspot",
         "bluetooth",
       ]);

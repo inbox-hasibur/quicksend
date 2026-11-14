@@ -56,7 +56,7 @@ describe("ICE & WebRTC Configuration", () => {
     ]);
   });
 
-  it("should return empty iceServers for Same Wi-Fi and Hotspot modes to prioritize local host candidates", () => {
+  it("should return empty iceServers for Same Wi-Fi, Hotspot, and Camera modes to prioritize local host candidates", () => {
     const sameNetConfig = getRtcConfig("same-network");
     expect(sameNetConfig.iceServers).toEqual([]);
     expect(sameNetConfig.iceCandidatePoolSize).toBe(0);
@@ -64,6 +64,10 @@ describe("ICE & WebRTC Configuration", () => {
     const hotspotConfig = getRtcConfig("hotspot");
     expect(hotspotConfig.iceServers).toEqual([]);
     expect(hotspotConfig.iceCandidatePoolSize).toBe(0);
+
+    const cameraConfig = getRtcConfig("camera");
+    expect(cameraConfig.iceServers).toEqual([]);
+    expect(cameraConfig.iceCandidatePoolSize).toBe(0);
   });
 
   it("should return STUN pool and candidate pool size for Internet mode", () => {
@@ -72,8 +76,8 @@ describe("ICE & WebRTC Configuration", () => {
     expect(internetConfig.iceCandidatePoolSize).toBe(10);
   });
 
-  it("should export standard 10-second ICE timeout and fallback message", () => {
-    expect(ICE_CONNECTION_TIMEOUT_MS).toBe(10000);
+  it("should export standard 30-second ICE timeout and fallback message", () => {
+    expect(ICE_CONNECTION_TIMEOUT_MS).toBe(30000);
     expect(FIREWALL_FALLBACK_MESSAGE).toContain("firewall");
     expect(FIREWALL_FALLBACK_MESSAGE).toContain("Mode 2");
     expect(FIREWALL_FALLBACK_MESSAGE).toContain("Mode 3");

@@ -30,13 +30,20 @@
 - **RTCDataChannel File & Text Streaming:** Direct encrypted browser-to-browser data transfer using DTLS/SCTP.
 - **NAT Traversal:** Public Google STUN servers with fallback timeout guidance for restrictive symmetric enterprise firewalls.
 
-### 3. Mode 2: Same Network Wi-Fi P2P (LAN Transfer)
-- **Local Subnet Peer Discovery:** Fast direct WebRTC connection prioritizing internal network interfaces.
+### 3. Mode 2: Same Network Wi-Fi P2P (Interactive Radar & LAN Transfer)
+- **Local Wi-Fi Radar & Auto-Discovery:** Automated device discovery across peers sharing the same Wi-Fi router via `/api/discover`.
+- **Tactile Radar Interface:** Interactive 360-degree sweep radar showing this device in the center and nearby devices floating on orbits.
+- **1-Click Beaming:** Select files in dropzone and tap any discovered peer on the radar to transfer immediately over WebRTC.
 - **Host Candidate Prioritization:** Direct internal IP-to-IP connection routing (RFC 1918 addresses) to bypass internet WAN bandwidth caps.
-- **High-Throughput Local Transfers:** Optimized buffer chunking for gigabyte-scale files without external cloud throttling.
-- **No-Internet LAN Fallback:** Optical camera-to-camera QR SDP handshake fallback when the local LAN has no external internet connection to reach a public signaling server.
+- **No-Internet LAN Fallback:** Direct 6-digit PIN connect and camera optical QR SDP handshake fallback when router client isolation is active.
 
-### 4. Mode 3: Wi-Fi + Hotspot Offline Transfer Interface
+### 4. Mode 5: Via Camera (Air-Gapped Optical Data Stream)
+- **Zero-Network Optical Transfer:** Transfer files and text with no Wi-Fi, no Bluetooth, and no internet.
+- **Visual QR Streaming:** Slices files into sequenced compact QR frames (`QS1|...`) playing at configurable speeds (Slow 500ms, Normal 320ms, Fast 220ms).
+- **Camera Frame Collector:** `Html5Qrcode` camera viewfinder with real-time chunk matrix and out-of-order reassembly.
+- **Auto Download & Integrity Check:** Assembles Blob, validates data, auto-triggers download, and saves to session history.
+
+### 5. Mode 3: Wi-Fi + Hotspot Offline Transfer Interface
 - **Transfer Interface Model:** Guided offline workflow operating without requiring browser-hosted HTTP/WebSocket servers.
 - **Sender Hotspot Setup:** Step-by-step assistant guiding the user through creating a mobile or laptop Wi-Fi hotspot, including Android settings deep-links (`intent:#Intent;action=android.settings.WIRELESS_SETTINGS;end`).
 - **Wi-Fi QR Join Credential Generator:** Generates standardized `WIFI:T:WPA;S:<SSID>;P:<Password>;;` QR codes readable natively by iOS and Android camera apps for instant auto-joining.

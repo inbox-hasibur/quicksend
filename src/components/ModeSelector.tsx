@@ -7,6 +7,7 @@ import {
   Wifi,
   Smartphone,
   Bluetooth,
+  Camera,
   ArrowLeft,
   ArrowRight,
 } from "lucide-react";
@@ -17,6 +18,7 @@ import { InternetSharingCard } from "@/components/InternetSharingCard";
 import { SameNetworkCard } from "@/components/SameNetworkCard";
 import { HotspotAssistantCard } from "@/components/HotspotAssistantCard";
 import { NearbyShareCard } from "@/components/NearbyShareCard";
+import { CameraStreamCard } from "@/components/CameraStreamCard";
 
 export function ModeSelector() {
   const searchParams = useSearchParams();
@@ -58,6 +60,13 @@ export function ModeSelector() {
           tag: "Proximity",
           summary: "Quick Share, AirDrop, and Web-BLE hardware client for adjacent devices.",
         };
+      case "camera":
+        return {
+          displayName: "Via Camera",
+          icon: <Camera className="h-5 w-5" />,
+          tag: "Air-Gapped",
+          summary: "Zero-network transfer. Stream files as animated QR codes scanned by opposite camera.",
+        };
     }
   };
 
@@ -66,7 +75,7 @@ export function ModeSelector() {
   return (
     <div className="w-full max-w-4xl">
       {!selectedMode ? (
-        /* 1. CLEAN HOME HUB: 4 OPTION CARDS */
+        /* 1. CLEAN HOME HUB: 5 OPTION CARDS */
         <div className="glass-card p-6 sm:p-8 space-y-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1 border-b border-[var(--border-hairline)]">
             <div>
@@ -78,12 +87,12 @@ export function ModeSelector() {
               </p>
             </div>
             <span className="text-[11px] font-mono font-medium text-[var(--text-muted)]">
-              4 Channels Available
+              {modes.length} Channels Available
             </span>
           </div>
 
-          {/* 4 Cards Grid - Inspired by the soft rounded tactile reference cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* 5 Cards Grid - Soft rounded tactile cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {modes.map((item) => {
               const theme = getModeTheme(item.mode);
               const isDisabled = !item.isAvailable;
@@ -177,6 +186,8 @@ export function ModeSelector() {
               )}
 
               {selectedMode === "same-network" && <SameNetworkCard />}
+
+              {selectedMode === "camera" && <CameraStreamCard />}
 
               {selectedMode === "hotspot" && <HotspotAssistantCard />}
 

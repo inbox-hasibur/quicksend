@@ -18,28 +18,49 @@ Current conventional solutions introduce major friction points:
 
 ---
 
-## 2. Upfront Home UX & The 4 Transfer Modes
+## 2. Upfront Home UX & The 5 Transfer Modes
 
-Immediately upon opening the app, users are presented with **4 upfront transfer mode cards** reflecting their physical and network environment:
+Immediately upon opening the app, users are presented with **5 upfront transfer mode cards** reflecting their physical and network environment:
 
 ```
-+---------------------------------------------------------------------------------------------------------+
-|                                           QuickSend Home Hub                                             |
-+---------------------------------------------------------------------------------------------------------+
-       |                               |                              |                            |
-       v                               v                              v                            v
-+------------------+          +------------------+          +--------------------+       +----------------+
-|      Mode 1      |          |      Mode 2      |          |       Mode 3       |       |     Mode 4     |
-|     Internet     |          |   Same Wi-Fi     |          |  Wi-Fi + Hotspot   |       |   Bluetooth    |
-|   (WebRTC P2P)   |          |  (Local Subnet)  |          | (Offline Transfer) |       |  (Nearby/BLE)  |
-+------------------+          +------------------+          +--------------------+       +----------------+
-       |                               |                              |                            |
-       +--> Select Format:             +--> Local LAN WebRTC          +--> Send: Hotspot Setup     +--> WebShare
-            - Unique Code (6-digit)         (Host ICE priority)            + WIFI:T:WPA QR              (Files/AirDrop)
-            - QR Code (Scan/Display)        Fallback: Camera               + Offline SDP QR Handshake   + Settings Link
-       +--> Choose Action:                  QR SDP Handshake          +--> Receive: QR Join Wi-Fi  +--> GATT Client
-            - Send / Receive                                               + Offline SDP QR Handshake   (Peripherals)
++-----------------------------------------------------------------------------------------------------------------------+
+|                                                  QuickSend Home Hub                                                   |
++-----------------------------------------------------------------------------------------------------------------------+
+       |                               |                             |                            |                 |
+       v                               v                             v                            v                 v
++------------------+          +------------------+          +------------------+        +--------------------+  +---------------+
+|      Mode 1      |          |      Mode 2      |          |      Mode 5      |        |       Mode 3       |  |    Mode 4     |
+|     Internet     |          |    Same Wi-Fi    |          |    Via Camera    |        |  Wi-Fi + Hotspot   |  |   Bluetooth   |
+|   (WebRTC P2P)   |          |  (Live Radar)    |          | (Optical Stream) |        | (Offline Transfer) |  | (Nearby/BLE)  |
++------------------+          +------------------+          +------------------+        +--------------------+  +---------------+
 ```
+
+---
+
+### Mode 1: Share via Internet (Dual WebRTC Transport + PIN / Mobile / QR)
+- **Primary Use Case:** Remote or cross-network P2P transfer between any devices globally.
+- **Dual Connection Transport:**
+  1. **Primary Broker:** Real-time PeerJS cloud signaling (`0.peerjs.com`) over WebSockets with zero serverless cold starts.
+  2. **Secondary Fallback:** `/api/signal` REST polling with Upstash Redis or ephemeral store.
+  3. **STUN Pool & Timeout:** Expanded Google + Cloudflare STUN pool with 30-second ICE gathering timeout to avoid premature firewalls.
+
+---
+
+### Mode 2: Same Wi-Fi (Interactive Animated Radar & Auto-Discovery)
+- **Primary Use Case:** Direct LAN transfer between phones, laptops, and PCs sharing the same Wi-Fi router.
+- **Interactive Radar UI:**
+  - Auto-detects device platform, browser, form-factor (`desktop`, `laptop`, `mobile`, `tablet`), and nickname.
+  - Interactive radar plate with 360-degree sweep and pulsing concentric waves.
+  - Discovered devices floating on radar orbits: tap any device to beam files or text instantly.
+  - Collapsible manual fallback for 6-digit PIN and camera optical handshake (for guest Wi-Fi client isolation).
+
+---
+
+### Mode 5: Share via Camera (Air-Gapped Optical QR Stream)
+- **Primary Use Case:** Completely air-gapped file and text transfer with **zero networks, zero internet, zero Wi-Fi, and zero Bluetooth**.
+- **Visual Streaming Engine:**
+  - **Sender:** Compresses files with Deflate, slices into compact base64 chunks (`QS1|...`), and cycles an animated high-contrast QR stream with speed controls (Slow 500ms, Normal 320ms, Fast 220ms) and frame scrubbers.
+  - **Receiver:** Points camera viewfinder at sender's screen; reactive `OpticalDataCollector` captures frames in any order, tracks visual progress blocks, reassembles original Blob/file upon 100% completion, verifies data, and triggers download.
 
 ---
 

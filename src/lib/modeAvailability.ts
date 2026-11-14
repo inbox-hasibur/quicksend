@@ -16,6 +16,9 @@ export function isModeAvailable(mode: TransferMode, capabilities: BrowserCapabil
     case "bluetooth":
       // Available if browser supports Web Bluetooth GATT client OR Web Share API (Quick Share / AirDrop)
       return capabilities.hasWebShare || capabilities.hasBluetooth;
+    case "camera":
+      // Always available: camera-to-screen optical transfer works completely offline without network
+      return true;
     default:
       return false;
   }
@@ -87,13 +90,24 @@ export function getModeStatus(mode: TransferMode, capabilities: BrowserCapabilit
         isOfflineCompatible: true,
       };
     }
+    case "camera": {
+      return {
+        mode: "camera",
+        name: "Share via Camera",
+        tagline: "Air-Gapped Optical Stream",
+        description: "Zero network transfer. Stream files as animated QR codes scanned by opposite device camera.",
+        isAvailable: true,
+        badge: "100% Offline Optical",
+        isOfflineCompatible: true,
+      };
+    }
   }
 }
 
 /**
- * Returns availability status for all 4 transfer modes in display order.
+ * Returns availability status for all transfer modes in display order.
  */
 export function getAllModesStatus(capabilities: BrowserCapabilities): ModeStatus[] {
-  const modes: TransferMode[] = ["internet", "same-network", "hotspot", "bluetooth"];
+  const modes: TransferMode[] = ["internet", "same-network", "camera", "hotspot", "bluetooth"];
   return modes.map((mode) => getModeStatus(mode, capabilities));
 }

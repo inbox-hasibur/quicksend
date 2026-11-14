@@ -1,4 +1,4 @@
-export type TransferMode = "internet" | "same-network" | "hotspot" | "bluetooth";
+export type TransferMode = "internet" | "same-network" | "hotspot" | "bluetooth" | "camera";
 
 export type InternetFormat = "code" | "qr";
 
