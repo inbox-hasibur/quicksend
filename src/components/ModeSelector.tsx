@@ -97,28 +97,24 @@ export function ModeSelector() {
                       setSelectedMode(item.mode);
                     }
                   }}
-                  className={`group relative flex items-center justify-between p-4 sm:p-5 rounded-3xl border transition-all text-left ${
+                  className={`group relative flex items-center justify-between p-4 sm:p-5 glass-card transition-all text-left ${
                     isDisabled
-                      ? "opacity-55 cursor-not-allowed bg-neutral-100/70 dark:bg-neutral-900/40 border-neutral-200/60 dark:border-neutral-800"
-                      : "bg-white dark:bg-[#14151B] border-neutral-200/60 dark:border-neutral-800 shadow-[0_8px_24px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)] hover:border-neutral-300 dark:hover:border-neutral-700 cursor-pointer active:scale-[0.99]"
+                      ? "opacity-55 cursor-not-allowed"
+                      : "cursor-pointer active:scale-[0.99] hover:border-[var(--accent)]"
                   }`}
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
-                    {/* Squircle Icon */}
-                    <div
-                      className={`h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center ${theme.bg} transition-transform group-hover:scale-105`}
-                    >
+                    {/* Squircle icon box with accent-soft background */}
+                    <div className="h-12 w-12 shrink-0 rounded-2xl flex items-center justify-center bg-[var(--accent-soft)] transition-transform group-hover:scale-105">
                       {theme.icon}
                     </div>
 
                     {/* Mode Info */}
                     <div className="min-w-0 pr-2">
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-sm sm:text-base text-neutral-900 dark:text-neutral-100 truncate">
-                          {item.name}
-                        </h3>
-                      </div>
-                      <p className="text-xs text-neutral-500 dark:text-neutral-400 truncate mt-0.5">
+                      <h3 className="font-bold text-sm sm:text-base text-[var(--text)] truncate">
+                        {item.name}
+                      </h3>
+                      <p className="text-xs text-[var(--text-muted)] truncate mt-0.5">
                         {theme.summary}
                       </p>
                     </div>
@@ -136,7 +132,7 @@ export function ModeSelector() {
                       {isDisabled ? "Offline" : theme.tag}
                     </span>
 
-                    <div className="h-9 w-9 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-400 group-hover:text-neutral-900 dark:group-hover:text-white group-hover:bg-neutral-200 dark:group-hover:bg-neutral-700 group-hover:translate-x-0.5 transition-all">
+                    <div className="h-9 w-9 rounded-full bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-[var(--text-muted)] group-hover:text-[var(--text)] group-hover:bg-neutral-200 dark:group-hover:bg-neutral-700 group-hover:translate-x-0.5 transition-all">
                       <ChevronRight className="h-4 w-4" />
                     </div>
                   </div>

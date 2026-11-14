@@ -1,36 +1,59 @@
 "use client";
 
-import { useState } from "react";
-import { Zap, Clock } from "lucide-react";
+import { useState, useSyncExternalStore } from "react";
+import { Clock } from "lucide-react";
 import { NetworkStatusBadge } from "@/components/NetworkStatusBadge";
 import { TransferHistoryModal } from "@/components/TransferHistoryModal";
 import { useTransferHistory } from "@/hooks/useTransferHistory";
+
+const emptySubscribe = () => () => {};
+
+function getClientDateSnapshot(): string {
+  return new Date().toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function getServerDateSnapshot(): string {
+  return "";
+}
 
 export function AppHeader() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const { history, clearHistory } = useTransferHistory();
 
+  // Hydration-safe date snapshot
+  const todayDate = useSyncExternalStore(
+    emptySubscribe,
+    getClientDateSnapshot,
+    getServerDateSnapshot
+  );
+
   return (
     <>
-      <header className="z-10 w-full max-w-4xl flex items-center justify-between font-mono text-sm mb-6 sm:mb-10">
-        <div className="flex items-center gap-2.5 font-bold tracking-tight text-base sm:text-lg">
-          <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm">
-            <Zap className="h-4 w-4 fill-current" />
-          </div>
-          <span className="font-sans font-extrabold tracking-tight">QuickSend</span>
+      <header className="z-10 w-full max-w-4xl flex items-center justify-between p-4 sm:p-5 glass-card mb-6 sm:mb-10">
+        <div>
+          <p className="text-xs text-[var(--text-muted)] font-medium h-4">
+            {todayDate}
+          </p>
+          <h1 className="font-extrabold text-xl sm:text-2xl text-[var(--text)] tracking-tight">
+            QuickSend
+          </h1>
         </div>
 
         <div className="flex items-center gap-2.5">
           <button
             type="button"
             onClick={() => setIsHistoryOpen(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 text-xs font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-neutral-750 transition-all shadow-2xs cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 pill bg-white dark:bg-neutral-800 border border-[var(--border-soft)] text-xs font-semibold text-[var(--text)] hover:bg-neutral-50 dark:hover:bg-neutral-750 transition-all shadow-2xs cursor-pointer"
             title="Session Transfer History"
           >
-            <Clock className="h-3.5 w-3.5 text-neutral-400" />
+            <Clock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
             <span className="hidden sm:inline">History</span>
             {history.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full bg-indigo-500 text-white text-[10px] font-bold">
+              <span className="px-1.5 py-0.2 rounded-full bg-[var(--accent)] text-white text-[10px] font-bold">
                 {history.length}
               </span>
             )}

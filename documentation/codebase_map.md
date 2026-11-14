@@ -207,8 +207,12 @@ flowchart TD
   4. *Error / Declined:* Informative status feedback.
 - **Exports:** `TransferModal({ progress, onAccept, onReject, onClose }: TransferModalProps): JSX.Element | null`
 
+#### `src/components/AppHeader.tsx`
+- **Purpose:** Soft glass header (`.glass-card`) displaying formatted client-side date (`useSyncExternalStore`), bold "QuickSend" title, session transfer history drawer toggle, and live network status badge.
+- **Exports:** `AppHeader(): JSX.Element`
+
 #### `src/components/ModeSelector.tsx`
-- **Purpose:** Client component rendering the 4 compact, rounded option tiles, auto grey-out state when offline, and focused dedicated mode workspace transitions with a top "All Modes" back pill navigation.
+- **Purpose:** Client component rendering the 4 mode tiles as `.glass-card` elements with accent-soft squircle icon boxes, title, summary, round arrow button, auto grey-out state when offline, and focused dedicated mode workspace transitions with a top "All Modes" back pill navigation.
 - **Exports:** `ModeSelector(): JSX.Element`
 
 #### `src/components/SegmentedControl.tsx`
