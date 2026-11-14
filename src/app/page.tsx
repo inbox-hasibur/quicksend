@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { ModeSelector } from "@/components/ModeSelector";
 import { AppHeader } from "@/components/AppHeader";
-import { UltrasonicCard } from "@/components/UltrasonicCard";
 
 export default function Home() {
   return (
@@ -22,7 +21,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* Transfer Channels Selector */}
+        {/* 5 Transfer Modes Selector (Clean Options Grid / Focused Workspace) */}
         <Suspense
           fallback={
             <div className="h-40 flex items-center justify-center text-xs text-[var(--text-muted)] font-mono">
@@ -32,14 +31,11 @@ export default function Home() {
         >
           <ModeSelector />
         </Suspense>
-
-        {/* Ultrasonic Sound Data Transfer (Experimental) */}
-        <UltrasonicCard />
       </div>
 
       {/* Redesigned Minimal Clean Footer */}
-      <footer className="w-full max-w-4xl pt-8 pb-4 mt-8 border-t border-[var(--border-hairline)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
-        <div className="flex items-center gap-3 text-[11px]">
+      <footer className="w-full max-w-4xl pt-6 sm:pt-8 pb-4 mt-6 sm:mt-8 border-t border-[var(--border-hairline)] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
+        <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 text-[11px]">
           <span className="flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             Direct Transfer
@@ -50,8 +46,9 @@ export default function Home() {
           <span>Private</span>
         </div>
 
-        <div className="text-[11px] text-[var(--text-muted)]">
-          QuickSend
+        <div className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5">
+          <span>Developed by</span>
+          <span className="font-bold text-[var(--text)] tracking-tight">IncodeBD</span>
         </div>
       </footer>
     </main>

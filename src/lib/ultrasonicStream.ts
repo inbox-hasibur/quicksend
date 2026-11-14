@@ -111,3 +111,118 @@ export function classifyTone(
   }
   return "unknown";
 }
+
+export interface AcousticPayload {
+  isBinary: boolean;
+  fileName: string;
+  data: string;
+  blob?: Blob;
+  size?: number;
+}
+
+/**
+ * Encodes a file or text payload into structured acoustic frame nibbles.
+ */
+export async function encodePayloadToAcousticNibbles(payload: {
+  file?: File;
+  text?: string;
+}): Promise<{
+  nibbles: number[];
+  rawString: string;
+  isBinary: boolean;
+  fileName: string;
+  fileSize: number;
+}> {
+  if (payload.file) {
+    const file = payload.file;
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    const base64 = btoa(binary);
+    const safeName = encodeURIComponent(file.name || "file.bin");
+    const rawString = `UA1|1|${safeName}|${base64}`;
+    const nibbles = textToNibbles(rawString);
+    return {
+      nibbles,
+      rawString,
+      isBinary: true,
+      fileName: file.name,
+      fileSize: file.size,
+    };
+  }
+
+  const text = payload.text?.trim() || "";
+  const rawString = `UA1|0|text|${text}`;
+  const nibbles = textToNibbles(rawString);
+  return {
+    nibbles,
+    rawString,
+    isBinary: false,
+    fileName: "message.txt",
+    fileSize: new Blob([text]).size,
+  };
+}
+
+/**
+ * Decodes received acoustic nibbles back into structured file or text payload.
+ */
+export function decodeAcousticNibblesToPayload(nibbles: number[]): AcousticPayload | null {
+  const text = nibblesToText(nibbles);
+  if (!text) return null;
+
+  if (text.startsWith("UA1|")) {
+    const parts = text.split("|");
+    if (parts.length >= 4) {
+      const isBinary = parts[1] === "1";
+      let fileName = "file.bin";
+      try {
+        fileName = decodeURIComponent(parts[2]);
+      } catch {
+        // Keep fallback
+      }
+      const data = parts.slice(3).join("|");
+
+      if (isBinary) {
+        try {
+          const binaryStr = atob(data);
+          const bytes = new Uint8Array(binaryStr.length);
+          for (let i = 0; i < binaryStr.length; i++) {
+            bytes[i] = binaryStr.charCodeAt(i);
+          }
+          const blob = new Blob([bytes], { type: "application/octet-stream" });
+          return {
+            isBinary: true,
+            fileName,
+            data,
+            blob,
+            size: bytes.length,
+          };
+        } catch {
+          return {
+            isBinary: true,
+            fileName,
+            data,
+          };
+        }
+      }
+
+      return {
+        isBinary: false,
+        fileName: "message.txt",
+        data,
+        size: new Blob([data]).size,
+      };
+    }
+  }
+
+  // Fallback for plain unformatted acoustic text
+  return {
+    isBinary: false,
+    fileName: "message.txt",
+    data: text,
+    size: new Blob([text]).size,
+  };
+}

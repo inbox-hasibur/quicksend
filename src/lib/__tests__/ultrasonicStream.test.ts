@@ -5,6 +5,8 @@ import {
   nibbleToFrequency,
   frequencyToNibble,
   classifyTone,
+  encodePayloadToAcousticNibbles,
+  decodeAcousticNibblesToPayload,
   ULTRASONIC_PRESETS,
 } from "@/lib/ultrasonicStream";
 
@@ -46,5 +48,38 @@ describe("Ultrasonic Sound Stream Protocol", () => {
     expect(classifyTone(config.stopFreq, config)).toBe("stop");
     expect(classifyTone(18200, config)).toBe("data");
     expect(classifyTone(12000, config)).toBe("unknown");
+  });
+
+  it("should encode and decode text payload via structured acoustic packets", async () => {
+    const message = "Secret PIN: 839201";
+    const encoded = await encodePayloadToAcousticNibbles({ text: message });
+
+    expect(encoded.isBinary).toBe(false);
+    expect(encoded.fileName).toBe("message.txt");
+    expect(encoded.rawString.startsWith("UA1|0|text|")).toBe(true);
+
+    const decoded = decodeAcousticNibblesToPayload(encoded.nibbles);
+    expect(decoded).not.toBeNull();
+    expect(decoded?.isBinary).toBe(false);
+    expect(decoded?.data).toBe(message);
+  });
+
+  it("should encode and decode binary file payload with bit-perfect integrity", async () => {
+    const fileBytes = new Uint8Array([0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x21]); // "Hello!"
+    const file = new File([fileBytes], "greeting.txt", { type: "text/plain" });
+
+    const encoded = await encodePayloadToAcousticNibbles({ file });
+    expect(encoded.isBinary).toBe(true);
+    expect(encoded.fileName).toBe("greeting.txt");
+    expect(encoded.rawString.startsWith("UA1|1|greeting.txt|")).toBe(true);
+
+    const decoded = decodeAcousticNibblesToPayload(encoded.nibbles);
+    expect(decoded).not.toBeNull();
+    expect(decoded?.isBinary).toBe(true);
+    expect(decoded?.fileName).toBe("greeting.txt");
+    expect(decoded?.blob).toBeDefined();
+
+    const recoveredBuf = await decoded!.blob!.arrayBuffer();
+    expect(new Uint8Array(recoveredBuf)).toEqual(fileBytes);
   });
 });

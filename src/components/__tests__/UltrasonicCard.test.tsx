@@ -34,19 +34,20 @@ describe("UltrasonicCard Component", () => {
     expect(container.textContent).toContain("Near-Ultrasonic (18–20 kHz)");
     expect(container.textContent).toContain("Audible Chirp (1.5–3 kHz)");
 
-    // Check broadcast role
-    expect(container.textContent).toContain("Broadcast (Speaker)");
-    expect(container.textContent).toContain("Listen (Microphone)");
+    // Check 2-partition layout
+    expect(container.textContent).toContain("Select Payload (Files or Text)");
+    expect(container.textContent).toContain("Send (Speaker)");
+    expect(container.textContent).toContain("Receive (Mic)");
     expect(container.textContent).toContain("Transmit via Sound");
   });
 
-  it("should switch to microphone receiver view when Listen tab is clicked", async () => {
+  it("should switch to microphone receiver view when Receive tab is clicked", async () => {
     await act(async () => {
       root.render(<UltrasonicCard />);
     });
 
     const listenTabBtn = Array.from(container.querySelectorAll("button")).find((btn) =>
-      btn.textContent?.includes("Listen (Microphone)")
+      btn.textContent?.includes("Receive (Mic)")
     );
     expect(listenTabBtn).toBeDefined();
 
