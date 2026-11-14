@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   KeyRound,
   Phone,
@@ -87,17 +87,19 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
   };
 
   // When sender dataChannel connects to receiver, automatically stream payload
-  if (rtcRole === "sender" && isConnected && progress.status === "connecting") {
-    if (selectedPayload.files.length > 0) {
-      sendFiles(selectedPayload.files).catch((err) => {
-        setErrorMsg(err.message);
-      });
-    } else if (selectedPayload.text.trim()) {
-      sendPayload({ text: selectedPayload.text }).catch((err) => {
-        setErrorMsg(err.message);
-      });
+  useEffect(() => {
+    if (rtcRole === "sender" && isConnected && progress.status === "connecting") {
+      if (selectedPayload.files.length > 0) {
+        sendFiles(selectedPayload.files).catch((err) => {
+          setErrorMsg(err.message);
+        });
+      } else if (selectedPayload.text.trim()) {
+        sendPayload({ text: selectedPayload.text }).catch((err) => {
+          setErrorMsg(err.message);
+        });
+      }
     }
-  }
+  }, [rtcRole, isConnected, progress.status, selectedPayload, sendFiles, sendPayload]);
 
   // Receiver session start
   const handleStartReceiver = async (codeToUse?: string) => {

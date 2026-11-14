@@ -30,9 +30,19 @@ export function TransferModal({
   onClose,
 }: TransferModalProps) {
   const [copied, setCopied] = useState(false);
+  const [dismissedStatus, setDismissedStatus] = useState<string | null>(null);
+
+  const handleDismiss = () => {
+    setDismissedStatus(progress.status);
+    onClose();
+  };
 
   // Modal is only visible when transfer is active or completed/rejected
-  if (progress.status === "idle" || progress.status === "connecting") {
+  if (
+    progress.status === "idle" ||
+    progress.status === "connecting" ||
+    dismissedStatus === progress.status
+  ) {
     return null;
   }
 
@@ -83,8 +93,9 @@ export function TransferModal({
             progress.status === "error") && (
               <button
                 type="button"
-                onClick={onClose}
-                className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+                onClick={handleDismiss}
+                className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                aria-label="Close transfer dialog"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -253,8 +264,8 @@ export function TransferModal({
 
               <button
                 type="button"
-                onClick={onClose}
-                className="w-full py-2.5 px-4 rounded-xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-medium text-xs transition-colors"
+                onClick={handleDismiss}
+                className="w-full py-2.5 px-4 rounded-xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-medium text-xs transition-colors cursor-pointer"
               >
                 Close Transfer
               </button>
@@ -270,8 +281,8 @@ export function TransferModal({
               </div>
               <button
                 type="button"
-                onClick={onClose}
-                className="w-full py-2 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold transition-colors"
+                onClick={handleDismiss}
+                className="w-full py-2 px-4 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white text-xs font-semibold transition-colors cursor-pointer"
               >
                 Close
               </button>

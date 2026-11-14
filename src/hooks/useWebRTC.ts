@@ -34,6 +34,34 @@ import type {
 
 const BUFFER_THRESHOLD = 1024 * 1024; // 1 MB backpressure threshold
 
+interface PeerJsConnection {
+  open?: boolean;
+  dataChannel?: RTCDataChannel;
+  on: (event: string, callback: (...args: unknown[]) => void) => void;
+  send: (data: unknown) => void;
+  close: () => void;
+}
+
+interface PeerJsInstance {
+  on: (event: string, callback: (...args: unknown[]) => void) => void;
+  connect: (id: string, options?: unknown) => PeerJsConnection;
+  destroy: () => void;
+}
+
+async function loadPeerConstructor() {
+  try {
+    const m = await import("peerjs");
+    const mod = (m && (m as { default?: unknown }).default ? (m as { default: unknown }).default : m) as Record<string, unknown>;
+    const PeerClass = (mod.Peer || mod.default || mod) as new (
+      id?: string,
+      options?: unknown
+    ) => PeerJsInstance;
+    return typeof PeerClass === "function" ? PeerClass : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useWebRTC(mode: TransferMode = "internet") {
   const [role, setRole] = useState<PeerRole | null>(null);
   const [roomId, setRoomId] = useState<string | null>(null);
@@ -140,6 +168,17 @@ export function useWebRTC(mode: TransferMode = "internet") {
     candidateQueueRef.current = [];
     setIsConnected(false);
     setPendingHeader(null);
+    setRole(null);
+    setRoomId(null);
+    setRoomCode(null);
+    setProgress({
+      status: "idle",
+      itemType: "file",
+      bytesTransferred: 0,
+      totalBytes: 0,
+      progressPercentage: 0,
+      speedBps: 0,
+    });
   }, [clearIceTimeout]);
 
   useEffect(() => {
@@ -551,18 +590,20 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       // 1. Direct PeerJS WebSocket broker on 0.peerjs.com
       if (typeof window !== "undefined" && mode !== "hotspot") {
-        import("peerjs")
-          .then(({ Peer }) => {
-            if (isConnectedRef.current) return;
+        loadPeerConstructor()
+          .then((PeerClass) => {
+            if (!PeerClass || isConnectedRef.current) return;
             const peerId = `qs-${generatedCode.toLowerCase()}`;
-            const peer = new Peer(peerId, {
+            const peer = new PeerClass(peerId, {
               config: getRtcConfig(mode),
+              debug: 1,
             });
             peerInstanceRef.current = peer;
 
-            peer.on("connection", (conn) => {
+            peer.on("connection", (rawConn: unknown) => {
+              const conn = rawConn as PeerJsConnection;
               dataConnRef.current = conn;
-              conn.on("open", () => {
+              const handleOpen = () => {
                 clearIceTimeout();
                 if (conn.dataChannel) {
                   dcRef.current = conn.dataChannel;
@@ -570,9 +611,15 @@ export function useWebRTC(mode: TransferMode = "internet") {
                 }
                 isConnectedRef.current = true;
                 setIsConnected(true);
-              });
+              };
 
-              conn.on("data", (data) => {
+              if (conn.open) {
+                handleOpen();
+              } else {
+                conn.on("open", handleOpen);
+              }
+
+              conn.on("data", (data: unknown) => {
                 handleIncomingData(data);
               });
 
@@ -582,8 +629,9 @@ export function useWebRTC(mode: TransferMode = "internet") {
               });
             });
 
-            peer.on("error", (err) => {
-              console.debug("PeerJS notice (fallback active):", err.type);
+            peer.on("error", (err: unknown) => {
+              const e = err as { type?: string };
+              console.debug("PeerJS notice (fallback active):", e?.type);
             });
           })
           .catch(() => {});
@@ -591,7 +639,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       // 2. Concurrently initiate HTTP signal store fallback
       signalingRef.current
-        .createRoom(customCode)
+        .createRoom(generatedCode)
         .then(({ roomId: sigRoomId, code: sigCode }) => {
           setRoomId(sigRoomId);
           setRoomCode(sigCode);
@@ -628,11 +676,12 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       // 1. Direct PeerJS WebSocket broker
       if (typeof window !== "undefined" && mode !== "hotspot") {
-        import("peerjs")
-          .then(({ Peer }) => {
-            if (isConnectedRef.current) return;
-            const peer = new Peer({
+        loadPeerConstructor()
+          .then((PeerClass) => {
+            if (!PeerClass || isConnectedRef.current) return;
+            const peer = new PeerClass(undefined, {
               config: getRtcConfig(mode),
+              debug: 1,
             });
             peerInstanceRef.current = peer;
 
@@ -641,7 +690,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
               const conn = peer.connect(targetId, { reliable: true });
               dataConnRef.current = conn;
 
-              conn.on("open", () => {
+              const handleOpen = () => {
                 clearIceTimeout();
                 if (conn.dataChannel) {
                   dcRef.current = conn.dataChannel;
@@ -649,9 +698,15 @@ export function useWebRTC(mode: TransferMode = "internet") {
                 }
                 isConnectedRef.current = true;
                 setIsConnected(true);
-              });
+              };
 
-              conn.on("data", (data) => {
+              if (conn.open) {
+                handleOpen();
+              } else {
+                conn.on("open", handleOpen);
+              }
+
+              conn.on("data", (data: unknown) => {
                 handleIncomingData(data);
               });
 
@@ -661,8 +716,9 @@ export function useWebRTC(mode: TransferMode = "internet") {
               });
             });
 
-            peer.on("error", (err) => {
-              console.debug("PeerJS receiver notice (fallback active):", err.type);
+            peer.on("error", (err: unknown) => {
+              const e = err as { type?: string };
+              console.debug("PeerJS receiver notice (fallback active):", e?.type);
             });
           })
           .catch(() => {});
@@ -670,7 +726,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       // 2. Concurrently initiate HTTP signal store fallback
       signalingRef.current
-        .joinRoom(code)
+        .joinRoom(cleanCode)
         .then(({ roomId: sigRoomId, code: sigCode }) => {
           setRoomId(sigRoomId);
           setRoomCode(sigCode);
@@ -683,7 +739,15 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   // Sequential Multi-File Batch Queue Sender
   const sendFiles = useCallback(async (files: File[]) => {
-    const dc = dcRef.current;
+    let dc = dcRef.current;
+    if (!dc || dc.readyState !== "open") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (dataConnRef.current && (dataConnRef.current as any).dataChannel) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dc = (dataConnRef.current as any).dataChannel;
+        dcRef.current = dc;
+      }
+    }
     if (!dc || dc.readyState !== "open") {
       throw new Error("WebRTC DataChannel is not open for transfer");
     }
@@ -793,7 +857,15 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   // Text snippet sender
   const sendText = useCallback(async (text: string) => {
-    const dc = dcRef.current;
+    let dc = dcRef.current;
+    if (!dc || dc.readyState !== "open") {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if (dataConnRef.current && (dataConnRef.current as any).dataChannel) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        dc = (dataConnRef.current as any).dataChannel;
+        dcRef.current = dc;
+      }
+    }
     if (!dc || dc.readyState !== "open") {
       throw new Error("WebRTC DataChannel is not open for transfer");
     }
