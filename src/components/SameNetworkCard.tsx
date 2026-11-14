@@ -36,7 +36,6 @@ export function SameNetworkCard() {
   const {
     profile,
     peers,
-    networkId,
     incomingBeam,
     beamToPeer,
     clearIncomingBeam,
@@ -235,8 +234,9 @@ export function SameNetworkCard() {
           <label className="text-xs font-semibold text-[var(--text)]">
             2. Nearby Devices on this Wi-Fi ({peers.length})
           </label>
-          <span className="text-[11px] font-mono text-[var(--text-muted)]">
-            {networkId ? `Subnet: ${networkId}` : "Detecting router..."}
+          <span className="text-[11px] text-[var(--text-muted)] flex items-center gap-1.5 font-medium">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>{peers.length > 0 ? "Local Network Synced" : "Scanning local router..."}</span>
           </span>
         </div>
 
