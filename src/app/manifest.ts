@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Share Anything",
-    short_name: "ShareAnything",
+    name: "QuickSend",
+    short_name: "QuickSend",
     description: "Zero-login instant file & text sharing across devices in your browser.",
     start_url: "/",
     display: "standalone",

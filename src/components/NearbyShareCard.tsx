@@ -50,7 +50,7 @@ export function NearbyShareCard() {
     await shareViaNative({
       files: selectedPayload.files.length > 0 ? selectedPayload.files : undefined,
       text: selectedPayload.text.trim() || undefined,
-      title: "Share Anything Beam",
+      title: "QuickSend Beam",
     });
   };
 

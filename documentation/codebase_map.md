@@ -1,7 +1,7 @@
-# Share Anything: Codebase Map & Dependency Graph
+# QuickSend: Codebase Map & Dependency Graph
 
 > **Last Updated:** Sprint 4 Complete (Mode 4 Bluetooth, Polish, History & Vercel Deployment)  
-> **Target Deployment:** [shareit.vercel.app](https://shareit.vercel.app)  
+> **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 
 This document provides a high-density, comprehensive map of the repository's modules, files, dependencies, exports, and browser API integrations. Any AI coding assistant or engineer can read this single document to understand the codebase without scanning raw files.
@@ -151,7 +151,7 @@ flowchart TD
 ### 3.1 Application Routes & Route Handlers (`src/app/`)
 
 #### `src/app/page.tsx`
-- **Purpose:** Primary landing hub for "Share Anything". Wraps `<ModeSelector />` in `<Suspense>` so dynamic search params (`?room=123456`) hydrate cleanly while maintaining static prerendering.
+- **Purpose:** Primary landing hub for "QuickSend". Wraps `<ModeSelector />` in `<Suspense>` so dynamic search params (`?room=123456`) hydrate cleanly while maintaining static prerendering.
 - **Exports:** `default Home(): JSX.Element`
 
 #### `src/app/api/signal/route.ts`

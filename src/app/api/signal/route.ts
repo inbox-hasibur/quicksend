@@ -77,7 +77,7 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     status: "ok",
-    service: "share-anything-signaling",
+    service: "quicksend-signaling",
     activeRooms: store.rooms.size,
   });
 }

@@ -124,7 +124,7 @@ export function useNearbyShare() {
       }
 
       const shareData: ShareData = {
-        title: payload.title || "Share Anything Beam",
+        title: payload.title || "QuickSend Beam",
       };
 
       if (payload.text && payload.text.trim()) {

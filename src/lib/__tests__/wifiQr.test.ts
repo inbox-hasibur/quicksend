@@ -39,7 +39,7 @@ describe("wifiQr string builder and parser", () => {
   });
 
   it("should return null for non-Wi-Fi strings", () => {
-    expect(parseWifiQrString("https://shareit.vercel.app")).toBeNull();
+    expect(parseWifiQrString("https://quicksend.vercel.app")).toBeNull();
     expect(parseWifiQrString("")).toBeNull();
   });
 

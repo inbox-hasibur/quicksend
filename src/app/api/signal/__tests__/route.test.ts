@@ -9,7 +9,7 @@ describe("Signaling API Route Handler", () => {
 
     expect(res.status).toBe(200);
     expect(data.status).toBe("ok");
-    expect(data.service).toBe("share-anything-signaling");
+    expect(data.service).toBe("quicksend-signaling");
   });
 
   it("should create room, join room, exchange signals, and clean up", async () => {

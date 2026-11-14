@@ -1,6 +1,6 @@
-# Share Anything: Product Backlog & Sprint Roadmap
+# QuickSend: Product Backlog & Sprint Roadmap
 
-> **Target Deployment:** [shareit.vercel.app](https://shareit.vercel.app)  
+> **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Status Legend:** `[x]` Completed | `[ ]` Pending
 
 ---
@@ -126,6 +126,7 @@
 - [x] Implement ephemeral session transfer history log (`useTransferHistory.ts`, `TransferHistoryModal.tsx`, `AppHeader.tsx`) and session teardown cleanup.
 - [x] Perform cross-browser and cross-device testing (Chrome, Edge, Safari, Android Chrome, iOS Safari).
 - [x] Prepare final production deployment configuration for Vercel (`vercel.json` with CSP, PWA cache policies, clean URLs).
+- [x] Rename project identity, package, PWA manifest, service worker cache, and documentation from Share Anything to QuickSend (`quicksend.vercel.app`).
 - [x] **Sprint 4 Testing & Verification Gate:**
   - Unit tests for Bluetooth/WebShare capability detection hooks (`src/lib/__tests__/nearbyShare.test.ts`).
   - Full end-to-end regression test suite passing across all components and utilities.

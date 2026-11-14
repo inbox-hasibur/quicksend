@@ -9,12 +9,12 @@ describe("Nearby & Bluetooth Capabilities and Transfer History", () => {
     it("should accept valid file and text payloads for OS share sheet", () => {
       const file = new File(["dummy content"], "report.pdf", { type: "application/pdf" });
       const payload = {
-        title: "Share Anything Beam",
+        title: "QuickSend Beam",
         text: "Important report",
         files: [file],
       };
 
-      expect(payload.title).toBe("Share Anything Beam");
+      expect(payload.title).toBe("QuickSend Beam");
       expect(payload.files).toHaveLength(1);
       expect(payload.files[0].name).toBe("report.pdf");
       expect(payload.files[0].size).toBeGreaterThan(0);

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Share Anything | Zero-Login Instant File & Text Sharing",
+  title: "QuickSend | Zero-Login Instant File & Text Sharing",
   description: "Zero-login instant file & text sharing across devices in your browser.",
 };
 

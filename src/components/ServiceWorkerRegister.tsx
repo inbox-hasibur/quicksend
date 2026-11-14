@@ -14,7 +14,7 @@ export function ServiceWorkerRegister() {
               installingWorker.addEventListener("statechange", () => {
                 if (installingWorker.state === "installed" && navigator.serviceWorker.controller) {
                   // New content is available once all tabs are closed
-                  console.info("Share Anything updated. Refresh to apply changes.");
+                  console.info("QuickSend updated. Refresh to apply changes.");
                 }
               });
             }

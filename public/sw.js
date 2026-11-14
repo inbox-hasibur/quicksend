@@ -1,5 +1,5 @@
-// Share Anything PWA Service Worker
-const CACHE_NAME = "share-anything-v1";
+// QuickSend PWA Service Worker
+const CACHE_NAME = "quicksend-v1";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -64,7 +64,7 @@ self.addEventListener("fetch", (event) => {
           if (cached) return cached;
           const shell = await caches.match("/");
           if (shell) return shell;
-          return new Response("Offline - Share Anything app shell unavailable", {
+          return new Response("Offline - QuickSend app shell unavailable", {
             status: 503,
             headers: { "Content-Type": "text/plain" },
           });

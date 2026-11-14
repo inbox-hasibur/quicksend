@@ -1,7 +1,7 @@
-# Share Anything ⚡
+# QuickSend ⚡
 
 > **Zero-login, instant, peer-to-peer file & text sharing across devices in your browser.**  
-> Target Deployment: [shareit.vercel.app](https://shareit.vercel.app)
+> Target Deployment: [quicksend.vercel.app](https://quicksend.vercel.app)
 
 ---
 
@@ -13,13 +13,13 @@ In university computer labs, research facilities, offices, and co-working spaces
 - **Clunky Workarounds:** Manually typing long URLs, emailing files to burner inboxes, or carrying physical USB flash drives (which risk malware propagation and may be port-disabled by administrators) wastes valuable time.
 - **Network & Connectivity Hurdles:** University and corporate networks often impose strict guest firewalls, client isolation, or intermittent external internet access.
 
-**Share Anything** solves this with a zero-friction, zero-login, browser-based web application that connects devices in seconds using short codes, dynamic QR codes, WebRTC direct data channels, local network discovery, Wi-Fi hotspot pairing, and Web Bluetooth interfaces.
+**QuickSend** solves this with a zero-friction, zero-login, browser-based web application that connects devices in seconds using short codes, dynamic QR codes, WebRTC direct data channels, local network discovery, Wi-Fi hotspot pairing, and Web Bluetooth interfaces.
 
 ---
 
 ## 🚀 Core Transfer Modes
 
-Share Anything features a versatile multi-modal transfer architecture designed for every environment:
+QuickSend features a versatile multi-modal transfer architecture designed for every environment:
 
 | Mode | Connectivity | Discovery / Handshake | Ideal Use Case |
 | :--- | :--- | :--- | :--- |
@@ -57,8 +57,8 @@ Share Anything features a versatile multi-modal transfer architecture designed f
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/share-anything.git
-   cd share-anything
+   git clone https://github.com/inbox-hasibur/quicksend.git
+   cd quicksend
    ```
 
 2. **Install dependencies:**
@@ -91,7 +91,7 @@ Share Anything features a versatile multi-modal transfer architecture designed f
 ## 📂 Project Structure
 
 ```
-share-anything/
+quicksend/
 ├── documentation/          # Architectural specs, RFCs, and project documentation
 │   └── about_project.md    # In-depth architectural & capabilities specification
 ├── public/                 # Static assets, SVG icons, and PWA assets
@@ -100,7 +100,7 @@ share-anything/
 │   │   ├── globals.css     # Global styles & Tailwind configuration
 │   │   ├── layout.tsx      # Root HTML shell & metadata
 │   │   ├── manifest.ts     # Web App Manifest for PWA installation
-│   │   └── page.tsx        # Share Anything landing & transfer interface
+│   │   └── page.tsx        # QuickSend landing & transfer interface
 │   ├── components/         # Reusable UI components (Modals, QR Scanner, Dropzone)
 │   ├── hooks/              # Custom React hooks (useWebRTC, useNetworkStatus, etc.)
 │   ├── lib/                # Core utilities (WebRTC signaling, QR helpers, Bluetooth)
@@ -123,4 +123,4 @@ share-anything/
 
 ## 📄 Documentation
 
-For deep technical details regarding WebRTC signaling, Web Bluetooth GATT characteristics, browser capability matrixes, and offline fallbacks, see [documentation/about_project.md](file:///c:/Users/inbox/OneDrive/Documents/GitHub/share-anything/documentation/about_project.md).
+For deep technical details regarding WebRTC signaling, Web Bluetooth GATT characteristics, browser capability matrixes, and offline fallbacks, see [documentation/about_project.md](documentation/about_project.md).

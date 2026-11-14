@@ -1,6 +1,6 @@
-# Share Anything: Architecture & Product Specifications
+# QuickSend: Architecture & Product Specifications
 
-> **Target Deployment:** [shareit.vercel.app](https://shareit.vercel.app)  
+> **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Core Concept:** Zero-login, instant, multi-modal file and text transfer between computers and mobile devices with zero server-side data retention.
 
 ---
@@ -14,7 +14,7 @@ Current conventional solutions introduce major friction points:
 2. **Hardware Constraints:** Administrative policies often lock down USB ports, and USB drives risk transmitting malware across machines.
 3. **Network Constraints:** Lab computers are frequently on isolated subnets, behind rigid campus firewalls, or restricted from accessing popular messaging websites.
 
-**Share Anything** bridges this gap using browser-native technologies. By avoiding user accounts, database persistence, and cloud storage, transfers are purely ephemeral, peer-to-peer, and instant.
+**QuickSend** bridges this gap using browser-native technologies. By avoiding user accounts, database persistence, and cloud storage, transfers are purely ephemeral, peer-to-peer, and instant.
 
 ---
 
@@ -24,7 +24,7 @@ Immediately upon opening the app, users are presented with **4 upfront transfer 
 
 ```
 +---------------------------------------------------------------------------------------------------------+
-|                                        Share Anything Home Hub                                          |
+|                                           QuickSend Home Hub                                             |
 +---------------------------------------------------------------------------------------------------------+
        |                               |                              |                            |
        v                               v                              v                            v
@@ -106,7 +106,7 @@ Immediately upon opening the app, users are presented with **4 upfront transfer 
 Instead of overwhelming users with multi-column pricing-style cards, the interface features a clean, mobile-first design with 4 compact option tiles (`rounded-3xl` with soft squircle icons, subtle shadows, and arrow indicators). Tapping any tile cleanly transitions into that mode's dedicated workspace with a top "← All Modes" back navigation pill:
 
 ```
-[ Share Anything Home Hub ]
+[ QuickSend Home Hub ]
    ├── [ Mode 1: Internet ] ────> Opens Dedicated Workspace ────> [ Send | Receive ]
    ├── [ Mode 2: Same Wi-Fi ] ───> Opens Dedicated Workspace ────> [ LAN Send | Optical Receive ]
    ├── [ Mode 3: Hotspot ] ──────> Opens Dedicated Workspace ────> [ Host AP | Join AP ]
@@ -157,7 +157,7 @@ Instead of overwhelming users with multi-column pricing-style cards, the interfa
 ### Service Worker Caching Architecture
 - **Application Shell:** HTML, CSS, JavaScript bundles, static SVG assets, and font files are pre-cached upon initial load.
 - **Tooling Libraries:** Client-side QR generator (`qrcode.react`), camera QR scanner (`html5-qrcode`), and crypto hashing utilities function completely offline.
-- **Manifest:** Configured via `src/app/manifest.ts` allowing users to install "Share Anything" to their desktop or home screen for instant offline access.
+- **Manifest:** Configured via `src/app/manifest.ts` allowing users to install "QuickSend" to their desktop or home screen for instant offline access.
 
 ### Dynamic Network State Detection
 The application actively monitors network state via:
@@ -215,7 +215,7 @@ Web standards enforce security sandboxes that prevent web applications from beha
 Below is the complete ASCII directory tree reflecting the workspace files and directories:
 
 ```
-share-anything/
+quicksend/
 ├── .gitignore
 ├── AGENTS.md
 ├── eslint.config.mjs

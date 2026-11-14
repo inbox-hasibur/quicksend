@@ -17,7 +17,7 @@ export function AppHeader() {
           <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-sm">
             <Zap className="h-4 w-4 fill-current" />
           </div>
-          <span className="font-sans font-extrabold tracking-tight">Share Anything</span>
+          <span className="font-sans font-extrabold tracking-tight">QuickSend</span>
         </div>
 
         <div className="flex items-center gap-2.5">
