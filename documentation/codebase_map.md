@@ -205,8 +205,12 @@ flowchart TD
 - **Exports:** `CameraStreamCard(): JSX.Element`
 
 #### `src/components/HotspotAssistantCard.tsx`
-- **Purpose:** Mode 3 Controller (Wi-Fi + Hotspot Interface). Guided wizard for mobile/laptop AP activation, Android settings shortcuts (`TETHER_SETTINGS`), standardized `WIFI:T:WPA;S:...` pairing QR code generation, and offline optical WebRTC handshake.
+- **Purpose:** Mode 3 Controller (Wi-Fi Hotspot Transfer Engine). Dual-phase transfer architecture combining compact 1-tap Android Hotspot/Wi-Fi settings shortcuts, optional collapsible Wi-Fi QR code generator, live Hotspot Radar with 1-tap subnet beaming via `useLocalDiscovery(true)` + `useWebRTC("hotspot")`, and a collapsible offline 6-digit PIN / QR pairing backup for zero-cellular environments.
 - **Exports:** `HotspotAssistantCard(): JSX.Element`
+
+#### `src/components/NearbyShareCard.tsx`
+- **Purpose:** Mode 4 Controller (Bluetooth & Quick Share). Honest 1-tap proximity sharing leveraging native OS share sheets (`navigator.share`) across Android Quick Share, Apple AirDrop, and Windows Bluetooth File Transfer with transfer history logging. Includes plain-English receiving instructions and a secondary collapsible Web Bluetooth GATT Client for microcontrollers and sensors.
+- **Exports:** `NearbyShareCard(): JSX.Element`
 
 #### `src/components/OpticalHandshakeModal.tsx`
 - **Purpose:** Visual modal for 100% zero-internet optical WebRTC signaling. Displays compressed Offer/Answer QR codes and launches the camera scanner to exchange SDP descriptions directly across device screens.

@@ -71,33 +71,25 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 
 ---
 
-### Mode 3: Share via Wi-Fi + Hotspot (Offline Transfer Interface)
-- **Primary Use Case:** Completely offline environments where neither device has access to external internet (field research stations, air-gapped lab computers, network outages).
-- **Architectural Reality:** Browsers **cannot** run background HTTP web servers or WebSocket servers due to browser sandbox security models. Therefore, Mode 3 acts as an interactive transfer orchestration interface powered by the cached PWA and optical WebRTC signaling:
-  - **Sender Flow:**
-    1. Assists user in toggling on their mobile or laptop Wi-Fi Hotspot (provides direct OS settings deep-links where supported on Android, e.g. `intent:#Intent;action=android.settings.WIRELESS_SETTINGS;end`).
-    2. Inputs Hotspot SSID and password (with 1-click random strong password generation) to generate a standard Wi-Fi configuration QR code:
-       ```text
-       WIFI:T:WPA;S:<SSID>;P:<Password>;;
-       ```
-    3. Renders the offline WebRTC SDP offer as an animated sequenced multi-frame QR carousel (`QS1|<index>/<total>|<hash>|<chunk>`) for low-res camera scannability.
-  - **Receiver Flow:**
-    1. Scans the Wi-Fi QR code with native phone camera or opens Wi-Fi settings (with Android settings shortcuts) to join the hotspot.
-    2. Once connected to the sender's hotspot, opens the cached PWA app shell.
-    3. Scans the sender's animated SDP offer QR code (with live frame collection progress `Captured X of Y frames`) or pastes code manually if camera is absent, then displays the SDP answer QR code back to the sender's camera.
-  - **Data Transfer:** WebRTC `RTCDataChannel` connects over the local hotspot subnet without any internet connection.
+### Mode 3: Share via Wi-Fi + Hotspot (Live Hotspot Radar & Transfer Engine)
+- **Primary Use Case:** Direct peer-to-peer transfer between devices sharing a mobile hotspot or portable Wi-Fi AP.
+- **Dual-Phase Architecture (Live Radar + Offline Backup):**
+  - **Step 1 (Connect):** Clean, compact 2-tab setup (`Host Hotspot` | `Join Hotspot`):
+    - *Host Hotspot:* 1-tap Android Hotspot Settings shortcut (`ANDROID_INTENTS.TETHER_SETTINGS`) + optional collapsible Wi-Fi QR Code generator (`WIFI:T:WPA;S:...`) for instant camera joining without forcing users to type passwords.
+    - *Join Hotspot:* 1-tap Android Wi-Fi Settings shortcut (`ANDROID_INTENTS.WIFI_SETTINGS`).
+  - **Step 2 (Instant Hotspot Radar — Primary Flow):** Powered directly by `useLocalDiscovery` + `useWebRTC("hotspot")`. Devices connected to the same phone hotspot (with mobile data on) discover each other automatically on the live Hotspot Radar and transfer with 1-tap beaming.
+  - **Offline Backup (Collapsible):** Seamlessly tucked inside `"No mobile data? Use Offline Direct PIN / QR Pairing"` for completely air-gapped field setups without cellular data. Users can pair via 6-digit session PIN or camera QR scanner.
 
 ---
 
-### Mode 4: Share via Bluetooth (Nearby Interface)
-- **Primary Use Case:** Rapid proximity sharing when no Wi-Fi router or hotspot is active.
-- **Architectural Reality (GATT Central vs. Peripheral):**
-  - The W3C Web Bluetooth specification (`navigator.bluetooth`) strictly implements the **GATT Central (Client)** role. Browsers **cannot** advertise as a GATT Peripheral or host a GATT Server. Consequently, direct browser-to-browser Web BLE transfer is impossible in pure web standards.
-- **The Mode 4 Multi-Tiered Strategy:**
-  1. **Capability Detection:** Automatically assesses browser support via `'bluetooth' in navigator` and `'share' in navigator`.
-  2. **Native OS Web Share (`navigator.share` with Files):** For device-to-device transfers, prompts the native OS Share Sheet with the selected files/text. This enables the user to select system-native proximity mechanisms: **Android Quick Share / Nearby Share, Windows Bluetooth File Transfer, or macOS/iOS AirDrop**.
-  3. **Android Bluetooth Settings Deep-Link:** Provides quick-launch shortcuts (`intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end`) to facilitate manual Bluetooth file reception on mobile devices.
-  4. **Web Bluetooth GATT Client Interface:** For specialized hardware (BLE microcontrollers, Arduino/ESP32 data loggers, custom peripheral hardware), maintains a full Web-BLE GATT client to read/write characteristic data streams directly in the browser.
+### Mode 4: Share via Bluetooth (Honest Native OS Proximity Share)
+- **Primary Use Case:** Proximity sharing directly leveraging your operating system's built-in proximity hardware.
+- **Architectural Reality (Honest Web Sandbox Standards):**
+  - Browsers cannot act as GATT Servers or intercept raw Bluetooth radio packets due to W3C security sandboxes.
+- **Streamlined User Experience:**
+  - **1-Tap Device Share (Primary):** Select files or text with Dropzone and tap **"Send via Quick Share / AirDrop / Bluetooth"** (`navigator.share`). Hands payload off directly to Android Quick Share, Apple AirDrop, or Windows Bluetooth File Transfer, logging sent items to session history.
+  - **Plain-English Receiving Guidance:** Clear, honest guidance explaining that incoming Bluetooth transfers are received via the device's native OS Quick Share / AirDrop / Bluetooth settings, accompanied by a 1-tap shortcut to Android Bluetooth Settings (`ANDROID_INTENTS.BLUETOOTH_SETTINGS`).
+  - **Secondary Collapsible for Hardware:** Cleanly tucked secondary section `"Connect BLE Device (Sensors / Hardware)"` for hardware developers connecting to BLE microcontrollers (ESP32, Arduino) via Web-BLE GATT Client.
 
 ---
 

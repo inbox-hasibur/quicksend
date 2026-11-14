@@ -197,3 +197,10 @@
 - [x] Compact & Highly Scannable Animated QR Codes: optimize `DEFAULT_CHUNK_RAW_BYTES` to 66 bytes (producing <= 88 base64 chars, <= 90 max payload chars) in `src/lib/opticalDataStream.ts`; render `<QRCodeSVG>` with `size={280}`, `level="L"`, `bgColor="#FFFFFF"`, `fgColor="#000000"`, `marginSize={3}`.
 - [x] Unit test in `src/lib/__tests__/opticalDataStream.test.ts` verifying compact frame payload sizes and bit-perfect reassembly at 66 raw bytes.
 - [x] **Sprint 9 Verification:** 128/128 unit tests passing across 21 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+### Sprint 10: Hotspot Radar Engine & Streamlined Honest Bluetooth Share
+- [x] Upgrade Mode 3 (`HotspotAssistantCard.tsx`): replace static guide feel with real working transfer engine combining 1-tap Android Hotspot/Wi-Fi settings shortcuts, optional collapsible Wi-Fi QR generator, and real-time Hotspot Radar & Subnet Beaming via `useLocalDiscovery(true)` + `useWebRTC("hotspot")`.
+- [x] Mode 3 Offline Backup: collapsible `"No mobile data? Use Offline Direct PIN / QR Pairing"` section for air-gapped hotspot transfers without cellular data, with 6-digit session PIN and camera QR scanner.
+- [x] Streamline Mode 4 (`NearbyShareCard.tsx`): remove confusing browser Bluetooth receive expectations; implement honest 1-tap Device Share (`navigator.share`) with automatic history logging, plain-English receiving instructions explaining OS Quick Share / AirDrop / Bluetooth settings, and a secondary collapsible BLE Hardware section for sensors and microcontrollers.
+- [x] Add automated component tests in `src/components/__tests__/HotspotAssistantCard.test.tsx` and `src/components/__tests__/NearbyShareCard.test.tsx`.
+- [x] **Sprint 10 Verification:** 132/132 unit tests passing across 23 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
