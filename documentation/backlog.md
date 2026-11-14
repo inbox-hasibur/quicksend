@@ -160,8 +160,10 @@
 - [x] Harden Service Worker (`public/sw.js`) to strictly bypass caching for `/api/*` endpoints (`NetworkOnly`) and configure `no-store` API headers in `vercel.json`.
 - [x] Redesign navbar into an ultra-minimal, clean header with brand mark, monospace subtitle, network status, history trigger, and tactile dark/light mode toggle (`src/components/AppHeader.tsx`, `src/components/ThemeToggle.tsx`).
 - [x] Implement interactive Dark Mode / Light Mode system (`src/hooks/useTheme.ts`, `globals.css` with `@custom-variant dark`, and anti-FOUC layout script in `src/app/layout.tsx`).
-- [x] Redesign footer into a minimal, clean monospace trust bar (`src/app/page.tsx`).
-- [x] **Sprint 4 Testing & Verification Gate:**
-  - Unit tests for Bluetooth/WebShare capability detection hooks, SegmentedControl, FileTypeBadge, SignalStore (Memory + Redis REST), ICE configuration, Health endpoint, SHA-256 chunker, DiskStream fallback, Multi-Frame Optical SDP Collector, useTransferHistory store, and useTheme hook.
-  - Full end-to-end regression test suite passing across all components, APIs, and utilities.
-  - Verification that `npm test` (95/95 passed across 15 test suites), `npm run lint` (0 errors), and `npm run build` pass cleanly with zero errors.
+- [x] Harden WebRTC DataChannel and ICE teardown state transitions: guard `status: "completed"` against false error overrides when sender terminates connection after successful file transfer.
+- [x] Implement Same Network beam signaling (`action: "beam"` & `action: "clearBeam"` in `/api/discover`) enabling 1-tap beaming from radar to receiver with zero manual room entry.
+- [x] Assign vibrant animal & creature avatars (🦊 Curious Fox, 🐬 Swift Dolphin, 🦁 Golden Lion, etc.) with device/OS badges to distinguish multiple devices at a glance even when mobile browsers mask phone models.
+- [x] Eliminate aggressive 30-second passive timeout in WebRTC: listening and pairing remain active until user navigates away or cancels.
+- [x] Fix QR code URL generation in local dev to point to production domain, preventing mobile camera scan failures ("this page couldn't load").
+- [x] Auto-connect receiver upon URL query navigation (`/?room=123456`) and fix modal dismiss handling.
+- [x] **Sprint 5 Verification:** 110/110 unit tests passing across 19 suites, `npm run lint` 0 errors/0 warnings, `npm run build` Turbopack production compilation passing.

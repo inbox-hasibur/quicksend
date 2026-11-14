@@ -28,7 +28,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS v4 (@tailwindcss/turbopack)"]
-        Vitest["Vitest v5 + happy-dom (109 Passing Tests across 19 Suites)"]
+        Vitest["Vitest v5 + happy-dom (110 Passing Tests across 19 Suites)"]
         PeerJS["peerjs (Global WebRTC Peer Connection & Real-Time Broker)"]
     end
 

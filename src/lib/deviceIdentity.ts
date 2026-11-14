@@ -1,28 +1,41 @@
 /**
  * Client Device Identity Utility.
- * Detects device platform, browser, form-factor, and manages customizable device name.
+ * Detects device platform, browser, form-factor, and assigns memorable distinct avatars & codenames.
  */
 
 export type DeviceFormFactor = "desktop" | "laptop" | "mobile" | "tablet";
 
+export interface AvatarPreset {
+  emoji: string;
+  codename: string;
+  color: string;
+}
+
+export const AVATAR_PRESETS: AvatarPreset[] = [
+  { emoji: "🦊", codename: "Curious Fox", color: "#F97316" },
+  { emoji: "🐬", codename: "Swift Dolphin", color: "#06B6D4" },
+  { emoji: "🦁", codename: "Golden Lion", color: "#F59E0B" },
+  { emoji: "🐼", codename: "Gentle Panda", color: "#10B981" },
+  { emoji: "🦉", codename: "Wise Owl", color: "#6366F1" },
+  { emoji: "🦄", codename: "Mystic Unicorn", color: "#8B5CF6" },
+  { emoji: "🐨", codename: "Calm Koala", color: "#14B8A6" },
+  { emoji: "🐯", codename: "Bold Tiger", color: "#F43F5E" },
+  { emoji: "🦩", codename: "Radiant Flamingo", color: "#EC4899" },
+  { emoji: "🦅", codename: "Brave Eagle", color: "#0EA5E9" },
+  { emoji: "🐙", codename: "Clever Octopus", color: "#A855F7" },
+  { emoji: "🐺", codename: "Lone Wolf", color: "#64748B" },
+];
+
 export interface DeviceProfile {
   id: string;
   name: string;
+  codename: string;
+  avatarEmoji: string;
+  avatarColor: string;
   formFactor: DeviceFormFactor;
   os: string;
   browser: string;
-  avatarColor: string;
 }
-
-const AVATAR_COLORS = [
-  "#6366F1", // Indigo
-  "#3B82F6", // Blue
-  "#10B981", // Emerald
-  "#F59E0B", // Amber
-  "#EC4899", // Pink
-  "#8B5CF6", // Purple
-  "#06B6D4", // Cyan
-];
 
 export function getPlatformInfo(ua = typeof navigator !== "undefined" ? navigator.userAgent : ""): {
   os: string;
@@ -41,7 +54,8 @@ export function getPlatformInfo(ua = typeof navigator !== "undefined" ? navigato
 
   // Detect Browser
   let browser = "Browser";
-  if (uaLower.includes("edg/")) browser = "Edge";
+  if (uaLower.includes("samsungbrowser")) browser = "Samsung Browser";
+  else if (uaLower.includes("edg/")) browser = "Edge";
   else if (uaLower.includes("chrome") && !uaLower.includes("edg/")) browser = "Chrome";
   else if (uaLower.includes("safari") && !uaLower.includes("chrome")) browser = "Safari";
   else if (uaLower.includes("firefox")) browser = "Firefox";
@@ -53,7 +67,6 @@ export function getPlatformInfo(ua = typeof navigator !== "undefined" ? navigato
   } else if (/mobile|iphone|ipod|android/i.test(uaLower)) {
     formFactor = "mobile";
   } else if (os === "macOS" || os === "Windows" || os === "Linux") {
-    // If screen is smaller than 1400 and has battery API, likely laptop
     formFactor = "laptop";
   }
 
@@ -65,10 +78,12 @@ export function getLocalDeviceProfile(): DeviceProfile {
     return {
       id: "srv_mock",
       name: "QuickSend Device",
+      codename: "Curious Fox",
+      avatarEmoji: "🦊",
+      avatarColor: AVATAR_PRESETS[0].color,
       formFactor: "desktop",
       os: "Server",
       browser: "Node",
-      avatarColor: AVATAR_COLORS[0],
     };
   }
 
@@ -80,25 +95,28 @@ export function getLocalDeviceProfile(): DeviceProfile {
     sessionStorage.setItem("quicksend_device_id", storedId);
   }
 
-  const storedName = localStorage.getItem("quicksend_device_name");
-  const deviceName =
-    storedName ||
-    `${os} ${formFactor === "mobile" ? "Phone" : formFactor === "tablet" ? "Tablet" : "PC"} (${browser})`;
-
-  // Pick deterministic avatar color based on id
+  // Pick deterministic avatar preset based on id
   let hash = 0;
   for (let i = 0; i < storedId.length; i++) {
     hash = (hash << 5) - hash + storedId.charCodeAt(i);
   }
-  const colorIndex = Math.abs(hash) % AVATAR_COLORS.length;
+  const presetIndex = Math.abs(hash) % AVATAR_PRESETS.length;
+  const preset = AVATAR_PRESETS[presetIndex];
+
+  const storedName = localStorage.getItem("quicksend_device_name");
+  const deviceName =
+    storedName ||
+    `${preset.codename} (${os} ${formFactor === "mobile" ? "Phone" : formFactor === "tablet" ? "Tablet" : "PC"})`;
 
   return {
     id: storedId,
     name: deviceName,
+    codename: preset.codename,
+    avatarEmoji: preset.emoji,
+    avatarColor: preset.color,
     formFactor,
     os,
     browser,
-    avatarColor: AVATAR_COLORS[colorIndex],
   };
 }
 

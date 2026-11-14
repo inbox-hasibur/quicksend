@@ -10,15 +10,27 @@ import {
 export interface NearbyPeer {
   id: string;
   name: string;
+  codename?: string;
+  avatarEmoji?: string;
+  avatarColor?: string;
+  os?: string;
+  browser?: string;
   formFactor: "desktop" | "laptop" | "mobile" | "tablet";
   peerId: string;
   lastSeen: number;
+}
+
+export interface IncomingBeamEvent {
+  fromPeer: Partial<NearbyPeer>;
+  roomCode: string;
+  timestamp: number;
 }
 
 export function useLocalDiscovery(isAutoDiscovering = true) {
   const [profile, setProfile] = useState<DeviceProfile>(() => getLocalDeviceProfile());
   const [peers, setPeers] = useState<NearbyPeer[]>([]);
   const [networkId, setNetworkId] = useState<string | null>(null);
+  const [incomingBeam, setIncomingBeam] = useState<IncomingBeamEvent | null>(null);
   const isScanning = isAutoDiscovering;
   const announceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -32,6 +44,11 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
           action: "announce",
           deviceId: profile.id,
           name: profile.name,
+          codename: profile.codename,
+          avatarEmoji: profile.avatarEmoji,
+          avatarColor: profile.avatarColor,
+          os: profile.os,
+          browser: profile.browser,
           formFactor: profile.formFactor,
           peerId: `qs-lan-${profile.id}`,
         }),
@@ -42,12 +59,61 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
         if (data.success) {
           setNetworkId(data.networkId);
           setPeers(data.peers || []);
+          if (data.incomingBeam) {
+            setIncomingBeam(data.incomingBeam);
+          }
         }
       }
     } catch {
       // Ignore network hiccups during background discovery
     }
   }, [profile]);
+
+  // Direct beam signaling from sender to receiver on same network
+  const beamToPeer = useCallback(
+    async (targetDeviceId: string, roomCode: string) => {
+      try {
+        await fetch("/api/discover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "beam",
+            targetDeviceId,
+            roomCode,
+            fromPeer: {
+              id: profile.id,
+              name: profile.name,
+              codename: profile.codename,
+              avatarEmoji: profile.avatarEmoji,
+              avatarColor: profile.avatarColor,
+              os: profile.os,
+              browser: profile.browser,
+              formFactor: profile.formFactor,
+            },
+          }),
+        });
+      } catch {
+        // Ignore beam signaling hiccup
+      }
+    },
+    [profile]
+  );
+
+  const clearIncomingBeam = useCallback(async () => {
+    setIncomingBeam(null);
+    try {
+      await fetch("/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "clearBeam",
+          deviceId: profile.id,
+        }),
+      });
+    } catch {
+      // Ignore
+    }
+  }, [profile.id]);
 
   // Leave network when unmounting
   const leaveNetwork = useCallback(async () => {
@@ -103,6 +169,9 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
     profile,
     peers,
     networkId,
+    incomingBeam,
+    beamToPeer,
+    clearIncomingBeam,
     isScanning,
     updateName,
     refreshPeers: announcePresence,

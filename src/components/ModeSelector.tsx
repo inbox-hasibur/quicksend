@@ -26,9 +26,15 @@ export function ModeSelector() {
 
   const capabilities = useBrowserCapabilities();
   const modes: ModeStatus[] = getAllModesStatus(capabilities);
-  const [selectedMode, setSelectedMode] = useState<TransferMode | null>(
-    initialRoomCode ? "internet" : null
-  );
+  const [selectedModeOverride, setSelectedModeOverride] = useState<TransferMode | "home" | null>(null);
+  const selectedMode =
+    selectedModeOverride === "home"
+      ? null
+      : selectedModeOverride || (initialRoomCode ? "internet" : null);
+
+  const handleSelectMode = (mode: TransferMode | null) => {
+    setSelectedModeOverride(mode === null ? "home" : mode);
+  };
 
   const getModeTheme = (mode: TransferMode) => {
     switch (mode) {
@@ -103,11 +109,11 @@ export function ModeSelector() {
                   role="button"
                   tabIndex={isDisabled ? -1 : 0}
                   onClick={() => {
-                    if (!isDisabled) setSelectedMode(item.mode);
+                    if (!isDisabled) handleSelectMode(item.mode);
                   }}
                   onKeyDown={(e) => {
                     if ((e.key === "Enter" || e.key === " ") && !isDisabled) {
-                      setSelectedMode(item.mode);
+                      handleSelectMode(item.mode);
                     }
                   }}
                   className={`group p-5 sm:p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] transition-all flex flex-col justify-between text-left ${
@@ -161,7 +167,7 @@ export function ModeSelector() {
             <div className="flex items-center justify-between pb-4 border-b border-[var(--border-hairline)]">
               <button
                 type="button"
-                onClick={() => setSelectedMode(null)}
+                onClick={() => handleSelectMode(null)}
                 className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--surface-subtle)] hover:bg-neutral-200/70 dark:hover:bg-neutral-750 border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text)] transition-all cursor-pointer"
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-[var(--text-muted)]" />

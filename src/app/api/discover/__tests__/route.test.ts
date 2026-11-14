@@ -71,4 +71,56 @@ describe("Discovery API Route (/api/discover)", () => {
     const checkJson = await checkRes.json();
     expect(checkJson.peers.some((p: { id: string }) => p.id === "dev_mac_1")).toBe(false);
   });
+
+  it("should handle direct beam signaling between local peers and clear notice", async () => {
+    // 1. Send beam from client 1 to client 2
+    const beamReq = new Request("http://localhost/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.4" },
+      body: JSON.stringify({
+        action: "beam",
+        targetDeviceId: "dev_phone_2",
+        roomCode: "lan123456",
+        fromPeer: {
+          id: "dev_mac_1",
+          name: "Curious Fox",
+          codename: "Curious Fox",
+          avatarEmoji: "🦊",
+          avatarColor: "#F97316",
+        },
+      }),
+    });
+    const beamRes = await POST(beamReq);
+    expect(beamRes.status).toBe(200);
+
+    // 2. Client 2 announces and should receive the incomingBeam notice
+    const announceReq = new Request("http://localhost/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.4" },
+      body: JSON.stringify({
+        action: "announce",
+        deviceId: "dev_phone_2",
+        name: "Swift Dolphin",
+        codename: "Swift Dolphin",
+      }),
+    });
+    const announceRes = await POST(announceReq);
+    const announceJson = await announceRes.json();
+    expect(announceJson.success).toBe(true);
+    expect(announceJson.incomingBeam).toBeDefined();
+    expect(announceJson.incomingBeam.roomCode).toBe("lan123456");
+    expect(announceJson.incomingBeam.fromPeer.avatarEmoji).toBe("🦊");
+
+    // 3. Clear beam
+    const clearReq = new Request("http://localhost/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "clearBeam",
+        deviceId: "dev_phone_2",
+      }),
+    });
+    const clearRes = await POST(clearReq);
+    expect(clearRes.status).toBe(200);
+  });
 });

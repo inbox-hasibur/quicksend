@@ -31,6 +31,12 @@ export function TransferModal({
 }: TransferModalProps) {
   const [copied, setCopied] = useState(false);
   const [dismissedStatus, setDismissedStatus] = useState<string | null>(null);
+  const [prevStatus, setPrevStatus] = useState(progress.status);
+
+  if (progress.status !== prevStatus) {
+    setPrevStatus(progress.status);
+    setDismissedStatus(null);
+  }
 
   const handleDismiss = () => {
     setDismissedStatus(progress.status);

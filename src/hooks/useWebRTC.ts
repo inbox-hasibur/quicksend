@@ -21,7 +21,6 @@ import {
 } from "@/lib/diskStream";
 import {
   getRtcConfig,
-  ICE_CONNECTION_TIMEOUT_MS,
   FIREWALL_FALLBACK_MESSAGE,
 } from "@/lib/iceConfig";
 import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
@@ -106,20 +105,9 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   const startIceTimeout = useCallback(() => {
     clearIceTimeout();
-    iceTimerRef.current = setTimeout(() => {
-      if (!isConnectedRef.current) {
-        setProgress((prev) => {
-          if (prev.status === "connecting") {
-            return {
-              ...prev,
-              status: "error",
-              errorMessage: FIREWALL_FALLBACK_MESSAGE,
-            };
-          }
-          return prev;
-        });
-      }
-    }, ICE_CONNECTION_TIMEOUT_MS);
+    // Do not force auto-disconnect timeouts while waiting for devices to pair or beam.
+    // The user explicitly requested to stay waiting until connected or cancelled:
+    // "ami back na dile timeout hoyar dorkar nei in sob case"
   }, [clearIceTimeout]);
 
   // Cleanup helper
@@ -375,11 +363,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
       };
 
       dc.onerror = () => {
-        setProgress((prev) => ({
-          ...prev,
-          status: "error",
-          errorMessage: "DataChannel error occurred during transfer.",
-        }));
+        setProgress((prev) => {
+          if (prev.status === "completed") return prev;
+          return {
+            ...prev,
+            status: "error",
+            errorMessage: "DataChannel error occurred during transfer.",
+          };
+        });
       };
 
       if (currentRole === "receiver") {
@@ -432,11 +423,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
           clearIceTimeout();
           isConnectedRef.current = false;
           setIsConnected(false);
-          setProgress((prev) => ({
-            ...prev,
-            status: "error",
-            errorMessage: FIREWALL_FALLBACK_MESSAGE,
-          }));
+          setProgress((prev) => {
+            if (prev.status === "completed") return prev;
+            return {
+              ...prev,
+              status: "error",
+              errorMessage: FIREWALL_FALLBACK_MESSAGE,
+            };
+          });
         }
       };
 
@@ -454,11 +448,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
           setIsConnected(false);
           if (pc.connectionState === "failed") {
             clearIceTimeout();
-            setProgress((prev) => ({
-              ...prev,
-              status: "error",
-              errorMessage: FIREWALL_FALLBACK_MESSAGE,
-            }));
+            setProgress((prev) => {
+              if (prev.status === "completed") return prev;
+              return {
+                ...prev,
+                status: "error",
+                errorMessage: FIREWALL_FALLBACK_MESSAGE,
+              };
+            });
           }
         }
       };

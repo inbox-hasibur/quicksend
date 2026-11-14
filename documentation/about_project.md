@@ -42,16 +42,17 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 - **Dual Connection Transport:**
   1. **Primary Broker:** Real-time PeerJS cloud signaling (`0.peerjs.com`) over WebSockets with zero serverless cold starts.
   2. **Secondary Fallback:** `/api/signal` REST polling with Upstash Redis or ephemeral store.
-  3. **STUN Pool & Timeout:** Expanded Google + Cloudflare STUN pool with 30-second ICE gathering timeout to avoid premature firewalls.
+  3. **STUN Pool & Seamless ICE:** Expanded Google + Cloudflare STUN pool without aggressive premature timeouts.
+  4. **Dynamic QR Code & Auto-Connect:** QR encodes full URL with `?room=...` query param that auto-selects Internet mode and auto-joins session seamlessly.
 
 ---
 
 ### Mode 2: Same Wi-Fi (Interactive Animated Radar & Auto-Discovery)
 - **Primary Use Case:** Direct LAN transfer between phones, laptops, and PCs sharing the same Wi-Fi router.
-- **Interactive Radar UI:**
-  - Auto-detects device platform, browser, form-factor (`desktop`, `laptop`, `mobile`, `tablet`), and nickname.
+- **Interactive Radar UI & Animal Avatars:**
+  - Distinct colorful creature avatars (🦊 Curious Fox, 🐬 Swift Dolphin, 🦁 Golden Lion, etc.) and OS badges for instant recognition even when mobile user-agents mask phone models.
   - Interactive radar plate with 360-degree sweep and pulsing concentric waves.
-  - Discovered devices floating on radar orbits: tap any device to beam files or text instantly.
+  - 1-Tap Direct Beaming: Select files and tap any discovered peer on the radar; direct beam signaling automatically coordinates session without manual room PIN entry.
   - Collapsible manual fallback for 6-digit PIN and camera optical handshake (for guest Wi-Fi client isolation).
 
 ---

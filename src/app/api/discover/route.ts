@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 export interface DiscoveredPeer {
   id: string;
   name: string;
+  codename?: string;
+  avatarEmoji?: string;
+  avatarColor?: string;
+  os?: string;
+  browser?: string;
   formFactor: "desktop" | "laptop" | "mobile" | "tablet";
   peerId: string;
   lastSeen: number;
@@ -10,6 +15,14 @@ export interface DiscoveredPeer {
 
 // In-memory discovery store per network subnet
 const networkPeers = new Map<string, Map<string, DiscoveredPeer>>();
+
+export interface IncomingBeamNotice {
+  fromPeer: Partial<DiscoveredPeer>;
+  roomCode: string;
+  timestamp: number;
+}
+
+const pendingBeams = new Map<string, IncomingBeamNotice>();
 
 function getClientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for");
@@ -75,7 +88,19 @@ export async function POST(request: Request) {
     const ip = getClientIp(request);
     const defaultNetworkId = computeNetworkId(ip);
     const body = await request.json();
-    const { action, deviceId, name, formFactor, peerId, networkId: customNetworkId } = body;
+    const {
+      action,
+      deviceId,
+      name,
+      codename,
+      avatarEmoji,
+      avatarColor,
+      os,
+      browser,
+      formFactor,
+      peerId,
+      networkId: customNetworkId,
+    } = body;
 
     const targetNetworkId = customNetworkId || defaultNetworkId;
 
@@ -93,6 +118,11 @@ export async function POST(request: Request) {
       peersMap.set(deviceId, {
         id: deviceId,
         name: name || "Anonymous Peer",
+        codename: codename || name || "Device",
+        avatarEmoji: avatarEmoji || "💻",
+        avatarColor: avatarColor || "#6366F1",
+        os: os || "Device",
+        browser: browser || "Browser",
         formFactor: formFactor || "laptop",
         peerId: peerId || deviceId,
         lastSeen: Date.now(),
@@ -102,16 +132,50 @@ export async function POST(request: Request) {
       // Return other peers excluding the caller
       const otherPeers = activePeers.filter((p) => p.id !== deviceId);
 
+      // Check if another peer on this subnet initiated a direct beam to this device
+      let incomingBeam: IncomingBeamNotice | undefined = undefined;
+      const beam = pendingBeams.get(deviceId);
+      if (beam && Date.now() - beam.timestamp < 45000) {
+        incomingBeam = beam;
+      } else if (beam) {
+        pendingBeams.delete(deviceId);
+      }
+
       return NextResponse.json({
         success: true,
         networkId: targetNetworkId,
         peers: otherPeers,
+        incomingBeam: incomingBeam || null,
       });
+    }
+
+    if (action === "beam") {
+      const { targetDeviceId, fromPeer, roomCode } = body;
+      if (!targetDeviceId || !roomCode) {
+        return NextResponse.json(
+          { success: false, error: "targetDeviceId and roomCode required" },
+          { status: 400 }
+        );
+      }
+      pendingBeams.set(targetDeviceId, {
+        fromPeer: fromPeer || { id: deviceId, name: name || "Nearby Peer" },
+        roomCode,
+        timestamp: Date.now(),
+      });
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === "clearBeam") {
+      if (deviceId) {
+        pendingBeams.delete(deviceId);
+      }
+      return NextResponse.json({ success: true });
     }
 
     if (action === "leave") {
       if (deviceId) {
         peersMap.delete(deviceId);
+        pendingBeams.delete(deviceId);
       }
       return NextResponse.json({ success: true });
     }

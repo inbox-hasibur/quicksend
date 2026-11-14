@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   KeyRound,
   Phone,
@@ -102,23 +102,37 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
   }, [rtcRole, isConnected, progress.status, selectedPayload, sendFiles, sendPayload]);
 
   // Receiver session start
-  const handleStartReceiver = async (codeToUse?: string) => {
-    const code = normalizeRoomCode(codeToUse || inputCode);
-    if (!isValidRoomCode(code)) {
-      setErrorMsg("Please enter a valid room PIN, Mobile Number, or Keyword.");
-      return;
-    }
+  const handleStartReceiver = useCallback(
+    async (codeToUse?: string) => {
+      const code = normalizeRoomCode(codeToUse || inputCode);
+      if (!isValidRoomCode(code)) {
+        setErrorMsg("Please enter a valid room PIN, Mobile Number, or Keyword.");
+        return;
+      }
 
-    try {
-      setIsConnecting(true);
-      setErrorMsg(null);
-      await startReceiver(code);
-    } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to join room. Verify key & retry.");
-    } finally {
-      setIsConnecting(false);
+      try {
+        setIsConnecting(true);
+        setErrorMsg(null);
+        await startReceiver(code);
+      } catch (err) {
+        setErrorMsg(err instanceof Error ? err.message : "Failed to join room. Verify key & retry.");
+      } finally {
+        setIsConnecting(false);
+      }
+    },
+    [inputCode, startReceiver]
+  );
+
+  // Auto-connect receiver if initialRoomCode was passed in URL query param (?room=123456)
+  useEffect(() => {
+    if (initialRoomCode && isValidRoomCode(normalizeRoomCode(initialRoomCode))) {
+      const clean = normalizeRoomCode(initialRoomCode);
+      const timer = setTimeout(() => {
+        handleStartReceiver(clean);
+      }, 50);
+      return () => clearTimeout(timer);
     }
-  };
+  }, [initialRoomCode, handleStartReceiver]);
 
   const handleScannerSuccess = (scannedCode: string) => {
     setInputCode(scannedCode);

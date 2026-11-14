@@ -65,8 +65,8 @@ self.addEventListener("fetch", (event) => {
           return response;
         })
         .catch(async () => {
-          // When offline, serve cached app shell
-          const cached = await caches.match(request);
+          // When offline, serve cached app shell (ignoring query strings like ?room=...)
+          const cached = await caches.match(request, { ignoreSearch: true });
           if (cached) return cached;
           const shell = await caches.match("/");
           if (shell) return shell;

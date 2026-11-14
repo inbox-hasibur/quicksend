@@ -22,6 +22,10 @@ import { useWebRTC } from "@/hooks/useWebRTC";
 import { useLocalDiscovery, type NearbyPeer } from "@/hooks/useLocalDiscovery";
 import { encodeOpticalSdp } from "@/lib/opticalSdp";
 
+function generateLanSessionCode(): string {
+  return `lan${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
 export function SameNetworkCard() {
   const [selectedPayload, setSelectedPayload] = useState<{ files: File[]; text: string }>({
     files: [],
@@ -33,6 +37,9 @@ export function SameNetworkCard() {
     profile,
     peers,
     networkId,
+    incomingBeam,
+    beamToPeer,
+    clearIncomingBeam,
     updateName,
   } = useLocalDiscovery(true);
 
@@ -56,13 +63,13 @@ export function SameNetworkCard() {
     cleanup,
   } = useWebRTC("same-network");
 
-  // Keep receiver listening on local device room code so peers can beam files to it
+  // When an incoming beam is directed to this device by a peer, automatically start receiver session
   useEffect(() => {
-    if (!isConnected && progress.status === "idle" && profile.id) {
-      const roomCode = profile.id.replace(/[^a-zA-Z0-9]/g, "").substring(0, 10);
-      startReceiver(roomCode).catch(() => {});
+    if (incomingBeam && !isConnected && progress.status === "idle") {
+      clearIncomingBeam();
+      startReceiver(incomingBeam.roomCode).catch(() => {});
     }
-  }, [isConnected, progress.status, profile.id, startReceiver]);
+  }, [incomingBeam, isConnected, progress.status, clearIncomingBeam, startReceiver]);
 
   // When sender connects to target peer, automatically transmit selected payload
   useEffect(() => {
@@ -81,15 +88,16 @@ export function SameNetworkCard() {
 
   const handleSendToPeer = async (peer: NearbyPeer) => {
     if (selectedPayload.files.length === 0 && !selectedPayload.text.trim()) {
-      setErrorMsg(`Please select a file or enter text in the dropzone above to send to ${peer.name}.`);
+      setErrorMsg(`Please select a file or enter text in the dropzone above to send to ${peer.codename || peer.name}.`);
       return;
     }
 
     try {
       setErrorMsg(null);
       setTargetPeer(peer);
-      const roomCode = peer.id.replace(/[^a-zA-Z0-9]/g, "").substring(0, 10);
-      await startSender(roomCode);
+      const sessionCode = generateLanSessionCode();
+      await startSender(sessionCode);
+      await beamToPeer(peer.id, sessionCode);
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : "Failed to connect to target device.");
     }
@@ -254,20 +262,20 @@ export function SameNetworkCard() {
           {/* Center Node (This Device) */}
           <div className="relative z-10 flex flex-col items-center text-center">
             <div className="relative flex items-center justify-center">
-              <div className="absolute w-12 h-12 rounded-full bg-[var(--accent)]/15 animate-radar-ping pointer-events-none" />
+              <div className="absolute w-14 h-14 rounded-full bg-[var(--accent)]/15 animate-radar-ping pointer-events-none" />
               <div
-                className="w-11 h-11 rounded-2xl flex items-center justify-center shadow-md text-white border-2 border-white dark:border-neutral-800"
+                className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md text-white border-2 border-white dark:border-neutral-800 text-2xl select-none"
                 style={{ backgroundColor: profile.avatarColor }}
               >
-                {getDeviceIcon(profile.formFactor, "w-5 h-5")}
+                {profile.avatarEmoji || "🦊"}
               </div>
             </div>
             <div className="mt-2">
-              <span className="text-[11px] font-bold text-[var(--text)] block truncate max-w-[130px]">
-                {profile.name}
+              <span className="text-xs font-bold text-[var(--text)] block truncate max-w-[140px]">
+                {profile.codename}
               </span>
               <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-                You (Discoverable)
+                You ({profile.os} • {profile.browser})
               </span>
             </div>
           </div>
@@ -287,17 +295,25 @@ export function SameNetworkCard() {
                         : "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hairline)] hover:border-neutral-400 dark:hover:border-neutral-600"
                     }`}
                     style={{
-                      // Slight radial stagger
+                      // Radial stagger around radar
                       transform: `rotate(${idx * 75}deg) translateY(-85px) rotate(-${idx * 75}deg)`,
                     }}
-                    title={`Send payload to ${peer.name}`}
+                    title={`Send payload to ${peer.codename || peer.name}`}
                   >
-                    <div className="w-8 h-8 rounded-xl bg-[var(--surface-subtle)] flex items-center justify-center text-[var(--accent)] group-hover:bg-neutral-200 dark:group-hover:bg-neutral-700 transition-colors">
-                      {getDeviceIcon(peer.formFactor, "w-4 h-4")}
+                    <div
+                      className="w-9 h-9 rounded-xl flex items-center justify-center text-xl select-none shrink-0 shadow-xs border border-white/20 text-white"
+                      style={{ backgroundColor: peer.avatarColor || "#6366F1" }}
+                    >
+                      {peer.avatarEmoji || "💻"}
                     </div>
                     <div className="text-left">
-                      <div className="text-xs font-bold truncate max-w-[110px]">{peer.name}</div>
-                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
+                      <div className="text-xs font-bold truncate max-w-[120px]">
+                        {peer.codename || peer.name}
+                      </div>
+                      <div className="text-[10px] text-[var(--text-muted)] font-medium">
+                        {peer.os || "Device"} ({peer.browser || "Online"})
+                      </div>
+                      <div className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-semibold mt-0.5">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         Tap to Beam
                       </div>

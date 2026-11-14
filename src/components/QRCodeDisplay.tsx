@@ -14,8 +14,20 @@ export function QRCodeDisplay({ code, url }: QRCodeDisplayProps) {
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  const displayUrl =
-    url || (typeof window !== "undefined" ? `${window.location.origin}/?room=${code}` : `/?room=${code}`);
+  const getOrigin = () => {
+    if (typeof window === "undefined") return "https://quicksend.vercel.app";
+    // In local dev, a mobile phone scanning the QR code cannot access "localhost:3000",
+    // so route to production domain so mobile devices load the app seamlessly.
+    if (
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1"
+    ) {
+      return "https://quicksend.vercel.app";
+    }
+    return window.location.origin;
+  };
+
+  const displayUrl = url || `${getOrigin()}/?room=${code}`;
 
   const handleCopyUrl = async () => {
     try {
