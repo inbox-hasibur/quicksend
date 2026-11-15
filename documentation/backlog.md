@@ -408,3 +408,27 @@
   - Placed `<ConnectionDiagnostics />` at the bottom of both Same Wi-Fi and Hotspot cards wired to their existing `useWebRTC` and `useLocalDiscovery` hook states.
 - [x] **Sprint 19 Verification:** 195/195 unit tests passing across 33 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
 
+### Sprint 20: Cross-IP Nearby Pairing Codes & WebRTC Send Path Hardening
+- [x] Server Nearby Code Pairing (`src/app/api/discover/route.ts` & tests):
+  - Added optional 4-digit numeric code support (`/^\d{4}$/`) in `GET` (list) and `POST` (announce/register).
+  - When valid `code` is supplied, assigns `networkId = "code:" + code`, `groupLabel = "code:" + code`, and `ipFamily = "local"`, bypassing IP grouping so devices on different public IPs (e.g. IPv4 vs IPv6, or CGNAT) discover each other.
+  - Retained strict IP-based grouping when code is omitted or invalid.
+  - Added route tests in `src/app/api/discover/__tests__/route.test.ts` verifying cross-IP discovery with identical codes, isolation between different codes, and fallback to IP grouping when code is invalid or missing.
+- [x] Client Nearby Code Management (`src/hooks/useLocalDiscovery.ts`):
+  - Updated hook signature to `useLocalDiscovery(isAutoDiscovering = true, code?: string)`.
+  - Normalizes code with `/^\d{4}$/`, transmitting `code` in presence announcements and leave requests.
+  - Restarts presence heartbeat loop and clears peers whenever `validCode` changes.
+- [x] Nearby Pairing Code UI (`src/components/SameNetworkCard.tsx`, `src/components/HotspotAssistantCard.tsx`):
+  - Added collapsible `<details>` section "Can't see the other device?" containing a 4-digit numeric input, a "Generate" button, a "Clear" button, and descriptive helper text.
+  - Wired pairing code state directly into `useLocalDiscovery(true, nearbyCode)`.
+  - Fixed receiver prompt lifecycle by resetting `processedBeamCodeRef.current = null` on modal close and accepting incoming beams from completed/error states.
+- [x] WebRTC Send Path Hardening (`src/hooks/useWebRTC.ts` & tests):
+  - Extracted and exported `waitForDrain(channel, threshold, timeoutMs = 5000)` backpressure utility that resolves immediately if buffered amount is <= threshold, sets `bufferedAmountLowThreshold`, listens for `"bufferedamountlow"` event, and enforces a 5s safety timeout against lost events.
+  - Added `waitForChannelOpen(timeoutMs = 10000)` ensuring sender waits for DataChannel readyState `"open"` before transmitting header JSON, resolving stalled sends on immediate connections.
+  - Configured `bufferedAmountLowThreshold` prior to initial chunk transmission in `sendFiles` and `sendText`.
+  - Safely wrapped queued candidate flushes in try-catch blocks in both offer and answer flows to prevent stale candidates from aborting queue processing.
+  - Updated ICE connection failure and 10s connection timeout handlers to append `"Open Connection details below and copy the report."` with `FIREWALL_MSG_WITH_DIAGNOSTICS`.
+  - Added unit test suite in `src/hooks/__tests__/useWebRTC.test.ts` testing `waitForDrain` behaviors.
+- [x] **Sprint 20 Verification:** 204/204 unit tests passing across 34 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+

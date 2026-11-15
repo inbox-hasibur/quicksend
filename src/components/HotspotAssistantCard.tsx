@@ -63,6 +63,8 @@ export function HotspotAssistantCard() {
   const [isConnectingManual, setIsConnectingManual] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  const [nearbyCode, setNearbyCode] = useState("");
+
   // Real Working Discovery Engine over Hotspot Subnet
   const {
     profile,
@@ -72,7 +74,7 @@ export function HotspotAssistantCard() {
     clearIncomingBeam,
     cycleAvatar,
     status: discoveryStatus,
-  } = useLocalDiscovery(true);
+  } = useLocalDiscovery(true, nearbyCode);
 
   // WebRTC DataChannel Engine
   const {
@@ -97,7 +99,7 @@ export function HotspotAssistantCard() {
     if (
       incomingBeam &&
       !isConnected &&
-      progress.status === "idle" &&
+      (progress.status === "idle" || progress.status === "completed" || progress.status === "error" || progress.status === "rejected") &&
       processedBeamCodeRef.current !== incomingBeam.roomCode
     ) {
       processedBeamCodeRef.current = incomingBeam.roomCode;
@@ -125,6 +127,7 @@ export function HotspotAssistantCard() {
     cleanup();
     setTargetPeer(null);
     setErrorMsg(null);
+    processedBeamCodeRef.current = null;
     clearIncomingBeam().catch(() => {});
   };
 
@@ -522,6 +525,47 @@ export function HotspotAssistantCard() {
           )}
         </div>
       </div>
+
+      {/* 4-digit Pairing Code for Cross-IP / CGNAT discovery */}
+      <details className="border border-[var(--border-hairline)] rounded-2xl bg-[var(--surface-subtle)] p-3 text-xs text-[var(--text-muted)] group">
+        <summary className="font-semibold text-[var(--text)] cursor-pointer select-none">
+          Can&apos;t see the other device?
+        </summary>
+        <div className="pt-3 mt-2 border-t border-[var(--border-hairline)] space-y-2">
+          <p className="text-[11px] text-[var(--text-muted)]">
+            Enter the same code on both devices
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={4}
+              placeholder="4-digit code"
+              value={nearbyCode}
+              onChange={(e) => setNearbyCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="w-32 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-sm font-mono font-bold text-center text-[var(--text)] focus:outline-none"
+              aria-label="Nearby 4-digit pairing code"
+            />
+            <button
+              type="button"
+              onClick={() => setNearbyCode(Math.floor(1000 + Math.random() * 9000).toString())}
+              className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] hover:text-[var(--text)] text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Generate
+            </button>
+            {nearbyCode && (
+              <button
+                type="button"
+                onClick={() => setNearbyCode("")}
+                className="text-xs text-[var(--text-muted)] hover:text-red-500 transition-colors cursor-pointer px-1"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </details>
 
       {/* COLLAPSIBLE OFFLINE BACKUP (PIN & OPTICAL PAIRING) */}
       <div className="border border-[var(--border-hairline)] rounded-2xl overflow-hidden bg-[var(--surface)]">

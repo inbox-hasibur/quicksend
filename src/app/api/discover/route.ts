@@ -364,9 +364,15 @@ async function clearBeam(deviceId: string): Promise<void> {
 export async function GET(request: Request) {
   try {
     const ip = getClientIp(request);
-    const networkId = computeNetworkId(ip);
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code")?.trim() || "";
+    const isCodeValid = /^\d{4}$/.test(code);
+
+    const networkId = isCodeValid ? `code:${code}` : computeNetworkId(ip);
     const peers = await getNetworkPeers(networkId);
-    const { groupLabel, ipFamily } = getNetworkGroupInfo(ip);
+    const { groupLabel, ipFamily } = isCodeValid
+      ? { groupLabel: `code:${code}`, ipFamily: "local" as const }
+      : getNetworkGroupInfo(ip);
 
     return NextResponse.json({
       success: true,
@@ -386,7 +392,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ip = getClientIp(request);
-    const defaultNetworkId = computeNetworkId(ip);
     const body = await request.json();
     const {
       action,
@@ -400,8 +405,13 @@ export async function POST(request: Request) {
       formFactor,
       peerId,
       networkId: customNetworkId,
+      code,
     } = body;
 
+    const rawCode = typeof code === "string" ? code.trim() : "";
+    const isCodeValid = /^\d{4}$/.test(rawCode);
+
+    const defaultNetworkId = isCodeValid ? `code:${rawCode}` : computeNetworkId(ip);
     const targetNetworkId = customNetworkId || defaultNetworkId;
 
     if (action === "announce") {
@@ -447,7 +457,9 @@ export async function POST(request: Request) {
 
       // Check if another peer on this subnet initiated a direct beam to this device
       const incomingBeam = await getAndClearBeam(deviceId);
-      const { groupLabel, ipFamily } = getNetworkGroupInfo(ip);
+      const { groupLabel, ipFamily } = isCodeValid
+        ? { groupLabel: `code:${rawCode}`, ipFamily: "local" as const }
+        : getNetworkGroupInfo(ip);
 
       return NextResponse.json({
         success: true,

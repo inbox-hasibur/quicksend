@@ -39,7 +39,10 @@ export interface DiscoveryStatus {
   ipFamily: string | null;
 }
 
-export function useLocalDiscovery(isAutoDiscovering = true) {
+export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
+  const normalizedCode = code?.trim() || "";
+  const validCode = /^\d{4}$/.test(normalizedCode) ? normalizedCode : undefined;
+
   const profile: DeviceProfile = useSyncExternalStore(
     subscribeToDeviceProfile,
     getLocalDeviceProfile,
@@ -58,6 +61,12 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
   });
   const isScanning = isAutoDiscovering;
   const announceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const activeCodeRef = useRef<string | undefined>(validCode);
+
+  useEffect(() => {
+    activeCodeRef.current = validCode;
+    setPeers([]);
+  }, [validCode]);
 
   // Announce local device to discovery endpoint
   const announcePresence = useCallback(async () => {
@@ -67,21 +76,26 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
     }
 
     try {
+      const announcePayload: Record<string, unknown> = {
+        action: "announce",
+        deviceId: profile.id,
+        name: profile.name,
+        codename: profile.codename,
+        avatarEmoji: profile.avatarEmoji,
+        avatarColor: profile.avatarColor,
+        os: profile.os,
+        browser: profile.browser,
+        formFactor: profile.formFactor,
+        peerId: `qs-lan-${profile.id}`,
+      };
+      if (validCode) {
+        announcePayload.code = validCode;
+      }
+
       const res = await fetch("/api/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "announce",
-          deviceId: profile.id,
-          name: profile.name,
-          codename: profile.codename,
-          avatarEmoji: profile.avatarEmoji,
-          avatarColor: profile.avatarColor,
-          os: profile.os,
-          browser: profile.browser,
-          formFactor: profile.formFactor,
-          peerId: `qs-lan-${profile.id}`,
-        }),
+        body: JSON.stringify(announcePayload),
       });
 
       if (res.ok) {
@@ -139,36 +153,41 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
         lastError: err instanceof Error ? err.message : "Network error",
       }));
     }
-  }, [profile]);
+  }, [profile, validCode]);
 
   // Direct beam signaling from sender to receiver on same network
   const beamToPeer = useCallback(
     async (targetDeviceId: string, roomCode: string) => {
       try {
+        const beamPayload: Record<string, unknown> = {
+          action: "beam",
+          targetDeviceId,
+          roomCode,
+          fromPeer: {
+            id: profile.id,
+            name: profile.name,
+            codename: profile.codename,
+            avatarEmoji: profile.avatarEmoji,
+            avatarColor: profile.avatarColor,
+            os: profile.os,
+            browser: profile.browser,
+            formFactor: profile.formFactor,
+          },
+        };
+        if (validCode) {
+          beamPayload.code = validCode;
+        }
+
         await fetch("/api/discover", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "beam",
-            targetDeviceId,
-            roomCode,
-            fromPeer: {
-              id: profile.id,
-              name: profile.name,
-              codename: profile.codename,
-              avatarEmoji: profile.avatarEmoji,
-              avatarColor: profile.avatarColor,
-              os: profile.os,
-              browser: profile.browser,
-              formFactor: profile.formFactor,
-            },
-          }),
+          body: JSON.stringify(beamPayload),
         });
       } catch {
         // Ignore beam signaling hiccup
       }
     },
-    [profile]
+    [profile, validCode]
   );
 
   const clearIncomingBeam = useCallback(async () => {
@@ -187,16 +206,21 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
     }
   }, [profile.id]);
 
-  // Leave network when unmounting
+  // Leave network when unmounting or changing code
   const leaveNetwork = useCallback(async () => {
     try {
+      const leavePayload: Record<string, unknown> = {
+        action: "leave",
+        deviceId: profile.id,
+      };
+      if (activeCodeRef.current) {
+        leavePayload.code = activeCodeRef.current;
+      }
+
       await fetch("/api/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "leave",
-          deviceId: profile.id,
-        }),
+        body: JSON.stringify(leavePayload),
       });
     } catch {
       // Ignore leave errors

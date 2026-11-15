@@ -270,4 +270,109 @@ describe("Discovery API Route (/api/discover)", () => {
       expect(postJson.ipFamily).toBe("v4");
     });
   });
+
+  describe("nearby 4-digit pairing code grouping", () => {
+    it("allows two clients with different IPs and the same code to see each other", async () => {
+      // Client 1 on IPv4
+      const client1Req = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.10" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: "dev_code_1",
+          name: "Device 1",
+          code: "5821",
+        }),
+      });
+      const res1 = await POST(client1Req);
+      const json1 = await res1.json();
+      expect(json1.success).toBe(true);
+      expect(json1.networkId).toBe("code:5821");
+      expect(json1.groupLabel).toBe("code:5821");
+
+      // Client 2 on completely different IPv6
+      const client2Req = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-forwarded-for": "2001:db8:ffff:1234::5678",
+        },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: "dev_code_2",
+          name: "Device 2",
+          code: "5821",
+        }),
+      });
+      const res2 = await POST(client2Req);
+      const json2 = await res2.json();
+      expect(json2.success).toBe(true);
+      expect(json2.networkId).toBe("code:5821");
+      expect(json2.peers.some((p: { id: string }) => p.id === "dev_code_1")).toBe(true);
+    });
+
+    it("ensures clients with different codes do not see each other", async () => {
+      const clientAReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.20" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: "dev_diff_a",
+          name: "Device A",
+          code: "1111",
+        }),
+      });
+      await POST(clientAReq);
+
+      const clientBReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.20" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: "dev_diff_b",
+          name: "Device B",
+          code: "2222",
+        }),
+      });
+      const resB = await POST(clientBReq);
+      const jsonB = await resB.json();
+      expect(jsonB.success).toBe(true);
+      expect(jsonB.networkId).toBe("code:2222");
+      expect(jsonB.peers.some((p: { id: string }) => p.id === "dev_diff_a")).toBe(false);
+    });
+
+    it("keeps standard IP grouping when no code is provided", async () => {
+      const req = new Request("http://localhost/api/discover", {
+        headers: { "x-forwarded-for": "192.168.1.55" },
+      });
+      const res = await GET(req);
+      const json = await res.json();
+      expect(json.networkId).toBe("local-lan");
+    });
+
+    it("treats invalid codes as no code (keeps IP grouping)", async () => {
+      // 3 digits
+      const reqShort = new Request("http://localhost/api/discover?code=123", {
+        headers: { "x-forwarded-for": "192.168.1.55" },
+      });
+      const resShort = await GET(reqShort);
+      const jsonShort = await resShort.json();
+      expect(jsonShort.networkId).toBe("local-lan");
+
+      // letters
+      const postReqLetters = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "192.168.1.55" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: "dev_invalid_code",
+          name: "Invalid Code Dev",
+          code: "abcd",
+        }),
+      });
+      const postRes = await POST(postReqLetters);
+      const postJson = await postRes.json();
+      expect(postJson.networkId).toBe("local-lan");
+    });
+  });
 });

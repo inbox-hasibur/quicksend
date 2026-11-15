@@ -73,6 +73,75 @@ export interface DebugLogEntry {
   msg: string;
 }
 
+export const FIREWALL_MSG_WITH_DIAGNOSTICS = `${FIREWALL_FALLBACK_MESSAGE}\nOpen Connection details below and copy the report.`;
+
+export interface DrainableChannel {
+  bufferedAmount: number;
+  bufferedAmountLowThreshold?: number;
+  addEventListener?: (type: string, listener: (ev?: unknown) => void, options?: { once?: boolean }) => void;
+  removeEventListener?: (type: string, listener: (ev?: unknown) => void) => void;
+  onbufferedamountlow?: ((this: any, ev: any) => any) | null; // eslint-disable-line @typescript-eslint/no-explicit-any
+}
+
+/**
+ * Wait for a DataChannel buffer to drain below threshold.
+ * Resolves immediately if already below or equal to threshold.
+ * Otherwise sets threshold, listens for "bufferedamountlow", and includes a 5s safety timeout.
+ */
+export async function waitForDrain(
+  channel: DrainableChannel | null | undefined,
+  threshold: number,
+  timeoutMs = 5000
+): Promise<void> {
+  if (!channel) return;
+  // Never wait if buffer is already at or below threshold
+  if (channel.bufferedAmount <= threshold) {
+    return;
+  }
+
+  // Set threshold before awaiting drain
+  if (typeof channel.bufferedAmountLowThreshold === "number" || "bufferedAmountLowThreshold" in channel) {
+    channel.bufferedAmountLowThreshold = threshold;
+  }
+
+  // Re-check in case buffer drained before event listener attachment
+  if (channel.bufferedAmount <= threshold) {
+    return;
+  }
+
+  return new Promise<void>((resolve) => {
+    let timer: NodeJS.Timeout | null = null;
+
+    const cleanupAndResolve = () => {
+      if (timer) {
+        clearTimeout(timer);
+        timer = null;
+      }
+      if (typeof channel.removeEventListener === "function") {
+        channel.removeEventListener("bufferedamountlow", onLow);
+      } else if (channel.onbufferedamountlow === onLow) {
+        channel.onbufferedamountlow = null;
+      }
+      resolve();
+    };
+
+    const onLow = () => {
+      cleanupAndResolve();
+    };
+
+    if (typeof channel.addEventListener === "function") {
+      channel.addEventListener("bufferedamountlow", onLow, { once: true });
+    } else {
+      channel.onbufferedamountlow = onLow;
+    }
+
+    // 5-second safety timeout so lost events cannot freeze transfer
+    timer = setTimeout(() => {
+      cleanupAndResolve();
+    }, timeoutMs);
+  });
+}
+
 type ActiveTransport = "peerjs" | "webrtc" | null;
 
 async function loadPeerConstructor() {
@@ -210,10 +279,57 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   const startIceTimeout = useCallback(() => {
     clearIceTimeout();
-    // Do not force auto-disconnect timeouts while waiting for devices to pair or beam.
-    // The user explicitly requested to stay waiting until connected or cancelled:
-    // "ami back na dile timeout hoyar dorkar nei in sob case"
-  }, [clearIceTimeout]);
+    // 4e: If no connection after 10 seconds, show firewall message with diagnostics report prompt
+    iceTimerRef.current = setTimeout(() => {
+      if (isConnectedRef.current || isCleaningUpRef.current) return;
+      setProgress((prev) => {
+        if (prev.status === "completed" || prev.status === "idle" || prev.progressPercentage >= 100) return prev;
+        return {
+          ...prev,
+          status: "error",
+          errorMessage: FIREWALL_MSG_WITH_DIAGNOSTICS,
+        };
+      });
+      setDiagnostics((d) => ({
+        ...d,
+        lastError: FIREWALL_MSG_WITH_DIAGNOSTICS,
+      }));
+      addLog("Connection timeout after 10 seconds");
+    }, 10000);
+  }, [clearIceTimeout, addLog]);
+
+  // Active channel accessor for backpressure monitoring
+  const getActiveChannel = useCallback((): DrainableChannel | null => {
+    if (dcRef.current) return dcRef.current;
+    if (dataConnRef.current && dataConnRef.current.dataChannel) {
+      return dataConnRef.current.dataChannel;
+    }
+    return null;
+  }, []);
+
+  // 4b: Sender must wait for channel readyState "open" (10s timeout) before sending header
+  const waitForChannelOpen = useCallback(async (timeoutMs = 10000): Promise<boolean> => {
+    const isChannelOpen = () => {
+      if (dcRef.current && dcRef.current.readyState === "open") return true;
+      if (dataConnRef.current && dataConnRef.current.open) return true;
+      return false;
+    };
+
+    if (isChannelOpen()) return true;
+
+    return new Promise<boolean>((resolve) => {
+      const start = Date.now();
+      const interval = setInterval(() => {
+        if (isChannelOpen()) {
+          clearInterval(interval);
+          resolve(true);
+        } else if (Date.now() - start > timeoutMs) {
+          clearInterval(interval);
+          resolve(false);
+        }
+      }, 50);
+    });
+  }, []);
 
   // Unified Data Sender across active transport
   const sendRawData = useCallback((data: string | ArrayBuffer) => {
@@ -242,16 +358,6 @@ export function useWebRTC(mode: TransferMode = "internet") {
     }
   }, []);
 
-  // Backpressure buffer monitor
-  const getBufferedAmount = useCallback((): number => {
-    if (dcRef.current) {
-      return dcRef.current.bufferedAmount;
-    }
-    if (dataConnRef.current && dataConnRef.current.dataChannel) {
-      return dataConnRef.current.dataChannel.bufferedAmount;
-    }
-    return 0;
-  }, []);
 
   // Cleanup helper
   const cleanup = useCallback(() => {
@@ -675,7 +781,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         }
 
         if (state === "failed") {
-          setDiagnostics((d) => ({ ...d, lastError: FIREWALL_FALLBACK_MESSAGE }));
+          setDiagnostics((d) => ({ ...d, lastError: FIREWALL_MSG_WITH_DIAGNOSTICS }));
           clearIceTimeout();
           isConnectedRef.current = false;
           setIsConnected(false);
@@ -684,7 +790,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
             return {
               ...prev,
               status: "error",
-              errorMessage: FIREWALL_FALLBACK_MESSAGE,
+              errorMessage: FIREWALL_MSG_WITH_DIAGNOSTICS,
             };
           });
         }
@@ -730,9 +836,10 @@ export function useWebRTC(mode: TransferMode = "internet") {
               return {
                 ...prev,
                 status: "error",
-                errorMessage: FIREWALL_FALLBACK_MESSAGE,
+                errorMessage: FIREWALL_MSG_WITH_DIAGNOSTICS,
               };
             });
+            setDiagnostics((d) => ({ ...d, lastError: FIREWALL_MSG_WITH_DIAGNOSTICS }));
           }
         }
       };
@@ -784,7 +891,13 @@ export function useWebRTC(mode: TransferMode = "internet") {
             const flushedCount = candidateQueueRef.current.length;
             while (candidateQueueRef.current.length > 0) {
               const cand = candidateQueueRef.current.shift();
-              if (cand) await pcInstance.addIceCandidate(new RTCIceCandidate(cand));
+              if (cand) {
+                try {
+                  await pcInstance.addIceCandidate(new RTCIceCandidate(cand));
+                } catch {
+                  // Ignore duplicate/late queued candidate
+                }
+              }
             }
             addLog(`Flushed ${flushedCount} queued candidates`);
 
@@ -807,7 +920,13 @@ export function useWebRTC(mode: TransferMode = "internet") {
             const flushedCount = candidateQueueRef.current.length;
             while (candidateQueueRef.current.length > 0) {
               const cand = candidateQueueRef.current.shift();
-              if (cand) await pc.addIceCandidate(new RTCIceCandidate(cand));
+              if (cand) {
+                try {
+                  await pc.addIceCandidate(new RTCIceCandidate(cand));
+                } catch {
+                  // Ignore duplicate/late queued candidate
+                }
+              }
             }
             addLog(`Flushed ${flushedCount} queued candidates`);
           }
@@ -1113,6 +1232,22 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const sendFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
 
+    // Sender must wait for channel readyState "open" (10s timeout) before sending header
+    const isOpen = await waitForChannelOpen(10000);
+    if (!isOpen) {
+      addLog("Channel open timeout (10s)");
+      const errMsg = "Connection did not open. See Connection details.";
+      setProgress((prev) => ({ ...prev, status: "error", errorMessage: errMsg }));
+      setDiagnostics((d) => ({ ...d, lastError: errMsg }));
+      return;
+    }
+
+    // Set backpressure threshold before first send
+    const channel = getActiveChannel();
+    if (channel && ("bufferedAmountLowThreshold" in channel || typeof channel.bufferedAmountLowThreshold === "number")) {
+      channel.bufferedAmountLowThreshold = BUFFER_THRESHOLD;
+    }
+
     const totalBatchBytes = files.reduce((acc, f) => acc + f.size, 0);
     const batchId = `batch_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     let accumulatedBatchBytes = 0;
@@ -1168,9 +1303,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       let sentFileBytes = 0;
 
       for await (const chunkInfo of sliceBlobIntoChunks(currentFile, DEFAULT_CHUNK_SIZE)) {
-        while (getBufferedAmount() > BUFFER_THRESHOLD) {
-          await new Promise((resolve) => setTimeout(resolve, 30));
-        }
+        await waitForDrain(getActiveChannel(), BUFFER_THRESHOLD, 5000);
 
         sendRawData(chunkInfo.chunk);
         sentFileBytes += chunkInfo.chunk.byteLength;
@@ -1213,10 +1346,26 @@ export function useWebRTC(mode: TransferMode = "internet") {
       progressPercentage: 100,
       speedBps: 0,
     }));
-  }, [mode, sendRawData, getBufferedAmount]);
+  }, [mode, sendRawData, waitForChannelOpen, getActiveChannel, addLog]);
 
   // Text snippet sender
   const sendText = useCallback(async (text: string) => {
+    // Sender must wait for channel readyState "open" (10s timeout) before sending header
+    const isOpen = await waitForChannelOpen(10000);
+    if (!isOpen) {
+      addLog("Channel open timeout (10s)");
+      const errMsg = "Connection did not open. See Connection details.";
+      setProgress((prev) => ({ ...prev, status: "error", errorMessage: errMsg }));
+      setDiagnostics((d) => ({ ...d, lastError: errMsg }));
+      return;
+    }
+
+    // Set backpressure threshold before first send
+    const channel = getActiveChannel();
+    if (channel && ("bufferedAmountLowThreshold" in channel || typeof channel.bufferedAmountLowThreshold === "number")) {
+      channel.bufferedAmountLowThreshold = BUFFER_THRESHOLD;
+    }
+
     const header = createTextHeader(text, DEFAULT_CHUNK_SIZE);
     const blobToSend = new Blob([text], { type: "text/plain;charset=utf-8" });
     const totalBytes = blobToSend.size;
@@ -1239,9 +1388,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     let sentBytes = 0;
 
     for await (const chunkInfo of sliceBlobIntoChunks(blobToSend, DEFAULT_CHUNK_SIZE)) {
-      while (getBufferedAmount() > BUFFER_THRESHOLD) {
-        await new Promise((resolve) => setTimeout(resolve, 30));
-      }
+      await waitForDrain(getActiveChannel(), BUFFER_THRESHOLD, 5000);
 
       sendRawData(chunkInfo.chunk);
       sentBytes += chunkInfo.chunk.byteLength;
@@ -1274,7 +1421,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       progressPercentage: 100,
       speedBps: 0,
     }));
-  }, [mode, sendRawData, getBufferedAmount]);
+  }, [mode, sendRawData, waitForChannelOpen, getActiveChannel, addLog]);
 
   // Universal payload sender
   const sendPayload = useCallback(
