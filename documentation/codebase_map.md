@@ -294,24 +294,32 @@ flowchart TD
 - **Exports:** `useHtml5Scanner(): UseHtml5ScannerReturn`, `UseHtml5ScannerReturn`
 
 #### `src/hooks/useQuadScanner.ts`
-- **Purpose:** 2x2 multi-quadrant camera scanner hook. Captures video via `getUserMedia`, runs 10fps loop, and decodes 4 quadrants using native `BarcodeDetector` or `jsQR` quadrant splitting (`decodeQuadrants`). Completely separates video DOM insertions and removals from React reconciliation.
-- **Exports:** `useQuadScanner(): UseQuadScannerReturn`, `UseQuadScannerReturn`
+- **Purpose:** Multi-layout camera scanner hook supporting 3x2, 2x2, and 1x1 grid decoding. Captures video via `getUserMedia`, runs 10fps loop, and decodes frames using native `BarcodeDetector` or `jsQR` multi-region splitting (`decodeGrid`) with auto-layout candidate rotation (`pickLayout`). Completely separates video DOM insertions and removals from React reconciliation.
+- **Exports:** `useQuadScanner(): UseQuadScannerReturn`, `pickLayout`, `LAYOUT_CANDIDATES`, `UseQuadScannerReturn`.
 
 ---
 
 ### 3.4 Protocol & Domain Libraries (`src/lib/`)
 
+#### `src/lib/base45.ts`
+- **Purpose:** RFC 9285 Base45 encoder and decoder for QR alphanumeric mode (~97% packing efficiency).
+- **Exports:** `encodeBase45`, `decodeBase45`, `BASE45_ALPHABET`.
+
+#### `src/lib/recoveryWords.ts`
+- **Purpose:** 256-word phonetic English dictionary (3-6 chars, unique 3-letter prefixes) for human-readable recovery codes.
+- **Exports:** `RECOVERY_WORDS`, `wordToIndex`.
+
 #### `src/lib/quadDecode.ts`
-- **Purpose:** Multi-region image grid splitting (3x2 6-cell and 2x2 4-quadrant) with overlap padding on inner edges for multi-QR camera stream decoding. Decodes regions with `decodeGrid`, `decodeQuadrants`, and `jsqrDecodeOne`.
-- **Exports:** `cropImageData`, `decodeGrid`, `decodeQuadrants`, `jsqrDecodeOne`.
+- **Purpose:** Multi-region image grid splitting (3x2, 2x2, 1x1) with 8% overlap padding on inner edges for multi-QR camera stream decoding. Decodes regions with `decodeGrid`, `decodeQuadrants`, and `jsqrDecodeOne`.
+- **Exports:** `cropImageData`, `getGridRects`, `decodeGrid`, `decodeQuadrants`, `jsqrDecodeOne`.
 
 #### `src/lib/opticalRecovery.ts`
-- **Purpose:** Optical Transfer Recovery Code encoder and decoder. Generates human-friendly 2-word phrase codes (`river fox 22, 43-46, 120`) and compact checksummed codes (`QSR-<hash>-<ranges>-<checksum>`), supporting natural range syntax (`43 to 46` or `22, 43-46, 120`) and session validation to replay lost frames.
-- **Exports:** `encodeWordRecoveryCode`, `encodeRecoveryCode`, `decodeRecoveryCode`, `hashToWords`, `wordsToHash`, `formatMissingRanges`, `parseMissingRanges`, `RECOVERY_WORD_LIST`, `DecodeRecoveryResult`.
+- **Purpose:** Optical Transfer word recovery code encoder and decoder. Generates human-friendly word sequences mapping session byte, LEB128 varint missing frame ranges, and modulo checksum word (max 40 words). Tolerates hyphens, commas, mixed case, and 3-letter abbreviations.
+- **Exports:** `encodeRecoveryCode`, `decodeRecoveryCode`, `formatMissingRanges`, `parseMissingRanges`, `DecodeRecoveryResult`.
 
 #### `src/lib/opticalDataStream.ts`
-- **Purpose:** Optical Data Stream protocol for zero-network air-gapped camera-to-screen transfer. Features sequenced animated QR carousels, FNV-1a checksums, symmetrical compression, stride-grouped XOR parity frames (`buildParityFrames`), and automatic single-packet loss reconstruction in `OpticalDataCollector`.
-- **Exports:** `encodeFileToOpticalFrames`, `encodeTextToOpticalFrames`, `buildParityFrames`, `getTotalFrameCount`, `parseOpticalDataFrame`, `parseOpticalParityFrame`, `computePayloadHash`, `OpticalDataCollector`, `OPTICAL_CHUNK_PRESETS`.
+- **Purpose:** Optical Data Stream protocol for zero-network air-gapped camera-to-screen transfer. Features Base45 alphanumeric QR frames (`QS2:...` and parity `QP2:...`), FNV-1a checksums, symmetrical compression, stride-grouped XOR parity frames (`buildParityFrames`), and automatic single-packet loss reconstruction in `OpticalDataCollector`.
+- **Exports:** `encodeFileToOpticalFrames`, `encodeTextToOpticalFrames`, `buildParityFrames`, `getTotalFrameCount`, `parseOpticalDataFrame`, `parseOpticalParityFrame`, `computePayloadHash`, `OpticalDataCollector`, `OPTICAL_CHUNK_PRESETS`, `splitFirstN`, `encodeB45Header`, `decodeB45Header`.
 
 #### `src/lib/transferEstimate.ts`
 - **Purpose:** Universal transfer time estimation engine providing baseline transfer speeds per channel, live measured throughput overrides, optical camera frame calculations (with `framesPerTick` multiplier for 2x2 Grid mode), and human-friendly duration formatting.
@@ -383,5 +391,5 @@ flowchart TD
 ---
 
 ## 4. Sprint Status: All Sprints Completed & Production Verified
-All seventeen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, typed recovery codes, 2x2 & 3x2 multi-grid QR decoding, high-density defaults, and human-readable word recovery codes) are fully implemented, verified with 177 passing unit tests across 31 test suites, zero lint warnings, and production build ready.
+All seventeen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 3x2 grid layout, auto-layout detection, and human-readable word recovery codes) are fully implemented, verified with 188 passing unit tests across 32 test suites, zero lint warnings, and production build ready.
 ```

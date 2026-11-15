@@ -28,27 +28,23 @@ import {
   type OpticalDataFrame,
   type ReassembledPayload,
 } from "@/lib/opticalDataStream";
-import {
-  encodeRecoveryCode,
-  encodeWordRecoveryCode,
-  decodeRecoveryCode,
-} from "@/lib/opticalRecovery";
+import { encodeRecoveryCode, decodeRecoveryCode } from "@/lib/opticalRecovery";
 import { useTransferHistory } from "@/hooks/useTransferHistory";
 import { formatBytes } from "@/lib/chunker";
 
 type OpticalRole = "send" | "receive";
-export type CameraLayout = "grid-3x2" | "grid-2x2" | "single";
+export type CameraLayout = "single" | "2x2" | "3x2";
 
 export function getFramesPerTick(layout: CameraLayout): number {
-  if (layout === "grid-3x2") return 6;
-  if (layout === "grid-2x2") return 4;
+  if (layout === "3x2") return 6;
+  if (layout === "2x2") return 4;
   return 1;
 }
 
 export function CameraStreamCard() {
   const [role, setRole] = useState<OpticalRole>("send");
 
-  // Sender state (Starts paused on Frame 1 with default Grid 3x2 and Large density)
+  // Sender state (Starts paused on Frame 1 with default 3x2 and Large density)
   const [frames, setFrames] = useState<OpticalDataFrame[]>([]);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -57,7 +53,7 @@ export function CameraStreamCard() {
   const [isEncoding, setIsEncoding] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<OpticalChunkPreset>("large");
   const [activePayload, setActivePayload] = useState<{ files: File[]; text: string } | null>(null);
-  const [senderLayout, setSenderLayout] = useState<CameraLayout>("grid-3x2");
+  const [senderLayout, setSenderLayout] = useState<CameraLayout>("3x2");
 
   // Sender recovery replay state
   const [isReplayOpen, setIsReplayOpen] = useState(false);
@@ -65,17 +61,17 @@ export function CameraStreamCard() {
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [replayIndices, setReplayIndices] = useState<number[] | null>(null);
 
-  // Receiver layout and scanners (Default to Grid 3x2)
-  const [receiverLayout, setReceiverLayout] = useState<CameraLayout>("grid-3x2");
+  // Receiver scanner state
+  const [scannerType, setScannerType] = useState<"auto" | "classic">("auto");
   const html5Scanner = useHtml5Scanner();
   const quadScanner = useQuadScanner();
 
   const isCameraActive =
-    receiverLayout !== "single" ? quadScanner.isRunning : html5Scanner.isRunning;
+    scannerType === "auto" ? quadScanner.isRunning : html5Scanner.isRunning;
   const isCameraStarting =
-    receiverLayout !== "single" ? false : html5Scanner.isStarting;
+    scannerType === "auto" ? false : html5Scanner.isStarting;
   const scannerError =
-    receiverLayout !== "single" ? quadScanner.error : html5Scanner.error;
+    scannerType === "auto" ? quadScanner.error : html5Scanner.error;
 
   const [showRecoveryCode, setShowRecoveryCode] = useState(false);
   const [recoveryCodeCopied, setRecoveryCodeCopied] = useState(false);
@@ -239,12 +235,12 @@ export function CameraStreamCard() {
   }, [role, activeFramesList.length, isPlaying, speedMs, senderLayout]);
 
   const stopCamera = useCallback(async () => {
-    if (receiverLayout !== "single") {
+    if (scannerType === "auto") {
       await quadScanner.stop();
     } else {
       await html5Scanner.stop();
     }
-  }, [html5Scanner, quadScanner, receiverLayout]);
+  }, [html5Scanner, quadScanner, scannerType]);
 
   // Reusable frame processor for camera frames
   const processDecodedFrame = useCallback(
@@ -392,14 +388,10 @@ export function CameraStreamCard() {
       diagnosticsRef.current = { decoded: 0, valid: 0, invalid: 0, last: "none" };
       setDiagnostics({ decoded: 0, valid: 0, invalid: 0, last: "none" });
 
-      if (receiverLayout !== "single") {
-        const is3x2 = receiverLayout === "grid-3x2";
-        await quadScanner.start(
-          (decodedText) => {
-            processDecodedFrame(decodedText);
-          },
-          { cols: is3x2 ? 3 : 2, rows: 2 }
-        );
+      if (scannerType === "auto") {
+        await quadScanner.start((decodedText) => {
+          processDecodedFrame(decodedText);
+        });
       } else {
         // Populate camera list
         try {
@@ -425,7 +417,7 @@ export function CameraStreamCard() {
       html5Scanner,
       processDecodedFrame,
       quadScanner,
-      receiverLayout,
+      scannerType,
       selectedCameraId,
     ]
   );
@@ -443,11 +435,11 @@ export function CameraStreamCard() {
     [isCameraActive, startCamera, stopCamera]
   );
 
-  const handleReceiverLayoutChange = async (newLayout: CameraLayout) => {
+  const handleScannerTypeChange = async (newType: "auto" | "classic") => {
     if (isCameraActive) {
       await stopCamera();
     }
-    setReceiverLayout(newLayout);
+    setScannerType(newType);
   };
 
   const handleApplyRecoveryCode = () => {
@@ -458,7 +450,9 @@ export function CameraStreamCard() {
     const sessionHash = frames[0]?.hash || "";
     const decoded = decodeRecoveryCode(recoveryInput.trim(), sessionHash);
     if (!decoded.ok) {
-      if (decoded.reason === "session") {
+      if (decoded.reason === "word") {
+        setRecoveryError("A word is not recognized.");
+      } else if (decoded.reason === "session") {
         setRecoveryError("Recovery code is from a different transfer session.");
       } else if (decoded.reason === "checksum") {
         setRecoveryError("Recovery code checksum mismatch. Please recheck typing.");
@@ -581,21 +575,20 @@ export function CameraStreamCard() {
                 <div className="text-left w-full sm:w-auto">
                   <div className="text-xs font-bold text-[var(--text)]">QR Density &amp; Layout</div>
                   <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                    Grid 3x2 &amp; Large for maximum speed. Adjust down if camera struggles.
+                    Smaller is easier to scan, larger is faster
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <SegmentedControl
                     value={senderLayout}
                     onChange={(val) => {
-                      const nextLayout = val as CameraLayout;
-                      setSenderLayout(nextLayout);
+                      setSenderLayout(val as CameraLayout);
                       setCurrentFrameIndex(0);
                     }}
                     options={[
-                      { value: "grid-3x2", label: "Grid 3x2" },
-                      { value: "grid-2x2", label: "Grid 2x2" },
                       { value: "single", label: "Single" },
+                      { value: "2x2", label: "2x2" },
+                      { value: "3x2", label: "3x2" },
                     ]}
                     ariaLabel="Sender QR layout"
                   />
@@ -614,72 +607,61 @@ export function CameraStreamCard() {
                 </div>
               </div>
 
+              <p className="text-[11px] text-[var(--text-muted)] text-center w-full">
+                Hard to scan? Use 2x2 or Medium density.
+              </p>
+
               {/* QR Display Card */}
-              <div className="flex flex-col items-center justify-center p-4 sm:p-6 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl">
-                {senderLayout === "single" ? (
-                  <div className="p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
-                    <QRCodeSVG
-                      value={activeFramesList[currentFrameIndex]?.encodedPayload || ""}
-                      size={280}
-                      level="L"
-                      bgColor="#FFFFFF"
-                      fgColor="#000000"
-                      marginSize={2}
-                    />
-                  </div>
-                ) : senderLayout === "grid-2x2" ? (
-                  <div className="w-full max-w-[400px] mx-auto grid grid-cols-2 gap-1.5 p-2 bg-white rounded-2xl shadow-sm border border-neutral-200">
-                    {[0, 1, 2, 3].map((offset) => {
-                      const tick = Math.floor(currentFrameIndex / 4);
-                      const frame = activeFramesList[tick * 4 + offset];
-                      return (
-                        <div
-                          key={offset}
-                          className="aspect-square flex items-center justify-center p-0.5 rounded-lg bg-white border border-neutral-100 overflow-hidden"
-                        >
-                          {frame ? (
-                            <QRCodeSVG
-                              value={frame.encodedPayload}
-                              size={180}
-                              level="L"
-                              bgColor="#FFFFFF"
-                              fgColor="#000000"
-                              marginSize={1}
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-white rounded-md flex items-center justify-center text-neutral-300 font-mono text-[10px]" />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="w-full max-w-[480px] mx-auto grid grid-cols-3 gap-1 sm:gap-1.5 p-2 bg-white rounded-2xl shadow-sm border border-neutral-200">
-                    {[0, 1, 2, 3, 4, 5].map((offset) => {
-                      const tick = Math.floor(currentFrameIndex / 6);
-                      const frame = activeFramesList[tick * 6 + offset];
-                      return (
-                        <div
-                          key={offset}
-                          className="aspect-square flex items-center justify-center p-0.5 rounded-lg bg-white border border-neutral-100 overflow-hidden"
-                        >
-                          {frame ? (
-                            <QRCodeSVG
-                              value={frame.encodedPayload}
-                              size={140}
-                              level="L"
-                              bgColor="#FFFFFF"
-                              fgColor="#000000"
-                              marginSize={1}
-                            />
-                          ) : (
-                            <div className="w-full h-full bg-white rounded-md flex items-center justify-center text-neutral-300 font-mono text-[10px]" />
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+              <div className="flex flex-col items-center justify-center p-6 sm:p-8 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl">
+                {(() => {
+                  const perTick = getFramesPerTick(senderLayout);
+                  const tick = Math.floor(currentFrameIndex / perTick);
+                  const maxWidthClass =
+                    senderLayout === "3x2"
+                      ? "max-w-[720px]"
+                      : senderLayout === "2x2"
+                      ? "max-w-[420px]"
+                      : "max-w-[360px]";
+                  const gridColsClass =
+                    senderLayout === "3x2"
+                      ? "grid-cols-3"
+                      : senderLayout === "2x2"
+                      ? "grid-cols-2"
+                      : "grid-cols-1";
+
+                  const tickFrames = Array.from(
+                    { length: perTick },
+                    (_, i) => activeFramesList[tick * perTick + i] || null
+                  );
+
+                  return (
+                    <div
+                      className={`w-full ${maxWidthClass} mx-auto p-1 rounded-xl bg-white shadow-sm border border-neutral-200`}
+                    >
+                      <div className={`grid gap-[2px] ${gridColsClass}`}>
+                        {tickFrames.map((frame, idx) => (
+                          <div
+                            key={idx}
+                            className="w-full bg-white flex items-center justify-center overflow-hidden"
+                          >
+                            {frame ? (
+                              <QRCodeSVG
+                                value={frame.encodedPayload}
+                                size={256}
+                                level="L"
+                                marginSize={2}
+                                shapeRendering="crispEdges"
+                                style={{ width: "100%", height: "auto" }}
+                              />
+                            ) : (
+                              <div className="w-full aspect-square bg-white" />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* Frame Counter & Progress Bar */}
                 <div className="w-full max-w-sm mt-5 space-y-2">
@@ -688,22 +670,19 @@ export function CameraStreamCard() {
                       {frames[0]?.fileName}
                     </span>
                     <span className="font-mono tabular-nums text-[11px]">
-                      {senderLayout === "single" ? (
-                        replayIndices !== null
-                          ? `Replay ${currentFrameIndex + 1} of ${activeFramesList.length}`
-                          : `Frame ${currentFrameIndex + 1} of ${frames.length}`
-                      ) : (
-                        (() => {
-                          const perTick = getFramesPerTick(senderLayout);
-                          const tick = Math.floor(currentFrameIndex / perTick);
-                          const start = tick * perTick + 1;
-                          const end = Math.min(tick * perTick + perTick, activeFramesList.length);
-                          const prefix = replayIndices !== null ? "Replay" : "Frames";
-                          return start === end
-                            ? `${prefix} ${start} of ${activeFramesList.length}`
-                            : `${prefix} ${start} to ${end} of ${activeFramesList.length}`;
-                        })()
-                      )}
+                      {(() => {
+                        const perTick = getFramesPerTick(senderLayout);
+                        const prefix = replayIndices !== null ? "Replay" : "Frames";
+                        if (perTick === 1) {
+                          return `${prefix} ${currentFrameIndex + 1} of ${activeFramesList.length}`;
+                        }
+                        const tick = Math.floor(currentFrameIndex / perTick);
+                        const start = tick * perTick + 1;
+                        const end = Math.min(tick * perTick + perTick, activeFramesList.length);
+                        return start === end
+                          ? `${prefix} ${start} of ${activeFramesList.length}`
+                          : `${prefix} ${start} to ${end} of ${activeFramesList.length}`;
+                      })()}
                     </span>
                   </div>
 
@@ -741,9 +720,9 @@ export function CameraStreamCard() {
                     type="button"
                     onClick={() => {
                       const perTick = getFramesPerTick(senderLayout);
-                      const totalSteps = Math.ceil(activeFramesList.length / perTick);
+                      const totalTicks = Math.ceil(activeFramesList.length / perTick);
                       const curTick = Math.floor(currentFrameIndex / perTick);
-                      const prevTick = (curTick - 1 + totalSteps) % totalSteps;
+                      const prevTick = (curTick - 1 + totalTicks) % totalTicks;
                       setCurrentFrameIndex(prevTick * perTick);
                     }}
                     className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
@@ -784,9 +763,9 @@ export function CameraStreamCard() {
                     type="button"
                     onClick={() => {
                       const perTick = getFramesPerTick(senderLayout);
-                      const totalSteps = Math.ceil(activeFramesList.length / perTick);
+                      const totalTicks = Math.ceil(activeFramesList.length / perTick);
                       const curTick = Math.floor(currentFrameIndex / perTick);
-                      const nextTick = (curTick + 1) % totalSteps;
+                      const nextTick = (curTick + 1) % totalTicks;
                       setCurrentFrameIndex(nextTick * perTick);
                     }}
                     className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
@@ -868,28 +847,32 @@ export function CameraStreamCard() {
                       <p className="text-[11px] text-[var(--text-muted)]">
                         Enter the recovery code from the receiver to loop only frames lost to camera shake.
                       </p>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="text"
+                      <div className="space-y-2">
+                        <textarea
+                          rows={2}
                           value={recoveryInput}
                           onChange={(e) => {
                             setRecoveryInput(e.target.value);
                             setRecoveryError(null);
                           }}
-                          placeholder="e.g. river fox 22, 43-46, 120 or 22, 43-46"
-                          className="flex-1 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-xs font-mono text-[var(--text)] focus:outline-none"
+                          placeholder="Type or paste the words, for example: tiger river lamp ..."
+                          className="w-full px-3 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-xs text-[var(--text)] focus:outline-none resize-none leading-relaxed"
                         />
-                        <button
-                          type="button"
-                          onClick={handleApplyRecoveryCode}
-                          className="px-3 py-1.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
-                        >
-                          Apply
-                        </button>
+                        <div className="flex items-center justify-between">
+                          {recoveryError ? (
+                            <p className="text-[11px] text-red-500">{recoveryError}</p>
+                          ) : (
+                            <span />
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleApplyRecoveryCode}
+                            className="px-3 py-1.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer ml-auto"
+                          >
+                            Apply
+                          </button>
+                        </div>
                       </div>
-                      {recoveryError && (
-                        <p className="text-[11px] text-red-500">{recoveryError}</p>
-                      )}
                     </div>
                   )}
 
@@ -940,18 +923,17 @@ export function CameraStreamCard() {
         <div className="space-y-6">
           {!receivedPayload ? (
             <div className="space-y-4">
-              {/* Receiver Layout Toggle */}
+              {/* Receiver Scanner Toggle */}
               <div className="flex items-center justify-between max-w-md mx-auto w-full">
-                <span className="text-xs font-semibold text-[var(--text)]">Scanner Layout</span>
+                <span className="text-xs font-semibold text-[var(--text)]">Scanner</span>
                 <SegmentedControl
-                  value={receiverLayout}
-                  onChange={(val) => handleReceiverLayoutChange(val as CameraLayout)}
+                  value={scannerType}
+                  onChange={(val) => handleScannerTypeChange(val as "auto" | "classic")}
                   options={[
-                    { value: "grid-3x2", label: "Grid 3x2" },
-                    { value: "grid-2x2", label: "Grid 2x2" },
-                    { value: "single", label: "Single" },
+                    { value: "auto", label: "Auto" },
+                    { value: "classic", label: "Classic" },
                   ]}
-                  ariaLabel="Receiver scanner layout"
+                  ariaLabel="Receiver scanner mode"
                 />
               </div>
 
@@ -959,7 +941,7 @@ export function CameraStreamCard() {
               <div className="relative w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square">
                 {/* Scanner container: always laid out, never display:none */}
                 <div
-                  ref={receiverLayout !== "single" ? quadScanner.containerRef : html5Scanner.containerRef}
+                  ref={scannerType === "auto" ? quadScanner.containerRef : html5Scanner.containerRef}
                   className={`relative w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square overflow-hidden rounded-2xl bg-black qs-scanner transition-opacity ${
                     !isCameraActive ? "opacity-0 pointer-events-none" : "opacity-100"
                   }`}
@@ -1025,7 +1007,7 @@ export function CameraStreamCard() {
 
                   {/* Camera dropdown and Stop Camera button */}
                   <div className="flex items-center gap-2">
-                    {availableCameras.length > 1 && receiverLayout === "single" && (
+                    {availableCameras.length > 1 && scannerType === "classic" && (
                       <select
                         value={selectedCameraId || ""}
                         onChange={(e) => handleCameraChange(e.target.value)}
@@ -1051,9 +1033,9 @@ export function CameraStreamCard() {
                 </div>
               )}
 
-              {/* Diagnostic line: Decoded 0 | Valid 0 | Invalid 0 | Last: none */}
+              {/* Diagnostic line: Decoded 0 | Valid 0 | Invalid 0 | Layout 3x2 | Last: none */}
               <div className="font-mono text-[11px] text-[var(--text-muted)] text-center">
-                Decoded {diagnostics.decoded} | Valid {diagnostics.valid} | Invalid {diagnostics.invalid} | Last: {diagnostics.last}
+                Decoded {diagnostics.decoded} | Valid {diagnostics.valid} | Invalid {diagnostics.invalid} | Layout {scannerType === "auto" ? quadScanner.detectedLayout : "1x1"} | Last: {diagnostics.last}
               </div>
 
               {(cameraError || scannerError) && (
@@ -1107,9 +1089,7 @@ export function CameraStreamCard() {
                                 </p>
                               );
                             }
-                            const wordCode = encodeWordRecoveryCode(sessionHash, missing);
-                            const fallbackCode = encodeRecoveryCode(sessionHash, missing);
-                            const code = wordCode || fallbackCode;
+                            const code = encodeRecoveryCode(sessionHash, missing);
                             if (!code) {
                               return (
                                 <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -1118,18 +1098,9 @@ export function CameraStreamCard() {
                               );
                             }
                             return (
-                              <>
-                                <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                                  <span>Missing {missing.length} frames • Type into sender</span>
-                                  <span className="font-mono text-[10px]">Readable code</span>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    readOnly
-                                    value={code}
-                                    className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] font-mono text-xs text-[var(--text)] select-all focus:outline-none"
-                                  />
+                              <div className="p-3 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] space-y-2">
+                                <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
+                                  <span>Missing {missing.length} frames</span>
                                   <button
                                     type="button"
                                     onClick={async () => {
@@ -1139,13 +1110,16 @@ export function CameraStreamCard() {
                                         setTimeout(() => setRecoveryCodeCopied(false), 2000);
                                       } catch {}
                                     }}
-                                    className="px-3 py-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
+                                    className="px-2.5 py-1 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
                                   >
                                     {recoveryCodeCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                                     {recoveryCodeCopied ? "Copied" : "Copy"}
                                   </button>
                                 </div>
-                              </>
+                                <p className="text-base text-[var(--text)] font-sans leading-relaxed break-words select-all">
+                                  {code}
+                                </p>
+                              </div>
                             );
                           })()}
                         </div>

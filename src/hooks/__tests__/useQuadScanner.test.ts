@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React, { act } from "react";
 import { createRoot, Root } from "react-dom/client";
-import { useQuadScanner, type UseQuadScannerReturn } from "../useQuadScanner";
+import { useQuadScanner, pickLayout, type UseQuadScannerReturn } from "../useQuadScanner";
 
 // @ts-expect-error React act environment flag
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -140,5 +140,28 @@ describe("useQuadScanner Hook", () => {
 
     // After stop, zero children remain
     expect(domContainer.childElementCount).toBe(0);
+  });
+
+  describe("pickLayout helper", () => {
+    it("returns lastGood when missStreak is under 5", () => {
+      expect(pickLayout("3x2", 0, 0)).toBe("3x2");
+      expect(pickLayout("3x2", 4, 1)).toBe("3x2");
+      expect(pickLayout("2x2", 3, 2)).toBe("2x2");
+    });
+
+    it("rotates to other candidates when missStreak >= 5", () => {
+      // Candidates are ["3x2", "2x2", "1x1"]. For lastGood="3x2", others are ["2x2", "1x1"]
+      expect(pickLayout("3x2", 5, 0)).toBe("2x2");
+      expect(pickLayout("3x2", 5, 1)).toBe("1x1");
+      expect(pickLayout("3x2", 6, 2)).toBe("2x2");
+
+      // For lastGood="2x2", others are ["3x2", "1x1"]
+      expect(pickLayout("2x2", 5, 0)).toBe("3x2");
+      expect(pickLayout("2x2", 5, 1)).toBe("1x1");
+    });
+
+    it("resets back to lastGood immediately when missStreak resets to 0", () => {
+      expect(pickLayout("1x1", 0, 5)).toBe("1x1");
+    });
   });
 });

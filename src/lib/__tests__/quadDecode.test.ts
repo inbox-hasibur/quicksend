@@ -81,28 +81,60 @@ describe("quadDecode", () => {
     expect(results).toEqual([]);
   });
 
-  it("should split into 6 cells for 3x2 grid layouts and decode each", () => {
-    const W = 900;
-    const H = 600;
-    const img = createTestImageData(W, H);
-
-    const recordedCrops: Array<{ width: number; height: number }> = [];
-    const fakeDecodeOne = vi.fn((crop: ImageData): string | null => {
-      recordedCrops.push({ width: crop.width, height: crop.height });
-      return `QS1|cell_${recordedCrops.length}`;
-    });
-
-    const results = decodeGrid(img, fakeDecodeOne, 3, 2);
-
-    expect(recordedCrops.length).toBe(6);
-    expect(results.length).toBe(6);
-    expect(results).toContain("QS1|cell_1");
-    expect(results).toContain("QS1|cell_6");
-  });
-
   it("should return null from jsqrDecodeOne when no QR is present in blank image", () => {
     const blank = createTestImageData(100, 100);
     const result = jsqrDecodeOne(blank);
     expect(result).toBeNull();
+  });
+
+  it("should split into 6 regions for 3x2 grid with 8% overlap padding", () => {
+    const W = 900;
+    const H = 600;
+    const img = createTestImageData(W, H);
+    const recordedCrops: Array<{ width: number; height: number }> = [];
+
+    const fakeDecodeOne = vi.fn((crop: ImageData): string | null => {
+      recordedCrops.push({ width: crop.width, height: crop.height });
+      return `QS2:cell${recordedCrops.length}`;
+    });
+
+    const results = decodeGrid(img, 3, 2, fakeDecodeOne);
+    expect(recordedCrops.length).toBe(6);
+    expect(results.length).toBe(6);
+
+    const padX = Math.round(W * 0.08); // 72
+    const padY = Math.round(H * 0.08); // 48
+    const baseW = 300;
+    const baseH = 300;
+
+    // TL cell (c=0, r=0): right & bottom inner edges padded
+    expect(recordedCrops[0].width).toBe(baseW + padX); // 372
+    expect(recordedCrops[0].height).toBe(baseH + padY); // 348
+
+    // Center-top cell (c=1, r=0): left, right & bottom inner edges padded
+    expect(recordedCrops[1].width).toBe(baseW + 2 * padX); // 444
+    expect(recordedCrops[1].height).toBe(baseH + padY); // 348
+
+    // TR cell (c=2, r=0): left & bottom inner edges padded
+    expect(recordedCrops[2].width).toBe(baseW + padX); // 372
+    expect(recordedCrops[2].height).toBe(baseH + padY); // 348
+  });
+
+  it("should handle 1x1 grid as full image with no padding", () => {
+    const W = 500;
+    const H = 400;
+    const img = createTestImageData(W, H);
+    const recordedCrops: Array<{ width: number; height: number }> = [];
+
+    const fakeDecodeOne = vi.fn((crop: ImageData): string | null => {
+      recordedCrops.push({ width: crop.width, height: crop.height });
+      return "QS2:single";
+    });
+
+    const results = decodeGrid(img, 1, 1, fakeDecodeOne);
+    expect(recordedCrops.length).toBe(1);
+    expect(recordedCrops[0].width).toBe(500);
+    expect(recordedCrops[0].height).toBe(400);
+    expect(results).toEqual(["QS2:single"]);
   });
 });

@@ -3,15 +3,30 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { decodeGrid, jsqrDecodeOne } from "@/lib/quadDecode";
 
+export type LayoutCandidate = "3x2" | "2x2" | "1x1";
+export const LAYOUT_CANDIDATES: LayoutCandidate[] = ["3x2", "2x2", "1x1"];
+
+/**
+ * Pure helper to pick decoding layout based on miss streaks.
+ * Rotates through other candidate layouts when missStreak >= 5.
+ */
+export function pickLayout(
+  lastGood: LayoutCandidate,
+  missStreak: number,
+  rotateIndex: number
+): LayoutCandidate {
+  if (missStreak < 5) return lastGood;
+  const others = LAYOUT_CANDIDATES.filter((c) => c !== lastGood);
+  return others[Math.abs(rotateIndex) % others.length];
+}
+
 export interface UseQuadScannerReturn {
   containerRef: React.RefObject<HTMLDivElement | null>;
-  start: (
-    onDecode: (decodedText: string) => void,
-    scanOptions?: { cols?: number; rows?: number }
-  ) => Promise<void>;
+  start: (onDecode: (decodedText: string) => void) => Promise<void>;
   stop: () => Promise<void>;
   isRunning: boolean;
   error: string | null;
+  detectedLayout: string;
 }
 
 interface BarcodeResult {
@@ -42,12 +57,16 @@ export function useQuadScanner(): UseQuadScannerReturn {
 
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [detectedLayout, setDetectedLayout] = useState<string>("3x2");
+
+  const lastGoodRef = useRef<LayoutCandidate>("3x2");
+  const missStreakRef = useRef(0);
+  const rotateIndexRef = useRef(0);
 
   const isStartingRef = useRef(false);
   const isStoppingRef = useRef(false);
   const isUnmountedRef = useRef(false);
   const shouldStopRef = useRef(false);
-  const gridShapeRef = useRef<{ cols: number; rows: number }>({ cols: 3, rows: 2 });
 
   // Safely stop stream, cancel loop, and remove video element
   const stop = useCallback(async (): Promise<void> => {
@@ -98,18 +117,16 @@ export function useQuadScanner(): UseQuadScannerReturn {
   }, []);
 
   const start = useCallback(
-    async (
-      onDecode: (decodedText: string) => void,
-      scanOptions?: { cols?: number; rows?: number }
-    ): Promise<void> => {
+    async (onDecode: (decodedText: string) => void): Promise<void> => {
       if (isStartingRef.current) return;
       isStartingRef.current = true;
       shouldStopRef.current = false;
       setError(null);
       onDecodeRef.current = onDecode;
-
-      if (scanOptions?.cols) gridShapeRef.current.cols = scanOptions.cols;
-      if (scanOptions?.rows) gridShapeRef.current.rows = scanOptions.rows;
+      lastGoodRef.current = "3x2";
+      missStreakRef.current = 0;
+      rotateIndexRef.current = 0;
+      setDetectedLayout("3x2");
 
       // Ensure any previous session is halted
       await stop();
@@ -278,15 +295,29 @@ export function useQuadScanner(): UseQuadScannerReturn {
                 }
               }
 
-              // Fallback to multi-region jsQR decode if BarcodeDetector found nothing
+              const activeCandidate = pickLayout(
+                lastGoodRef.current,
+                missStreakRef.current,
+                rotateIndexRef.current
+              );
+              if (missStreakRef.current >= 5) {
+                rotateIndexRef.current++;
+              }
+
+              // Fallback to auto-grid jsQR decode if BarcodeDetector found nothing
               if (decodedStrings.length === 0 && ctx) {
                 const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                decodedStrings = decodeGrid(
-                  imgData,
-                  jsqrDecodeOne,
-                  gridShapeRef.current.cols,
-                  gridShapeRef.current.rows
-                );
+                const [cols, rows] =
+                  activeCandidate === "3x2" ? [3, 2] : activeCandidate === "2x2" ? [2, 2] : [1, 1];
+                decodedStrings = decodeGrid(imgData, cols, rows, jsqrDecodeOne);
+              }
+
+              if (decodedStrings.length > 0) {
+                lastGoodRef.current = activeCandidate;
+                missStreakRef.current = 0;
+                setDetectedLayout(activeCandidate);
+              } else {
+                missStreakRef.current++;
               }
 
               for (const text of decodedStrings) {
@@ -331,5 +362,6 @@ export function useQuadScanner(): UseQuadScannerReturn {
     stop,
     isRunning,
     error,
+    detectedLayout,
   };
 }

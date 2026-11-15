@@ -1,121 +1,130 @@
 import { describe, it, expect } from "vitest";
 import {
   encodeRecoveryCode,
-  encodeWordRecoveryCode,
   decodeRecoveryCode,
   formatMissingRanges,
   parseMissingRanges,
-  hashToWords,
-  wordsToHash,
 } from "../opticalRecovery";
+import { RECOVERY_WORDS, wordToIndex } from "../recoveryWords";
 
-describe("opticalRecovery", () => {
-  const sessionHash = "811c9dc5";
+describe("Word-Based Recovery System", () => {
+  const sessionHash = "811C9DC5";
 
-  it("should format missing ranges into condensed 1-based format", () => {
-    // 0-based indices [21, 42, 43, 44, 45, 119] -> 1-based 22, 43-46, 120
-    const indices = [21, 42, 43, 44, 45, 119];
-    const ranges = formatMissingRanges(indices);
-    expect(ranges).toBe("22,43-46,120");
+  it("RECOVERY_WORDS has length 256, all unique, unique 3-letter prefixes, only a-z 3-6 chars", () => {
+    expect(RECOVERY_WORDS.length).toBe(256);
 
-    const parsed = parseMissingRanges(ranges);
-    expect(parsed).toEqual(indices);
+    const wordSet = new Set(RECOVERY_WORDS);
+    expect(wordSet.size).toBe(256);
+
+    const prefixSet = new Set(RECOVERY_WORDS.map((w) => w.slice(0, 3)));
+    expect(prefixSet.size).toBe(256);
+
+    for (const w of RECOVERY_WORDS) {
+      expect(w).toMatch(/^[a-z]{3,6}$/);
+    }
+
+    // wordToIndex test
+    expect(wordToIndex("ace")).toBe(0);
+    expect(wordToIndex("ACE")).toBe(0);
+    expect(wordToIndex("ac")).toBe(-1);
+    expect(wordToIndex("zzz")).toBe(-1);
   });
 
-  it("should perform full encode/decode round trip with case-insensitivity and whitespace tolerance", () => {
-    const missing = [0, 4, 5, 6, 10, 19];
-    const code = encodeRecoveryCode(sessionHash, missing);
+  it("round-trips single frame [22]", () => {
+    const code = encodeRecoveryCode(sessionHash, [22]);
     expect(code).not.toBeNull();
-    expect(code).toMatch(/^QSR-811c-1,5-7,11,20-[0-9a-z]{2}$/i);
-
-    // Decode exact
     const res = decodeRecoveryCode(code!, sessionHash);
     expect(res.ok).toBe(true);
-    expect(res.indices).toEqual(missing);
-
-    // Decode uppercase with whitespace
-    const spaced = `  QSR - 811C - 1, 5-7, 11, 20 - ${code!.slice(-2).toUpperCase()}  `;
-    const resSpaced = decodeRecoveryCode(spaced, sessionHash);
-    expect(resSpaced.ok).toBe(true);
-    expect(resSpaced.indices).toEqual(missing);
+    expect(res.indices).toEqual([22]);
   });
 
-  it("should reject invalid checksum caused by typo", () => {
-    const code = encodeRecoveryCode(sessionHash, [5, 6, 7])!;
-    // Corrupt a digit in the range
-    const corrupted = code.replace("6-8", "6-9");
-    const res = decodeRecoveryCode(corrupted, sessionHash);
+  it("round-trips range list [22, 43, 44, 45, 46, 120]", () => {
+    const list = [22, 43, 44, 45, 46, 120];
+    const code = encodeRecoveryCode(sessionHash, list);
+    expect(code).not.toBeNull();
+    const res = decodeRecoveryCode(code!, sessionHash);
+    expect(res.ok).toBe(true);
+    expect(res.indices).toEqual(list);
+  });
+
+  it("round-trips 1 to 50 consecutive frames", () => {
+    const list = Array.from({ length: 50 }, (_, i) => i);
+    const code = encodeRecoveryCode(sessionHash, list);
+    expect(code).not.toBeNull();
+    const res = decodeRecoveryCode(code!, sessionHash);
+    expect(res.ok).toBe(true);
+    expect(res.indices).toEqual(list);
+  });
+
+  it("returns null when total word count exceeds 40 for many scattered frames", () => {
+    // 30 non-adjacent frames require at least 30 * 2 = 60 payload bytes > 40 words
+    const scattered = Array.from({ length: 30 }, (_, i) => i * 4);
+    const code = encodeRecoveryCode(sessionHash, scattered);
+    expect(code).toBeNull();
+  });
+
+  it("supports typed words using only the first 3 letters of each word", () => {
+    const code = encodeRecoveryCode(sessionHash, [22, 43]);
+    expect(code).not.toBeNull();
+    const threeLetterCode = code!
+      .split(" ")
+      .map((w) => w.slice(0, 3))
+      .join(" ");
+
+    const res = decodeRecoveryCode(threeLetterCode, sessionHash);
+    expect(res.ok).toBe(true);
+    expect(res.indices).toEqual([22, 43]);
+  });
+
+  it("handles mixed case, commas, and hyphens", () => {
+    const code = encodeRecoveryCode(sessionHash, [22, 43]);
+    expect(code).not.toBeNull();
+    const words = code!.split(" ");
+    // Join with mixed punctuation and case
+    const messyCode = words
+      .map((w, idx) => (idx % 2 === 0 ? w.toUpperCase() : w))
+      .reduce((acc, w, idx) => (idx === 0 ? w : `${acc}${idx % 2 === 0 ? ", " : "-"}${w}`), "");
+
+    const res = decodeRecoveryCode(messyCode, sessionHash);
+    expect(res.ok).toBe(true);
+    expect(res.indices).toEqual([22, 43]);
+  });
+
+  it("rejects one-word typo with checksum failure", () => {
+    const code = encodeRecoveryCode(sessionHash, [22, 43]);
+    expect(code).not.toBeNull();
+    const words = code!.split(" ");
+    // Change second word to a different valid word
+    const altWord = words[1] === RECOVERY_WORDS[0] ? RECOVERY_WORDS[1] : RECOVERY_WORDS[0];
+    words[1] = altWord;
+    const altered = words.join(" ");
+
+    const res = decodeRecoveryCode(altered, sessionHash);
     expect(res.ok).toBe(false);
     expect(res.reason).toBe("checksum");
   });
 
-  it("should return reason 'session' when session hash prefix does not match", () => {
-    const code = encodeRecoveryCode(sessionHash, [2, 3, 4])!;
-    const res = decodeRecoveryCode(code, "9999ffff");
+  it("rejects wrong session hash with session failure", () => {
+    const code = encodeRecoveryCode(sessionHash, [22]);
+    expect(code).not.toBeNull();
+    const res = decodeRecoveryCode(code!, "00000000");
     expect(res.ok).toBe(false);
     expect(res.reason).toBe("session");
   });
 
-  it("should return null if ranges string exceeds 600 characters", () => {
-    // Generate thousands of non-consecutive indices to produce a long string
-    const sparseIndices: number[] = [];
-    for (let i = 0; i < 400; i++) {
-      sparseIndices.push(i * 3);
-    }
-    const code = encodeRecoveryCode(sessionHash, sparseIndices);
-    expect(code).toBeNull();
+  it("rejects unknown words with word failure", () => {
+    const res = decodeRecoveryCode("xyz foo bar qux", sessionHash);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe("word");
   });
 
-  it("should return reason 'format' on malformed input strings", () => {
-    expect(decodeRecoveryCode("INVALID-CODE", sessionHash)).toEqual({
-      ok: false,
-      reason: "format",
-    });
-    expect(decodeRecoveryCode("QSR-811c-bad_range-00", sessionHash)).toEqual({
-      ok: false,
-      reason: "checksum",
-    });
+  it("rejects malformed code with format failure", () => {
+    expect(decodeRecoveryCode("", sessionHash).ok).toBe(false);
+    expect(decodeRecoveryCode("ace", sessionHash).ok).toBe(false);
   });
 
-  describe("Human-Readable Word Recovery Codes", () => {
-    it("should map 4-char session hex hash to 2 friendly words and back", () => {
-      const [w1, w2] = hashToWords(sessionHash);
-      expect(typeof w1).toBe("string");
-      expect(typeof w2).toBe("string");
-      expect(w1.length).toBeGreaterThanOrEqual(3);
-      expect(w2.length).toBeGreaterThanOrEqual(3);
-
-      const restoredHash = wordsToHash(w1, w2);
-      expect(restoredHash).toBe("811c");
-    });
-
-    it("should encode and decode human-friendly word recovery codes", () => {
-      const missing = [21, 42, 43, 44, 45, 119];
-      const wordCode = encodeWordRecoveryCode(sessionHash, missing);
-      expect(wordCode).not.toBeNull();
-      // Should format as e.g. "word1 word2 22, 43-46, 120"
-      expect(wordCode).toMatch(/^[a-z]+ [a-z]+ 22, 43-46, 120$/);
-
-      const decoded = decodeRecoveryCode(wordCode!, sessionHash);
-      expect(decoded.ok).toBe(true);
-      expect(decoded.indices).toEqual(missing);
-    });
-
-    it("should decode direct frame numbers with whitespace or 'to' syntax", () => {
-      const missing = [42, 43, 44, 45]; // 43 to 46
-      const res = decodeRecoveryCode("43 to 46", sessionHash);
-      expect(res.ok).toBe(true);
-      expect(res.indices).toEqual(missing);
-
-      const resMixed = decodeRecoveryCode("22, 43 to 46, 120", sessionHash);
-      expect(resMixed.ok).toBe(true);
-      expect(resMixed.indices).toEqual([21, 42, 43, 44, 45, 119]);
-    });
-
-    it("should reject word code with mismatched session words", () => {
-      const res = decodeRecoveryCode("ocean sun 22, 43-46", sessionHash);
-      expect(res.ok).toBe(false);
-      expect(res.reason).toBe("session");
-    });
+  it("preserves formatMissingRanges and parseMissingRanges helpers", () => {
+    expect(formatMissingRanges([0, 1, 2, 5])).toBe("1-3,6");
+    expect(parseMissingRanges("1-3,6")).toEqual([0, 1, 2, 5]);
   });
 });

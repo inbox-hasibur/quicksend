@@ -340,23 +340,30 @@
   - Added `opts.framesPerTick` parameter to `estimateSeconds` and `EstimateBadge` for accurate 4x accelerated ETA calculations in Grid mode.
 - [x] **Sprint 16 Verification:** 172/172 unit tests passing across 31 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
 
-### Sprint 17: 3x2 Grid QR Layout, High-Density Defaults & Word Recovery Codes
-- [x] Camera Mode Speed Rating Calibration (`src/components/ModeSelector.tsx`):
-  - Calibrated `Via Camera Scan` transfer speed rating from 2 bars to 1 bar (`speedBars: 1`), accurately representing optical visual transmission as the slowest transfer method.
-- [x] 3x2 Grid QR Layout & Tight Spacing (`src/components/CameraStreamCard.tsx`):
-  - Added 6-QR `Grid 3x2` layout option alongside `Grid 2x2` and `Single`.
-  - Tightened grid spacing with `gap-1 sm:gap-1.5 p-2` and reduced `marginSize={1}` to maximize QR code visual area on screen.
-  - Set `Grid 3x2` layout and `Large` QR density as the default configuration for both sender and receiver. Removed automatic density downgrades to preserve user-selected throughput.
-  - Updated playback step progression to advance by 6 frames per tick (`getFramesPerTick`) in 3x2 mode, scaling the transfer time estimate accordingly.
-- [x] Multi-Region Grid Decoding Engine (`src/lib/quadDecode.ts` & `src/hooks/useQuadScanner.ts`):
-  - Added generalized `decodeGrid(imageData, decodeOne, cols, rows)` supporting both 3x2 (6 regions) and 2x2 (4 regions) with 6% overlap padding.
-  - Updated `useQuadScanner` to support configurable `{ cols, rows }` options during camera start and rAF decoding loop.
-  - Added unit test in `src/lib/__tests__/quadDecode.test.ts` verifying 3x2 grid cropping and decoding.
-- [x] Human-Readable Word Recovery Codes (`src/lib/opticalRecovery.ts` & `src/lib/__tests__/opticalRecovery.test.ts`):
-  - Curated 256-word phonetic dictionary (`RECOVERY_WORD_LIST`) mapping session hashes to natural word pairs (`hashToWords` / `wordsToHash`).
-  - Added `encodeWordRecoveryCode` producing human-friendly codes like `river fox 22, 43-46, 120`.
-  - Updated `parseMissingRanges` to support natural language syntax such as `43 to 46` or `22, 43-46, 120`.
-  - Seamless decoding supporting word codes, direct frame numbers, and legacy `QSR-...` formats.
-- [x] **Sprint 17 Verification:** 177/177 unit tests passing across 31 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
-
+### Sprint 17: Base45 QR Alphanumeric Mode, 3x2 Grid Engine & Word Recovery Codes
+- [x] Base45 RFC 9285 Codec (`src/lib/base45.ts` & `src/lib/__tests__/base45.test.ts`):
+  - Implemented `encodeBase45` and `decodeBase45` strictly conforming to RFC 9285 alphanumeric QR mode (~97% efficiency).
+  - Verified RFC test vectors, empty input, 1000-byte random round-trip, and invalid character rejection.
+- [x] Base45 Optical Frame Protocol (`src/lib/opticalDataStream.ts` & `src/lib/__tests__/opticalDataStream.test.ts`):
+  - Switched frame formats to alphanumeric `QS2:<index>:<total>:<HASH>:<fileNameB45>:<fileSize>:<mimeB45>:<isCompressed>:<base45Data>.` and parity `QP2:<g>:<S>:<HASH>:<lastLen>:<base45 xor>.`.
+  - Uppercase hex FNV-1a checksums and trailing period delimiters (`.`).
+  - Raw chunk presets adjusted to small 90, medium 200, large 390 bytes.
+  - Rejection of legacy `QS1|` and `QP1|` payloads.
+- [x] Word Recovery Code Engine (`src/lib/recoveryWords.ts`, `src/lib/opticalRecovery.ts` & `src/lib/__tests__/opticalRecovery.test.ts`):
+  - 256 common English words dictionary with unique 3-letter prefixes and $O(1)$ prefix lookup (`wordToIndex`).
+  - LEB128 varint encoding for missing frame ranges (gap & length) with checksum word, bounded to max 40 words.
+  - Case-insensitive, hyphen/comma-tolerant decoder returning clear reason status ("word" | "format" | "session" | "checksum").
+- [x] 3x2 Grid QR Layout & Auto-Layout Detection (`src/lib/quadDecode.ts`, `src/hooks/useQuadScanner.ts` & tests):
+  - `decodeGrid(imageData, cols, rows, decodeOne)` with 8% overlap padding on inner edges.
+  - Pure helper `pickLayout(lastGood, missStreak, rotateIndex)` rotating candidates on 5-miss streak with auto-reset.
+  - Exposing `detectedLayout` in `useQuadScanner`.
+- [x] Camera Stream UI Enhancements (`src/components/CameraStreamCard.tsx`):
+  - Sender layout options: "Single", "2x2", "3x2" (default "3x2" with Large density, 6 frames per tick, CSS grid with 2px gap, crispEdges, 720px max-width).
+  - Receiver scanner segmented control: "Scanner: Auto / Classic" (default Auto using `useQuadScanner` with auto-layout).
+  - Diagnostic line displaying detected layout (`Layout 3x2`).
+  - Natural word-wrapped recovery code display in bordered card with copy button.
+  - 2-row textarea for Replay input on sender with friendly error messaging.
+- [x] Service Worker Cache Update (`public/sw.js`):
+  - Incremented cache version string to `quicksend-v2`.
+- [x] **Sprint 17 Verification:** 188/188 unit tests passing across 32 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
 

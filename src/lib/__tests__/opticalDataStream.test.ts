@@ -8,8 +8,10 @@ import {
   getTotalFrameCount,
   OpticalDataCollector,
   OPTICAL_CHUNK_PRESETS,
+  splitFirstN,
   type OpticalDataFrame,
 } from "@/lib/opticalDataStream";
+import { encodeBase45 } from "@/lib/base45";
 
 describe("Optical Data Stream Protocol", () => {
   /**
@@ -124,11 +126,13 @@ describe("Optical Data Stream Protocol", () => {
     const garbageInputs = [
       "",
       "random string",
-      "QS1|incomplete",
-      "QS1||||||||",
-      "QS1|t1|not_number|total|name|size|mime|0|data",
-      "QS1|t1|0|5|name|-1|mime|0|data",
-      "QS1|t1|10|5|name|100|mime|0|data", // index >= total
+      "QS2:incomplete",
+      "QS2:::::",
+      "QS2:not_num:total:HASH:data.",
+      "QS2:0:5:HASH:NAME:-1:MIME:0:data.",
+      "QS2:10:5:HASH:data.", // index >= total
+      "QS1|old|format|test|1|2|3|4|5|6", // old QS1 format must parse to null
+      "QP1|0/2|hash|xor", // old QP1 format must parse to null
       null as unknown as string,
       undefined as unknown as string,
     ];
@@ -137,9 +141,6 @@ describe("Optical Data Stream Protocol", () => {
       expect(() => parseOpticalDataFrame(input)).not.toThrow();
       expect(parseOpticalDataFrame(input)).toBeNull();
     }
-
-    // Invalid URI sequence must not throw
-    expect(() => parseOpticalDataFrame("QS1|t1|0|1|bad_%E0%A4%A|10|mime|0|data")).not.toThrow();
   });
 
   it("should return a clear error value (not exception) when payload hash check fails", async () => {
@@ -147,10 +148,10 @@ describe("Optical Data Stream Protocol", () => {
     const file = new File([data], "hash-test.dat", { type: "application/octet-stream" });
     const frames = await encodeFileToOpticalFrames(file, 2);
 
-    // Tamper with base64 data in frame 0
-    const parts = frames[0].encodedPayload.split("|");
-    parts[8] = btoa("corrupted"); // modify base64
-    const tamperedPayload = parts.join("|");
+    // Tamper with payload in frame 0
+    const parts = splitFirstN(frames[0].encodedPayload.slice(0, -1), ":", 8);
+    parts[8] = encodeBase45(new TextEncoder().encode("corrupted"));
+    const tamperedPayload = parts.join(":") + ".";
 
     const collector = new OpticalDataCollector();
     await collector.add(tamperedPayload);
@@ -167,7 +168,7 @@ describe("Optical Data Stream Protocol", () => {
     expect(errorResult?.error).toContain("Hash check failed");
   });
 
-  it("should ensure all OPTICAL_CHUNK_PRESETS produce frames within QR capacity (<= 500 chars for large)", async () => {
+  it("should ensure all OPTICAL_CHUNK_PRESETS produce frames matching Base45 alphabet and under 900 chars for large", async () => {
     const payload10k = new Uint8Array(10240);
     for (let i = 0; i < payload10k.length; i++) {
       payload10k[i] = (i * 37) % 256;
@@ -176,16 +177,28 @@ describe("Optical Data Stream Protocol", () => {
       type: "application/octet-stream",
     });
 
-    for (const [presetName, chunkSize] of Object.entries(OPTICAL_CHUNK_PRESETS)) {
-      const frames = await encodeFileToOpticalFrames(testFile, chunkSize);
-      expect(frames.length).toBeGreaterThan(0);
+    const base45Regex = /^[0-9A-Z $%*+\-./:]+$/;
 
-      for (const frame of frames) {
-        expect(frame.encodedPayload.startsWith("QS1|")).toBe(true);
+    for (const [presetName, chunkSize] of Object.entries(OPTICAL_CHUNK_PRESETS)) {
+      const dataFrames = await encodeFileToOpticalFrames(testFile, chunkSize);
+      const parityFrames = buildParityFrames(dataFrames, chunkSize);
+      const allFrames = [...dataFrames, ...parityFrames];
+
+      expect(dataFrames.length).toBeGreaterThan(0);
+
+      for (const frame of allFrames) {
+        expect(frame.encodedPayload.endsWith(".")).toBe(true);
+        expect(base45Regex.test(frame.encodedPayload)).toBe(true);
         if (presetName === "large") {
-          expect(frame.encodedPayload.length).toBeLessThanOrEqual(500);
+          expect(frame.encodedPayload.length).toBeLessThan(900);
         }
       }
+    }
+
+    const textFrames = await encodeTextToOpticalFrames("Hello world message!", OPTICAL_CHUNK_PRESETS.large);
+    for (const tf of textFrames) {
+      expect(tf.encodedPayload.endsWith(".")).toBe(true);
+      expect(base45Regex.test(tf.encodedPayload)).toBe(true);
     }
   });
 

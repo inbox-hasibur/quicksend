@@ -5,6 +5,8 @@
  * Includes XOR parity frames for automatic packet recovery and typed recovery codes.
  */
 
+import { encodeBase45, decodeBase45 } from "@/lib/base45";
+
 export interface OpticalDataFrame {
   transferId: string;
   chunkIndex: number; // 0-based
@@ -33,17 +35,17 @@ export interface ReassembledPayload {
 }
 
 export const OPTICAL_CHUNK_PRESETS = {
-  small: 66,
-  medium: 150,
-  large: 300,
+  small: 90,
+  medium: 200,
+  large: 390,
 } as const;
 
 export type OpticalChunkPreset = keyof typeof OPTICAL_CHUNK_PRESETS;
 
-export const DEFAULT_CHUNK_RAW_BYTES = OPTICAL_CHUNK_PRESETS.medium; // 150 bytes default
+export const DEFAULT_CHUNK_RAW_BYTES = OPTICAL_CHUNK_PRESETS.medium; // 200 bytes default
 
 /**
- * Fast 32-bit FNV-1a payload checksum formatted as 8-character hex.
+ * Fast 32-bit FNV-1a payload checksum formatted as 8-character uppercase hex.
  */
 export function computePayloadHash(bytes: Uint8Array): string {
   let hash = 0x811c9dc5;
@@ -51,7 +53,7 @@ export function computePayloadHash(bytes: Uint8Array): string {
     hash ^= bytes[i];
     hash = Math.imul(hash, 0x01000193);
   }
-  return (hash >>> 0).toString(16).padStart(8, "0");
+  return (hash >>> 0).toString(16).toUpperCase().padStart(8, "0");
 }
 
 export function base64ToBytes(b64: string): Uint8Array {
@@ -71,6 +73,34 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
+export function encodeB45Header(str: string): string {
+  const rawB45 = encodeBase45(new TextEncoder().encode(str));
+  return rawB45.replace(/%/g, "%P").replace(/:/g, "%C");
+}
+
+export function decodeB45Header(str: string): string {
+  const unescaped = str.replace(/%C/g, ":").replace(/%P/g, "%");
+  const bytes = decodeBase45(unescaped);
+  if (!bytes) return "";
+  return new TextDecoder().decode(bytes);
+}
+
+/**
+ * Splits string on the first N occurrences of delimiter.
+ */
+export function splitFirstN(str: string, delimiter: string, n: number): string[] {
+  const parts: string[] = [];
+  let cur = str;
+  for (let i = 0; i < n; i++) {
+    const idx = cur.indexOf(delimiter);
+    if (idx === -1) break;
+    parts.push(cur.slice(0, idx));
+    cur = cur.slice(idx + delimiter.length);
+  }
+  parts.push(cur);
+  return parts;
+}
+
 /**
  * Encodes an ArrayBuffer or Blob into sequenced optical QR frames.
  */
@@ -78,10 +108,10 @@ export async function encodeFileToOpticalFrames(
   file: File,
   chunkSize: number = DEFAULT_CHUNK_RAW_BYTES
 ): Promise<OpticalDataFrame[]> {
-  const transferId = `opt_${Date.now().toString(36).slice(-4)}_${Math.random().toString(36).substring(2, 5)}`;
   const buffer = await file.arrayBuffer();
   const rawBytes = new Uint8Array(buffer);
   const hash = computePayloadHash(rawBytes);
+  const transferId = `opt_${hash.slice(0, 8)}`;
 
   // Compress if CompressionStream is available
   let dataBytes = rawBytes;
@@ -106,19 +136,19 @@ export async function encodeFileToOpticalFrames(
   const totalChunks = Math.max(1, Math.ceil(dataBytes.length / chunkSize));
   const frames: OpticalDataFrame[] = [];
 
-  // Safe file name escaping for pipe delimiter
-  const safeFileName = encodeURIComponent(file.name || "payload.bin");
-  const safeMime = encodeURIComponent(file.type || "application/octet-stream");
+  const b45Name = encodeB45Header(file.name || "payload.bin");
+  const b45Mime = encodeB45Header(file.type || "application/octet-stream");
+  const compFlag = isCompressed ? "1" : "0";
 
   for (let i = 0; i < totalChunks; i++) {
     const start = i * chunkSize;
     const end = Math.min(start + chunkSize, dataBytes.length);
     const slice = dataBytes.slice(start, end);
 
-    const base64Data = bytesToBase64(slice);
+    const base45Data = encodeBase45(slice);
 
-    // Protocol format: QS1|<transferId>|<index>|<total>|<fileName>|<fileSize>|<mimeType>|<isCompressed>|<base64>|<hash>
-    const encodedPayload = `QS1|${transferId}|${i}|${totalChunks}|${safeFileName}|${file.size}|${safeMime}|${isCompressed ? 1 : 0}|${base64Data}|${hash}`;
+    // Protocol format: QS2:<index>:<total>:<HASH>:<fileNameB45>:<fileSize>:<mimeB45>:<isCompressed>:<base45Data>.
+    const encodedPayload = `QS2:${i}:${totalChunks}:${hash}:${b45Name}:${file.size}:${b45Mime}:${compFlag}:${base45Data}.`;
 
     frames.push({
       transferId,
@@ -128,7 +158,7 @@ export async function encodeFileToOpticalFrames(
       fileSize: file.size,
       mimeType: file.type || "application/octet-stream",
       isCompressed,
-      base64Data,
+      base64Data: base45Data,
       encodedPayload,
       hash,
       isParity: false,
@@ -165,7 +195,7 @@ export function buildParityFrames(
   const sessionHash = dataFrames[0]?.hash || computePayloadHash(new Uint8Array(0));
   const parityFrames: OpticalDataFrame[] = [];
 
-  const lastChunkBytes = base64ToBytes(dataFrames[K - 1].base64Data);
+  const lastChunkBytes = decodeBase45(dataFrames[K - 1].base64Data) || base64ToBytes(dataFrames[K - 1].base64Data);
   const lastChunkLen = lastChunkBytes.length;
   const lastChunkGroup = (K - 1) % S;
   const hasShortFinalChunk = lastChunkLen < chunkSize;
@@ -175,27 +205,26 @@ export function buildParityFrames(
     const xorBuffer = new Uint8Array(chunkSize);
 
     for (const df of groupFrames) {
-      const bytes = base64ToBytes(df.base64Data);
+      const bytes = decodeBase45(df.base64Data) || base64ToBytes(df.base64Data);
       for (let b = 0; b < bytes.length; b++) {
         xorBuffer[b] ^= bytes[b];
       }
     }
 
-    const base64Xor = bytesToBase64(xorBuffer);
-    const isLastGroup = g === lastChunkGroup && hasShortFinalChunk;
-    const encodedPayload = isLastGroup
-      ? `QP1|${g}/${S}|${sessionHash}|${base64Xor}|${lastChunkLen}`
-      : `QP1|${g}/${S}|${sessionHash}|${base64Xor}`;
+    const base45Xor = encodeBase45(xorBuffer);
+    const lastLen = g === lastChunkGroup && hasShortFinalChunk ? lastChunkLen : 0;
+    // Protocol format: QP2:<g>:<S>:<HASH>:<lastLen>:<base45 xor>.
+    const encodedPayload = `QP2:${g}:${S}:${sessionHash}:${lastLen}:${base45Xor}.`;
 
     parityFrames.push({
-      transferId: dataFrames[0]?.transferId || "parity",
+      transferId: dataFrames[0]?.transferId || `opt_${sessionHash.slice(0, 8)}`,
       chunkIndex: K + g,
       totalChunks: K + S,
       fileName: dataFrames[0]?.fileName || "parity",
       fileSize: dataFrames[0]?.fileSize || 0,
       mimeType: "application/x-parity",
       isCompressed: false,
-      base64Data: base64Xor,
+      base64Data: base45Xor,
       encodedPayload,
       hash: sessionHash,
       isParity: true,
@@ -221,7 +250,11 @@ export const totalFrameCount = getTotalFrameCount;
  * Validates whether a scanned QR string matches the QuickSend optical data frame signature.
  */
 export function isOpticalDataFrame(payload: string): boolean {
-  return typeof payload === "string" && (payload.startsWith("QS1|") || payload.startsWith("QP1|"));
+  return (
+    typeof payload === "string" &&
+    payload.endsWith(".") &&
+    (payload.startsWith("QS2:") || payload.startsWith("QP2:"))
+  );
 }
 
 /**
@@ -229,53 +262,97 @@ export function isOpticalDataFrame(payload: string): boolean {
  */
 export function parseOpticalDataFrame(raw: string): OpticalDataFrame | null {
   try {
-    if (!raw || typeof raw !== "string" || !raw.startsWith("QS1|")) return null;
-
-    const parts = raw.split("|");
-    if (parts.length < 9) return null;
-
-    const [, transferId, idxStr, totalStr, rawName, sizeStr, rawMime, compStr, base64Data, frameHash] = parts;
-    const chunkIndex = parseInt(idxStr, 10);
-    const totalChunks = parseInt(totalStr, 10);
-    const fileSize = parseInt(sizeStr, 10);
-    const isCompressed = compStr === "1";
-
-    if (
-      isNaN(chunkIndex) ||
-      isNaN(totalChunks) ||
-      isNaN(fileSize) ||
-      chunkIndex < 0 ||
-      totalChunks <= 0 ||
-      chunkIndex >= totalChunks ||
-      fileSize < 0 ||
-      !transferId ||
-      !base64Data
-    ) {
+    if (!raw || typeof raw !== "string" || !raw.startsWith("QS2:") || !raw.endsWith(".")) {
       return null;
     }
 
-    let fileName = "payload.bin";
-    let mimeType = "application/octet-stream";
-    try {
-      fileName = decodeURIComponent(rawName);
-      mimeType = decodeURIComponent(rawMime);
-    } catch {
-      // Keep defaults
+    const trimmed = raw.slice(0, -1);
+    const parts9 = splitFirstN(trimmed, ":", 8);
+
+    if (parts9.length === 9) {
+      const [, idxStr, totalStr, hash, b45Name, sizeStr, b45Mime, compStr, payload] = parts9;
+      const chunkIndex = parseInt(idxStr, 10);
+      const totalChunks = parseInt(totalStr, 10);
+      const fileSize = parseInt(sizeStr, 10);
+      const isCompressed = compStr === "1";
+
+      if (
+        isNaN(chunkIndex) ||
+        isNaN(totalChunks) ||
+        isNaN(fileSize) ||
+        chunkIndex < 0 ||
+        totalChunks <= 0 ||
+        chunkIndex >= totalChunks ||
+        fileSize < 0 ||
+        (compStr !== "0" && compStr !== "1") ||
+        !hash ||
+        !payload
+      ) {
+        return null;
+      }
+
+      let fileName = "payload.bin";
+      let mimeType = "application/octet-stream";
+      try {
+        fileName = decodeB45Header(b45Name) || "payload.bin";
+        mimeType = decodeB45Header(b45Mime) || "application/octet-stream";
+      } catch {
+        // Keep defaults
+      }
+
+      const transferId = `opt_${hash.slice(0, 8)}`;
+
+      return {
+        transferId,
+        chunkIndex,
+        totalChunks,
+        fileName,
+        fileSize,
+        mimeType,
+        isCompressed,
+        base64Data: payload,
+        encodedPayload: raw,
+        hash,
+        isParity: false,
+      };
     }
 
-    return {
-      transferId,
-      chunkIndex,
-      totalChunks,
-      fileName,
-      fileSize,
-      mimeType,
-      isCompressed,
-      base64Data,
-      encodedPayload: raw,
-      hash: frameHash || undefined,
-      isParity: false,
-    };
+    const parts5 = splitFirstN(trimmed, ":", 4);
+    if (parts5.length === 5) {
+      const [, idxStr, totalStr, hash, payload] = parts5;
+      const chunkIndex = parseInt(idxStr, 10);
+      const totalChunks = parseInt(totalStr, 10);
+
+      if (
+        isNaN(chunkIndex) ||
+        isNaN(totalChunks) ||
+        chunkIndex < 0 ||
+        totalChunks <= 0 ||
+        chunkIndex >= totalChunks ||
+        !hash ||
+        !payload
+      ) {
+        return null;
+      }
+
+      const transferId = `opt_${hash.slice(0, 8)}`;
+
+      return {
+        transferId,
+        chunkIndex,
+        totalChunks,
+        fileName: "payload.bin",
+        fileSize: 0,
+        mimeType: "application/octet-stream",
+        isCompressed: false,
+        base64Data: payload,
+        encodedPayload: raw,
+        hash,
+        isParity: false,
+      };
+    }
+
+    return null;
   } catch {
     return null;
   }
@@ -290,20 +367,22 @@ export interface ParsedParityFrame {
 }
 
 /**
- * Parses an incoming optical parity frame (QP1|<g>/<S>|<sessionHash>|<base64 xor>[|<lastChunkLen>]).
+ * Parses an incoming optical parity frame (QP2:<g>:<S>:<HASH>:<lastLen>:<base45 xor>.).
  */
 export function parseOpticalParityFrame(raw: string): ParsedParityFrame | null {
   try {
-    if (!raw || typeof raw !== "string" || !raw.startsWith("QP1|")) return null;
-    const parts = raw.split("|");
-    if (parts.length < 4) return null;
+    if (!raw || typeof raw !== "string" || !raw.startsWith("QP2:") || !raw.endsWith(".")) {
+      return null;
+    }
 
-    const groupParts = parts[1].split("/");
-    if (groupParts.length !== 2) return null;
-    const group = parseInt(groupParts[0], 10);
-    const totalGroups = parseInt(groupParts[1], 10);
-    const sessionHash = parts[2];
-    const base64Data = parts[3];
+    const trimmed = raw.slice(0, -1);
+    const parts = splitFirstN(trimmed, ":", 5);
+    if (parts.length !== 6) return null;
+
+    const [, gStr, SStr, sessionHash, lastLenStr, base45Data] = parts;
+    const group = parseInt(gStr, 10);
+    const totalGroups = parseInt(SStr, 10);
+    const lastLen = parseInt(lastLenStr, 10);
 
     if (
       isNaN(group) ||
@@ -312,28 +391,23 @@ export function parseOpticalParityFrame(raw: string): ParsedParityFrame | null {
       totalGroups <= 0 ||
       group >= totalGroups ||
       !sessionHash ||
-      !base64Data
+      !base45Data
     ) {
       return null;
     }
 
-    let lastChunkLen: number | undefined = undefined;
-    if (parts.length >= 5 && parts[4]) {
-      const len = parseInt(parts[4], 10);
-      if (!isNaN(len) && len >= 0) {
-        lastChunkLen = len;
-      }
-    }
+    const xorBytes = decodeBase45(base45Data);
+    if (!xorBytes) return null;
 
-    const xorBytes = base64ToBytes(base64Data);
     return {
       group,
       totalGroups,
       sessionHash,
       xorBytes,
-      lastChunkLen,
+      lastChunkLen: isNaN(lastLen) || lastLen <= 0 ? undefined : lastLen,
     };
-  } catch {
+  } catch (err) {
+    console.log("PARSE_ERR:", err);
     return null;
   }
 }
@@ -380,13 +454,13 @@ export class OpticalDataCollector {
   }
 
   async ingestFrame(raw: string): Promise<IngestResult> {
-    if (!raw || typeof raw !== "string") return { status: "invalid" };
+    if (!raw || typeof raw !== "string" || !raw.endsWith(".")) return { status: "invalid" };
 
-    if (raw.startsWith("QP1|")) {
+    if (raw.startsWith("QP2:")) {
       return this.ingestParityFrame(raw);
     }
 
-    if (raw.startsWith("QS1|")) {
+    if (raw.startsWith("QS2:")) {
       return this.ingestDataFrame(raw);
     }
 
@@ -461,10 +535,11 @@ export class OpticalDataCollector {
       return { status: "completed", payload: this.completedPayload };
     }
 
-    // Decode base64 to binary
+    // Decode base45 to binary
     if (!this.chunks.has(frame.chunkIndex)) {
       try {
-        const bytes = base64ToBytes(frame.base64Data);
+        const bytes = decodeBase45(frame.base64Data);
+        if (!bytes) return { status: "invalid" };
         this.chunks.set(frame.chunkIndex, bytes);
       } catch {
         return { status: "invalid" };
@@ -530,7 +605,7 @@ export class OpticalDataCollector {
         }
 
         let finalChunkBytes = recovered;
-        if (missingIdx === K - 1 && parity.lastChunkLen !== undefined) {
+        if (missingIdx === K - 1 && parity.lastChunkLen !== undefined && parity.lastChunkLen > 0) {
           finalChunkBytes = recovered.slice(0, parity.lastChunkLen);
         }
 
