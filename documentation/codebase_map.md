@@ -294,7 +294,7 @@ flowchart TD
 - **Exports:** `useHtml5Scanner(): UseHtml5ScannerReturn`, `UseHtml5ScannerReturn`
 
 #### `src/hooks/useQuadScanner.ts`
-- **Purpose:** Multi-layout camera scanner hook supporting 3x2, 2x2, and 1x1 grid decoding. Captures video via `getUserMedia`, runs 10fps loop, and decodes frames using native `BarcodeDetector` or `jsQR` multi-region splitting (`decodeGrid`) with auto-layout candidate rotation (`pickLayout`). Completely separates video DOM insertions and removals from React reconciliation.
+- **Purpose:** Multi-layout camera scanner hook supporting 2x2, 2x3, and 1x1 grid decoding. Captures video via `getUserMedia`, runs 10fps loop, and decodes frames using native `BarcodeDetector` or `jsQR` multi-region splitting (`decodeGrid`) with auto-layout candidate rotation (`pickLayout`). Completely separates video DOM insertions and removals from React reconciliation.
 - **Exports:** `useQuadScanner(): UseQuadScannerReturn`, `pickLayout`, `LAYOUT_CANDIDATES`, `UseQuadScannerReturn`.
 
 ---
@@ -310,7 +310,7 @@ flowchart TD
 - **Exports:** `RECOVERY_WORDS`, `wordToIndex`.
 
 #### `src/lib/quadDecode.ts`
-- **Purpose:** Multi-region image grid splitting (3x2, 2x2, 1x1) with 8% overlap padding on inner edges for multi-QR camera stream decoding. Decodes regions with `decodeGrid`, `decodeQuadrants`, and `jsqrDecodeOne`.
+- **Purpose:** Multi-region image grid splitting (2x2, 2x3, 1x1) with 8% overlap padding on inner edges for multi-QR camera stream decoding. Decodes regions with `decodeGrid`, `decodeQuadrants`, and `jsqrDecodeOne`.
 - **Exports:** `cropImageData`, `getGridRects`, `decodeGrid`, `decodeQuadrants`, `jsqrDecodeOne`.
 
 #### `src/lib/opticalRecovery.ts`
@@ -391,5 +391,5 @@ flowchart TD
 ---
 
 ## 4. Sprint Status: All Sprints Completed & Production Verified
-All seventeen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 3x2 grid layout, auto-layout detection, and human-readable word recovery codes) are fully implemented, verified with 188 passing unit tests across 32 test suites, zero lint warnings, and production build ready.
+All eighteen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, and human-readable word recovery codes) are fully implemented, verified with 188 passing unit tests across 32 test suites, zero lint warnings, and production build ready.
 ```

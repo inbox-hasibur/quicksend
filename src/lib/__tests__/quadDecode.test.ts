@@ -87,9 +87,9 @@ describe("quadDecode", () => {
     expect(result).toBeNull();
   });
 
-  it("should split into 6 regions for 3x2 grid with 8% overlap padding", () => {
-    const W = 900;
-    const H = 600;
+  it("should split into 6 regions for 2x3 grid with 8% overlap padding", () => {
+    const W = 600;
+    const H = 900;
     const img = createTestImageData(W, H);
     const recordedCrops: Array<{ width: number; height: number }> = [];
 
@@ -98,26 +98,26 @@ describe("quadDecode", () => {
       return `QS2:cell${recordedCrops.length}`;
     });
 
-    const results = decodeGrid(img, 3, 2, fakeDecodeOne);
+    const results = decodeGrid(img, 2, 3, fakeDecodeOne);
     expect(recordedCrops.length).toBe(6);
     expect(results.length).toBe(6);
 
-    const padX = Math.round(W * 0.08); // 72
-    const padY = Math.round(H * 0.08); // 48
+    const padX = Math.round(W * 0.08); // 48
+    const padY = Math.round(H * 0.08); // 72
     const baseW = 300;
     const baseH = 300;
 
     // TL cell (c=0, r=0): right & bottom inner edges padded
-    expect(recordedCrops[0].width).toBe(baseW + padX); // 372
-    expect(recordedCrops[0].height).toBe(baseH + padY); // 348
+    expect(recordedCrops[0].width).toBe(baseW + padX); // 348
+    expect(recordedCrops[0].height).toBe(baseH + padY); // 372
 
-    // Center-top cell (c=1, r=0): left, right & bottom inner edges padded
-    expect(recordedCrops[1].width).toBe(baseW + 2 * padX); // 444
-    expect(recordedCrops[1].height).toBe(baseH + padY); // 348
+    // TR cell (c=1, r=0): left & bottom inner edges padded
+    expect(recordedCrops[1].width).toBe(baseW + padX); // 348
+    expect(recordedCrops[1].height).toBe(baseH + padY); // 372
 
-    // TR cell (c=2, r=0): left & bottom inner edges padded
-    expect(recordedCrops[2].width).toBe(baseW + padX); // 372
-    expect(recordedCrops[2].height).toBe(baseH + padY); // 348
+    // Center-left cell (c=0, r=1): right & top & bottom inner edges padded
+    expect(recordedCrops[2].width).toBe(baseW + padX); // 348
+    expect(recordedCrops[2].height).toBe(baseH + 2 * padY); // 444
   });
 
   it("should handle 1x1 grid as full image with no padding", () => {

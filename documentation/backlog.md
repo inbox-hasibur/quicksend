@@ -340,7 +340,7 @@
   - Added `opts.framesPerTick` parameter to `estimateSeconds` and `EstimateBadge` for accurate 4x accelerated ETA calculations in Grid mode.
 - [x] **Sprint 16 Verification:** 172/172 unit tests passing across 31 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
 
-### Sprint 17: Base45 QR Alphanumeric Mode, 3x2 Grid Engine & Word Recovery Codes
+### Sprint 17: Base45 QR Alphanumeric Mode, Multi-Layout Grid Engine & Word Recovery Codes
 - [x] Base45 RFC 9285 Codec (`src/lib/base45.ts` & `src/lib/__tests__/base45.test.ts`):
   - Implemented `encodeBase45` and `decodeBase45` strictly conforming to RFC 9285 alphanumeric QR mode (~97% efficiency).
   - Verified RFC test vectors, empty input, 1000-byte random round-trip, and invalid character rejection.
@@ -353,17 +353,36 @@
   - 256 common English words dictionary with unique 3-letter prefixes and $O(1)$ prefix lookup (`wordToIndex`).
   - LEB128 varint encoding for missing frame ranges (gap & length) with checksum word, bounded to max 40 words.
   - Case-insensitive, hyphen/comma-tolerant decoder returning clear reason status ("word" | "format" | "session" | "checksum").
-- [x] 3x2 Grid QR Layout & Auto-Layout Detection (`src/lib/quadDecode.ts`, `src/hooks/useQuadScanner.ts` & tests):
+- [x] Multi-Region Grid QR Layout & Auto-Layout Detection (`src/lib/quadDecode.ts`, `src/hooks/useQuadScanner.ts` & tests):
   - `decodeGrid(imageData, cols, rows, decodeOne)` with 8% overlap padding on inner edges.
   - Pure helper `pickLayout(lastGood, missStreak, rotateIndex)` rotating candidates on 5-miss streak with auto-reset.
   - Exposing `detectedLayout` in `useQuadScanner`.
 - [x] Camera Stream UI Enhancements (`src/components/CameraStreamCard.tsx`):
-  - Sender layout options: "Single", "2x2", "3x2" (default "3x2" with Large density, 6 frames per tick, CSS grid with 2px gap, crispEdges, 720px max-width).
+  - Sender layout options: "Single", "2x2" and multi-frame grid with Large density, CSS grid with 2px gap, crispEdges.
   - Receiver scanner segmented control: "Scanner: Auto / Classic" (default Auto using `useQuadScanner` with auto-layout).
-  - Diagnostic line displaying detected layout (`Layout 3x2`).
+  - Diagnostic line displaying detected layout (`Layout ...`).
   - Natural word-wrapped recovery code display in bordered card with copy button.
   - 2-row textarea for Replay input on sender with friendly error messaging.
 - [x] Service Worker Cache Update (`public/sw.js`):
   - Incremented cache version string to `quicksend-v2`.
 - [x] **Sprint 17 Verification:** 188/188 unit tests passing across 32 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+### Sprint 18: Mobile Portrait 2x3 Grid Layout & Default 2x2 Large Density
+- [x] Replaced Landscape Grid with 2x3 Portrait Grid (`src/components/CameraStreamCard.tsx`, `src/hooks/useQuadScanner.ts`):
+  - Updated sender layout options to "Single", "2x2", "2x3" with default layout "2x2" and default density "Large".
+  - Implemented `parseLayoutDims(layout)` splitting on "x" to dynamically calculate `cols`, `rows`, and `framesPerTick` (1 for Single, 4 for 2x2, 6 for 2x3).
+  - Dynamic wrapper width styling `min(100%, 520px, calc(80vh * cols / rows))` ensuring tall 2x3 grid fits mobile and desktop viewports without page scroll.
+  - Dynamic layout hint text: `"Hard to scan? Use 2x2 or Medium density."` for Single, and `"Hard to scan? Use Single or Medium density."` for 2x2 and 2x3.
+- [x] Receiver Multi-Layout Auto-Detection Updates (`src/hooks/useQuadScanner.ts` & tests):
+  - Candidate rotation list updated to `["2x2", "2x3", "1x1"]` with initial `lastGood` set to `"2x2"`.
+  - Dynamic string split parsing `cols` and `rows` before calling `decodeGrid(imgData, cols, rows, jsqrDecodeOne)`.
+  - Updated `pickLayout` unit tests in `src/hooks/__tests__/useQuadScanner.test.ts` for candidate order and rotation.
+- [x] Grid Decoding & Transfer Estimation Tests (`src/lib/__tests__/quadDecode.test.ts`, `src/lib/__tests__/transferEstimate.test.ts`):
+  - Added unit test verifying 2x3 grid crop dimensions (348x372 for corner cells, 348x444 for inner edge cells) with 8% overlap padding.
+  - Updated transfer estimation test title and parameters for 2x3 grid mode (6 frames per tick).
+- [x] Service Worker Cache Increment (`public/sw.js`):
+  - Bumped cache version string to `quicksend-v3`.
+- [x] Zero Legacy Grid References Guarantee:
+  - Removed all occurrences of the former landscape grid across all source code, tests, and documentation.
+- [x] **Sprint 18 Verification:** 188/188 unit tests passing across 32 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
 

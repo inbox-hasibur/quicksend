@@ -76,7 +76,7 @@ describe("transferEstimate", () => {
     expect(est.approximate).toBe(true);
   });
 
-  it("should calculate camera transfer time with framesPerTick in 3x2 grid mode (6 frames per tick)", () => {
+  it("should calculate camera transfer time with framesPerTick in 2x3 grid mode (6 frames per tick)", () => {
     // 25 frames, 6 frames per tick, 300ms per tick
     // ceil(25 / 6) = 5 ticks * 300ms = 1500ms = 1.5 seconds
     const est = estimateSeconds("camera", 8000, {

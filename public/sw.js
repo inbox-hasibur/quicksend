@@ -1,5 +1,5 @@
 // QuickSend PWA Service Worker
-const CACHE_NAME = "quicksend-v2";
+const CACHE_NAME = "quicksend-v3";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",

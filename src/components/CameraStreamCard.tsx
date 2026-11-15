@@ -33,18 +33,23 @@ import { useTransferHistory } from "@/hooks/useTransferHistory";
 import { formatBytes } from "@/lib/chunker";
 
 type OpticalRole = "send" | "receive";
-export type CameraLayout = "single" | "2x2" | "3x2";
+export type CameraLayout = "single" | "2x2" | "2x3";
+
+export function parseLayoutDims(layout: CameraLayout): { cols: number; rows: number } {
+  if (layout === "single") return { cols: 1, rows: 1 };
+  const [cols, rows] = layout.split("x").map(Number);
+  return { cols: cols || 1, rows: rows || 1 };
+}
 
 export function getFramesPerTick(layout: CameraLayout): number {
-  if (layout === "3x2") return 6;
-  if (layout === "2x2") return 4;
-  return 1;
+  const { cols, rows } = parseLayoutDims(layout);
+  return cols * rows;
 }
 
 export function CameraStreamCard() {
   const [role, setRole] = useState<OpticalRole>("send");
 
-  // Sender state (Starts paused on Frame 1 with default 3x2 and Large density)
+  // Sender state (Starts paused on Frame 1 with default 2x2 and Large density)
   const [frames, setFrames] = useState<OpticalDataFrame[]>([]);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -53,7 +58,7 @@ export function CameraStreamCard() {
   const [isEncoding, setIsEncoding] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<OpticalChunkPreset>("large");
   const [activePayload, setActivePayload] = useState<{ files: File[]; text: string } | null>(null);
-  const [senderLayout, setSenderLayout] = useState<CameraLayout>("3x2");
+  const [senderLayout, setSenderLayout] = useState<CameraLayout>("2x2");
 
   // Sender recovery replay state
   const [isReplayOpen, setIsReplayOpen] = useState(false);
@@ -588,7 +593,7 @@ export function CameraStreamCard() {
                     options={[
                       { value: "single", label: "Single" },
                       { value: "2x2", label: "2x2" },
-                      { value: "3x2", label: "3x2" },
+                      { value: "2x3", label: "2x3" },
                     ]}
                     ariaLabel="Sender QR layout"
                   />
@@ -608,26 +613,21 @@ export function CameraStreamCard() {
               </div>
 
               <p className="text-[11px] text-[var(--text-muted)] text-center w-full">
-                Hard to scan? Use 2x2 or Medium density.
+                {senderLayout === "single"
+                  ? "Hard to scan? Use 2x2 or Medium density."
+                  : "Hard to scan? Use Single or Medium density."}
               </p>
 
               {/* QR Display Card */}
               <div className="flex flex-col items-center justify-center p-6 sm:p-8 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl">
                 {(() => {
-                  const perTick = getFramesPerTick(senderLayout);
+                  const { cols, rows } = parseLayoutDims(senderLayout);
+                  const perTick = cols * rows;
                   const tick = Math.floor(currentFrameIndex / perTick);
-                  const maxWidthClass =
-                    senderLayout === "3x2"
-                      ? "max-w-[720px]"
-                      : senderLayout === "2x2"
-                      ? "max-w-[420px]"
-                      : "max-w-[360px]";
-                  const gridColsClass =
-                    senderLayout === "3x2"
-                      ? "grid-cols-3"
-                      : senderLayout === "2x2"
-                      ? "grid-cols-2"
-                      : "grid-cols-1";
+                  const wrapperStyle =
+                    senderLayout === "single"
+                      ? { width: "min(100%, 360px)" }
+                      : { width: `min(100%, 520px, calc(80vh * ${cols} / ${rows}))` };
 
                   const tickFrames = Array.from(
                     { length: perTick },
@@ -636,9 +636,13 @@ export function CameraStreamCard() {
 
                   return (
                     <div
-                      className={`w-full ${maxWidthClass} mx-auto p-1 rounded-xl bg-white shadow-sm border border-neutral-200`}
+                      style={wrapperStyle}
+                      className="mx-auto p-1 rounded-xl bg-white shadow-sm border border-neutral-200"
                     >
-                      <div className={`grid gap-[2px] ${gridColsClass}`}>
+                      <div
+                        className="grid gap-[2px]"
+                        style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}
+                      >
                         {tickFrames.map((frame, idx) => (
                           <div
                             key={idx}
@@ -1033,7 +1037,7 @@ export function CameraStreamCard() {
                 </div>
               )}
 
-              {/* Diagnostic line: Decoded 0 | Valid 0 | Invalid 0 | Layout 3x2 | Last: none */}
+              {/* Diagnostic line: Decoded 0 | Valid 0 | Invalid 0 | Layout 2x2 | Last: none */}
               <div className="font-mono text-[11px] text-[var(--text-muted)] text-center">
                 Decoded {diagnostics.decoded} | Valid {diagnostics.valid} | Invalid {diagnostics.invalid} | Layout {scannerType === "auto" ? quadScanner.detectedLayout : "1x1"} | Last: {diagnostics.last}
               </div>

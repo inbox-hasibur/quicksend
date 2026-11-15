@@ -3,8 +3,8 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { decodeGrid, jsqrDecodeOne } from "@/lib/quadDecode";
 
-export type LayoutCandidate = "3x2" | "2x2" | "1x1";
-export const LAYOUT_CANDIDATES: LayoutCandidate[] = ["3x2", "2x2", "1x1"];
+export type LayoutCandidate = "2x2" | "2x3" | "1x1";
+export const LAYOUT_CANDIDATES: LayoutCandidate[] = ["2x2", "2x3", "1x1"];
 
 /**
  * Pure helper to pick decoding layout based on miss streaks.
@@ -57,9 +57,9 @@ export function useQuadScanner(): UseQuadScannerReturn {
 
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detectedLayout, setDetectedLayout] = useState<string>("3x2");
+  const [detectedLayout, setDetectedLayout] = useState<string>("2x2");
 
-  const lastGoodRef = useRef<LayoutCandidate>("3x2");
+  const lastGoodRef = useRef<LayoutCandidate>("2x2");
   const missStreakRef = useRef(0);
   const rotateIndexRef = useRef(0);
 
@@ -123,10 +123,10 @@ export function useQuadScanner(): UseQuadScannerReturn {
       shouldStopRef.current = false;
       setError(null);
       onDecodeRef.current = onDecode;
-      lastGoodRef.current = "3x2";
+      lastGoodRef.current = "2x2";
       missStreakRef.current = 0;
       rotateIndexRef.current = 0;
-      setDetectedLayout("3x2");
+      setDetectedLayout("2x2");
 
       // Ensure any previous session is halted
       await stop();
@@ -307,8 +307,10 @@ export function useQuadScanner(): UseQuadScannerReturn {
               // Fallback to auto-grid jsQR decode if BarcodeDetector found nothing
               if (decodedStrings.length === 0 && ctx) {
                 const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const [cols, rows] =
-                  activeCandidate === "3x2" ? [3, 2] : activeCandidate === "2x2" ? [2, 2] : [1, 1];
+                const [cStr, rStr] =
+                  activeCandidate === "1x1" ? ["1", "1"] : activeCandidate.split("x");
+                const cols = parseInt(cStr, 10) || 1;
+                const rows = parseInt(rStr, 10) || 1;
                 decodedStrings = decodeGrid(imgData, cols, rows, jsqrDecodeOne);
               }
 
