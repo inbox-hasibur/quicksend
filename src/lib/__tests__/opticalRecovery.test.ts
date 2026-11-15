@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
 import {
   encodeRecoveryCode,
+  encodeWordRecoveryCode,
   decodeRecoveryCode,
   formatMissingRanges,
   parseMissingRanges,
+  hashToWords,
+  wordsToHash,
 } from "../opticalRecovery";
 
 describe("opticalRecovery", () => {
@@ -71,6 +74,48 @@ describe("opticalRecovery", () => {
     expect(decodeRecoveryCode("QSR-811c-bad_range-00", sessionHash)).toEqual({
       ok: false,
       reason: "checksum",
+    });
+  });
+
+  describe("Human-Readable Word Recovery Codes", () => {
+    it("should map 4-char session hex hash to 2 friendly words and back", () => {
+      const [w1, w2] = hashToWords(sessionHash);
+      expect(typeof w1).toBe("string");
+      expect(typeof w2).toBe("string");
+      expect(w1.length).toBeGreaterThanOrEqual(3);
+      expect(w2.length).toBeGreaterThanOrEqual(3);
+
+      const restoredHash = wordsToHash(w1, w2);
+      expect(restoredHash).toBe("811c");
+    });
+
+    it("should encode and decode human-friendly word recovery codes", () => {
+      const missing = [21, 42, 43, 44, 45, 119];
+      const wordCode = encodeWordRecoveryCode(sessionHash, missing);
+      expect(wordCode).not.toBeNull();
+      // Should format as e.g. "word1 word2 22, 43-46, 120"
+      expect(wordCode).toMatch(/^[a-z]+ [a-z]+ 22, 43-46, 120$/);
+
+      const decoded = decodeRecoveryCode(wordCode!, sessionHash);
+      expect(decoded.ok).toBe(true);
+      expect(decoded.indices).toEqual(missing);
+    });
+
+    it("should decode direct frame numbers with whitespace or 'to' syntax", () => {
+      const missing = [42, 43, 44, 45]; // 43 to 46
+      const res = decodeRecoveryCode("43 to 46", sessionHash);
+      expect(res.ok).toBe(true);
+      expect(res.indices).toEqual(missing);
+
+      const resMixed = decodeRecoveryCode("22, 43 to 46, 120", sessionHash);
+      expect(resMixed.ok).toBe(true);
+      expect(resMixed.indices).toEqual([21, 42, 43, 44, 45, 119]);
+    });
+
+    it("should reject word code with mismatched session words", () => {
+      const res = decodeRecoveryCode("ocean sun 22, 43-46", sessionHash);
+      expect(res.ok).toBe(false);
+      expect(res.reason).toBe("session");
     });
   });
 });

@@ -79,7 +79,7 @@ export function ModeSelector() {
           displayName: "Via Camera Scan",
           icon: <Camera className="h-5 w-5" />,
           tag: "Air-Gapped",
-          speedBars: 2,
+          speedBars: 1,
           summary: "Stream files as animated QR codes scanned by the other device's camera.",
         };
       case "cable":

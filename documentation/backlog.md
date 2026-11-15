@@ -340,3 +340,23 @@
   - Added `opts.framesPerTick` parameter to `estimateSeconds` and `EstimateBadge` for accurate 4x accelerated ETA calculations in Grid mode.
 - [x] **Sprint 16 Verification:** 172/172 unit tests passing across 31 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
 
+### Sprint 17: 3x2 Grid QR Layout, High-Density Defaults & Word Recovery Codes
+- [x] Camera Mode Speed Rating Calibration (`src/components/ModeSelector.tsx`):
+  - Calibrated `Via Camera Scan` transfer speed rating from 2 bars to 1 bar (`speedBars: 1`), accurately representing optical visual transmission as the slowest transfer method.
+- [x] 3x2 Grid QR Layout & Tight Spacing (`src/components/CameraStreamCard.tsx`):
+  - Added 6-QR `Grid 3x2` layout option alongside `Grid 2x2` and `Single`.
+  - Tightened grid spacing with `gap-1 sm:gap-1.5 p-2` and reduced `marginSize={1}` to maximize QR code visual area on screen.
+  - Set `Grid 3x2` layout and `Large` QR density as the default configuration for both sender and receiver. Removed automatic density downgrades to preserve user-selected throughput.
+  - Updated playback step progression to advance by 6 frames per tick (`getFramesPerTick`) in 3x2 mode, scaling the transfer time estimate accordingly.
+- [x] Multi-Region Grid Decoding Engine (`src/lib/quadDecode.ts` & `src/hooks/useQuadScanner.ts`):
+  - Added generalized `decodeGrid(imageData, decodeOne, cols, rows)` supporting both 3x2 (6 regions) and 2x2 (4 regions) with 6% overlap padding.
+  - Updated `useQuadScanner` to support configurable `{ cols, rows }` options during camera start and rAF decoding loop.
+  - Added unit test in `src/lib/__tests__/quadDecode.test.ts` verifying 3x2 grid cropping and decoding.
+- [x] Human-Readable Word Recovery Codes (`src/lib/opticalRecovery.ts` & `src/lib/__tests__/opticalRecovery.test.ts`):
+  - Curated 256-word phonetic dictionary (`RECOVERY_WORD_LIST`) mapping session hashes to natural word pairs (`hashToWords` / `wordsToHash`).
+  - Added `encodeWordRecoveryCode` producing human-friendly codes like `river fox 22, 43-46, 120`.
+  - Updated `parseMissingRanges` to support natural language syntax such as `43 to 46` or `22, 43-46, 120`.
+  - Seamless decoding supporting word codes, direct frame numbers, and legacy `QSR-...` formats.
+- [x] **Sprint 17 Verification:** 177/177 unit tests passing across 31 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+

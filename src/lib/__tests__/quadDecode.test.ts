@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { decodeQuadrants, cropImageData, jsqrDecodeOne } from "../quadDecode";
+import { decodeQuadrants, decodeGrid, cropImageData, jsqrDecodeOne } from "../quadDecode";
 
 describe("quadDecode", () => {
   function createTestImageData(width: number, height: number): ImageData {
@@ -79,6 +79,25 @@ describe("quadDecode", () => {
     const emptyImg = createTestImageData(0, 0);
     const results = decodeQuadrants(emptyImg, () => "test");
     expect(results).toEqual([]);
+  });
+
+  it("should split into 6 cells for 3x2 grid layouts and decode each", () => {
+    const W = 900;
+    const H = 600;
+    const img = createTestImageData(W, H);
+
+    const recordedCrops: Array<{ width: number; height: number }> = [];
+    const fakeDecodeOne = vi.fn((crop: ImageData): string | null => {
+      recordedCrops.push({ width: crop.width, height: crop.height });
+      return `QS1|cell_${recordedCrops.length}`;
+    });
+
+    const results = decodeGrid(img, fakeDecodeOne, 3, 2);
+
+    expect(recordedCrops.length).toBe(6);
+    expect(results.length).toBe(6);
+    expect(results).toContain("QS1|cell_1");
+    expect(results).toContain("QS1|cell_6");
   });
 
   it("should return null from jsqrDecodeOne when no QR is present in blank image", () => {

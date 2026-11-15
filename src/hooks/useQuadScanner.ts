@@ -1,11 +1,14 @@
 "use client";
 
 import { useRef, useState, useCallback, useEffect } from "react";
-import { decodeQuadrants, jsqrDecodeOne } from "@/lib/quadDecode";
+import { decodeGrid, jsqrDecodeOne } from "@/lib/quadDecode";
 
 export interface UseQuadScannerReturn {
   containerRef: React.RefObject<HTMLDivElement | null>;
-  start: (onDecode: (decodedText: string) => void) => Promise<void>;
+  start: (
+    onDecode: (decodedText: string) => void,
+    scanOptions?: { cols?: number; rows?: number }
+  ) => Promise<void>;
   stop: () => Promise<void>;
   isRunning: boolean;
   error: string | null;
@@ -44,6 +47,7 @@ export function useQuadScanner(): UseQuadScannerReturn {
   const isStoppingRef = useRef(false);
   const isUnmountedRef = useRef(false);
   const shouldStopRef = useRef(false);
+  const gridShapeRef = useRef<{ cols: number; rows: number }>({ cols: 3, rows: 2 });
 
   // Safely stop stream, cancel loop, and remove video element
   const stop = useCallback(async (): Promise<void> => {
@@ -94,12 +98,18 @@ export function useQuadScanner(): UseQuadScannerReturn {
   }, []);
 
   const start = useCallback(
-    async (onDecode: (decodedText: string) => void): Promise<void> => {
+    async (
+      onDecode: (decodedText: string) => void,
+      scanOptions?: { cols?: number; rows?: number }
+    ): Promise<void> => {
       if (isStartingRef.current) return;
       isStartingRef.current = true;
       shouldStopRef.current = false;
       setError(null);
       onDecodeRef.current = onDecode;
+
+      if (scanOptions?.cols) gridShapeRef.current.cols = scanOptions.cols;
+      if (scanOptions?.rows) gridShapeRef.current.rows = scanOptions.rows;
 
       // Ensure any previous session is halted
       await stop();
@@ -268,10 +278,15 @@ export function useQuadScanner(): UseQuadScannerReturn {
                 }
               }
 
-              // Fallback to 4-quadrant jsQR decode if BarcodeDetector found nothing
+              // Fallback to multi-region jsQR decode if BarcodeDetector found nothing
               if (decodedStrings.length === 0 && ctx) {
                 const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                decodedStrings = decodeQuadrants(imgData, jsqrDecodeOne);
+                decodedStrings = decodeGrid(
+                  imgData,
+                  jsqrDecodeOne,
+                  gridShapeRef.current.cols,
+                  gridShapeRef.current.rows
+                );
               }
 
               for (const text of decodedStrings) {

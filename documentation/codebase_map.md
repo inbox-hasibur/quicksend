@@ -302,12 +302,12 @@ flowchart TD
 ### 3.4 Protocol & Domain Libraries (`src/lib/`)
 
 #### `src/lib/quadDecode.ts`
-- **Purpose:** 4-quadrant image splitting with 8% overlap padding on inner edges for 2x2 grid QR decoding. Decodes quadrants with `decodeQuadrants` and `jsqrDecodeOne`.
-- **Exports:** `cropImageData`, `decodeQuadrants`, `jsqrDecodeOne`.
+- **Purpose:** Multi-region image grid splitting (3x2 6-cell and 2x2 4-quadrant) with overlap padding on inner edges for multi-QR camera stream decoding. Decodes regions with `decodeGrid`, `decodeQuadrants`, and `jsqrDecodeOne`.
+- **Exports:** `cropImageData`, `decodeGrid`, `decodeQuadrants`, `jsqrDecodeOne`.
 
 #### `src/lib/opticalRecovery.ts`
-- **Purpose:** Optical Transfer typed Recovery Code encoder and decoder. Generates compact codes (`QSR-<hash>-<ranges>-<checksum>`) with base-36 range checksum, strict 600-char limit, and session validation to replay lost frames.
-- **Exports:** `encodeRecoveryCode`, `decodeRecoveryCode`, `formatMissingRanges`, `parseMissingRanges`, `DecodeRecoveryResult`.
+- **Purpose:** Optical Transfer Recovery Code encoder and decoder. Generates human-friendly 2-word phrase codes (`river fox 22, 43-46, 120`) and compact checksummed codes (`QSR-<hash>-<ranges>-<checksum>`), supporting natural range syntax (`43 to 46` or `22, 43-46, 120`) and session validation to replay lost frames.
+- **Exports:** `encodeWordRecoveryCode`, `encodeRecoveryCode`, `decodeRecoveryCode`, `hashToWords`, `wordsToHash`, `formatMissingRanges`, `parseMissingRanges`, `RECOVERY_WORD_LIST`, `DecodeRecoveryResult`.
 
 #### `src/lib/opticalDataStream.ts`
 - **Purpose:** Optical Data Stream protocol for zero-network air-gapped camera-to-screen transfer. Features sequenced animated QR carousels, FNV-1a checksums, symmetrical compression, stride-grouped XOR parity frames (`buildParityFrames`), and automatic single-packet loss reconstruction in `OpticalDataCollector`.
@@ -383,5 +383,5 @@ flowchart TD
 ---
 
 ## 4. Sprint Status: All Sprints Completed & Production Verified
-All sixteen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, typed recovery codes, and 2x2 grid quadrant decoding) are fully implemented, verified with 172 passing unit tests across 31 test suites, zero lint warnings, and production build ready.
+All seventeen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, typed recovery codes, 2x2 & 3x2 multi-grid QR decoding, high-density defaults, and human-readable word recovery codes) are fully implemented, verified with 177 passing unit tests across 31 test suites, zero lint warnings, and production build ready.
 ```

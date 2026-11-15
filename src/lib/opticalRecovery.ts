@@ -1,6 +1,7 @@
 /**
  * Optical Transfer Recovery Code Encoder & Decoder.
  * Generates compact typed recovery codes (e.g. QSR-811C-22,43-46,120-3Z)
+ * and human-friendly word-text recovery codes (e.g. river fox 22, 43-46, 120)
  * enabling the sender to replay only the frames lost to camera shake.
  */
 
@@ -8,6 +9,68 @@ export interface DecodeRecoveryResult {
   ok: boolean;
   indices?: number[];
   reason?: "format" | "session" | "checksum";
+}
+
+/**
+ * Curated 256 common, friendly 3-6 letter English words for human-readable codes.
+ * Distinct, non-confusing nouns and nature words mapping 8 bits (0-255) per word.
+ */
+export const RECOVERY_WORD_LIST = [
+  "ace", "amber", "apple", "aqua", "arch", "arrow", "atlas", "badge",
+  "barn", "beach", "beam", "bear", "bell", "berry", "bird", "blade",
+  "blue", "boat", "bold", "bolt", "book", "branch", "brave", "breeze",
+  "brick", "bridge", "bright", "brook", "brush", "cabin", "cable", "calm",
+  "camel", "camp", "canyon", "cape", "cedar", "charm", "cliff", "cloud",
+  "clover", "coast", "comet", "coral", "cove", "crane", "creek", "crest",
+  "crown", "crystal", "daisy", "dawn", "deer", "delta", "desert", "diamond",
+  "dolphin", "dove", "drift", "dune", "eagle", "echo", "ember", "emerald",
+  "falcon", "fawn", "feather", "fern", "field", "finch", "fir", "fire",
+  "flame", "flash", "flint", "flora", "flow", "forest", "fox", "frost",
+  "galaxy", "garden", "gate", "glade", "glacier", "glow", "gold", "grain",
+  "grape", "grove", "gull", "harbor", "haven", "hawk", "hazel", "hill",
+  "hollow", "horizon", "hound", "ice", "inlet", "island", "ivy", "jade",
+  "jasper", "jay", "jewel", "jungle", "kelp", "kite", "lagoon", "lake",
+  "lamp", "lane", "lark", "leaf", "light", "lily", "lime", "lion",
+  "lodge", "lotus", "lunar", "maple", "marsh", "meadow", "mesa", "mint",
+  "mist", "moon", "moss", "mountain", "nectar", "nest", "north", "nova",
+  "oak", "oasis", "ocean", "olive", "opal", "orbit", "orchid", "otter",
+  "owl", "palm", "panda", "path", "peak", "pearl", "pebble", "pine",
+  "planet", "plover", "plum", "pond", "poppy", "prairie", "prism", "quail",
+  "quartz", "quill", "rain", "raven", "ray", "reef", "ridge", "ripple",
+  "river", "robin", "rock", "rose", "ruby", "sage", "sail", "salmon",
+  "sand", "sapphire", "sea", "seal", "shadow", "shell", "shore", "silver",
+  "sky", "slate", "snow", "solar", "song", "spark", "sparrow", "spring",
+  "spruce", "star", "stone", "storm", "stream", "summit", "sun", "swan",
+  "swift", "talon", "teal", "thistle", "thorn", "tide", "tiger", "timber",
+  "topaz", "trail", "tree", "tulip", "tundra", "valley", "vapor", "vine",
+  "violet", "walnut", "wave", "well", "whale", "wheat", "willow", "wind",
+  "wing", "wolf", "wood", "wren", "zenith", "anchor", "beacon", "blaze",
+  "blossom", "canopy", "cascade", "chime", "citrus", "clover", "canyon", "comet",
+  "den", "elm", "ember", "fern", "flare", "flora", "fossil", "glade",
+  "grove", "haven", "iris", "island", "jasper", "juniper", "lapis", "meadow",
+] as const;
+
+/**
+ * Converts the first 4 hex characters of a session hash into 2 readable words.
+ */
+export function hashToWords(sessionHash: string): [string, string] {
+  if (!sessionHash || sessionHash.length < 4) {
+    return ["quick", "send"];
+  }
+  const clean = sessionHash.toLowerCase().replace(/[^0-9a-f]/g, "").padEnd(4, "0");
+  const b0 = parseInt(clean.slice(0, 2), 16) % 256;
+  const b1 = parseInt(clean.slice(2, 4), 16) % 256;
+  return [RECOVERY_WORD_LIST[b0] || "quick", RECOVERY_WORD_LIST[b1] || "send"];
+}
+
+/**
+ * Converts 2 words back to a 4-character hex hash prefix if found in word list.
+ */
+export function wordsToHash(w1: string, w2: string): string | null {
+  const i0 = (RECOVERY_WORD_LIST as readonly string[]).indexOf(w1.toLowerCase());
+  const i1 = (RECOVERY_WORD_LIST as readonly string[]).indexOf(w2.toLowerCase());
+  if (i0 === -1 || i1 === -1) return null;
+  return i0.toString(16).padStart(2, "0") + i1.toString(16).padStart(2, "0");
 }
 
 /**
@@ -48,16 +111,23 @@ export function formatMissingRanges(indices: number[]): string {
 
 /**
  * Parses 1-based range string into sorted 0-based unique frame indices.
+ * Supports comma separation, whitespace, and "to" syntax (e.g. "22, 43-46, 120" or "43 to 46").
  */
 export function parseMissingRanges(ranges: string): number[] | null {
   if (!ranges || ranges.trim() === "") return [];
 
-  const parts = ranges.split(",");
+  // Normalize delimiters: colons, commas, "to", and hyphens with surrounding spaces
+  const normalized = ranges
+    .replace(/:/g, " ")
+    .replace(/\s*-\s*|\s+to\s+/gi, "-")
+    .replace(/,/g, " ");
+
+  const parts = normalized.trim().split(/\s+/);
   const indicesSet = new Set<number>();
 
   for (const part of parts) {
     const trimmed = part.trim();
-    if (!trimmed) return null;
+    if (!trimmed) continue;
 
     if (trimmed.includes("-")) {
       const bounds = trimmed.split("-");
@@ -101,7 +171,27 @@ export function encodeRecoveryCode(
 }
 
 /**
+ * Encodes session hash and missing indices into a readable word-text recovery code.
+ * Example: "river fox 22, 43-46, 120"
+ */
+export function encodeWordRecoveryCode(
+  sessionHash: string,
+  missingIndices: number[]
+): string | null {
+  if (!sessionHash || !missingIndices || missingIndices.length === 0) return null;
+  const ranges = formatMissingRanges(missingIndices);
+  if (ranges.length > 600) return null;
+  const [w1, w2] = hashToWords(sessionHash);
+  const readableRanges = ranges.replace(/,/g, ", ");
+  return `${w1} ${w2} ${readableRanges}`;
+}
+
+/**
  * Decodes a recovery code and validates it against the current session hash.
+ * Supports:
+ * - Legacy format: QSR-<hashPrefix>-<ranges>-<checksum>
+ * - Word-text format: "river fox 22, 43-46, 120"
+ * - Direct numbers: "22, 43-46, 120" or "43 to 46"
  */
 export function decodeRecoveryCode(
   code: string,
@@ -111,32 +201,60 @@ export function decodeRecoveryCode(
     return { ok: false, reason: "format" };
   }
 
-  // Case-insensitive, strip whitespace
-  const clean = code.replace(/\s+/g, "");
-  const parts = clean.split("-");
+  const trimmed = code.trim();
 
-  // Format: QSR-<4-char-hash>-<ranges>-<2-char-checksum>
-  // ranges can contain hyphens (e.g. 43-46), so split length >= 4
-  if (parts.length < 4 || parts[0].toUpperCase() !== "QSR") {
+  // 1. Legacy QSR format: QSR-<4-char-hash>-<ranges>-<2-char-checksum>
+  const cleanQsr = trimmed.replace(/\s+/g, "");
+  if (cleanQsr.toUpperCase().startsWith("QSR-")) {
+    const parts = cleanQsr.split("-");
+    if (parts.length < 4) {
+      return { ok: false, reason: "format" };
+    }
+
+    const hashPart = parts[1].toLowerCase();
+    const expectedHashPrefix = sessionHash.slice(0, 4).toLowerCase();
+    if (hashPart !== expectedHashPrefix) {
+      return { ok: false, reason: "session" };
+    }
+
+    const checksumPart = parts[parts.length - 1].toLowerCase();
+    const rangesPart = parts.slice(2, parts.length - 1).join("-");
+
+    const expectedChecksum = computeRangesChecksum(rangesPart);
+    if (checksumPart !== expectedChecksum) {
+      return { ok: false, reason: "checksum" };
+    }
+
+    const indices = parseMissingRanges(rangesPart);
+    if (indices === null || indices.length === 0) {
+      return { ok: false, reason: "format" };
+    }
+
+    return { ok: true, indices };
+  }
+
+  // 2. Word-text format ("river fox 22, 43-46, 120") or Direct numbers ("22, 43-46")
+  const firstDigitMatch = trimmed.search(/\d/);
+  if (firstDigitMatch === -1) {
     return { ok: false, reason: "format" };
   }
 
-  const hashPart = parts[1].toLowerCase();
-  const expectedHashPrefix = sessionHash.slice(0, 4).toLowerCase();
-  if (hashPart !== expectedHashPrefix) {
-    return { ok: false, reason: "session" };
+  const textPrefix = trimmed.slice(0, firstDigitMatch).trim();
+  const rangePart = trimmed.slice(firstDigitMatch).trim();
+
+  // If words are present before digits, validate session prefix words
+  const words = textPrefix.toLowerCase().match(/[a-z]+/g) || [];
+  if (words.length >= 2) {
+    const [expW1, expW2] = hashToWords(sessionHash);
+    const w1 = words[0];
+    const w2 = words[1];
+    if (w1 !== expW1 || w2 !== expW2) {
+      return { ok: false, reason: "session" };
+    }
   }
 
-  const checksumPart = parts[parts.length - 1].toLowerCase();
-  const rangesPart = parts.slice(2, parts.length - 1).join("-");
-
-  const expectedChecksum = computeRangesChecksum(rangesPart);
-  if (checksumPart !== expectedChecksum) {
-    return { ok: false, reason: "checksum" };
-  }
-
-  const indices = parseMissingRanges(rangesPart);
-  if (indices === null) {
+  const indices = parseMissingRanges(rangePart);
+  if (indices === null || indices.length === 0) {
     return { ok: false, reason: "format" };
   }
 

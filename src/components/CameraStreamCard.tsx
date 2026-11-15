@@ -28,26 +28,36 @@ import {
   type OpticalDataFrame,
   type ReassembledPayload,
 } from "@/lib/opticalDataStream";
-import { encodeRecoveryCode, decodeRecoveryCode } from "@/lib/opticalRecovery";
+import {
+  encodeRecoveryCode,
+  encodeWordRecoveryCode,
+  decodeRecoveryCode,
+} from "@/lib/opticalRecovery";
 import { useTransferHistory } from "@/hooks/useTransferHistory";
 import { formatBytes } from "@/lib/chunker";
 
 type OpticalRole = "send" | "receive";
+export type CameraLayout = "grid-3x2" | "grid-2x2" | "single";
+
+export function getFramesPerTick(layout: CameraLayout): number {
+  if (layout === "grid-3x2") return 6;
+  if (layout === "grid-2x2") return 4;
+  return 1;
+}
 
 export function CameraStreamCard() {
   const [role, setRole] = useState<OpticalRole>("send");
 
-  // Sender state (Starts paused on Frame 1 by default)
+  // Sender state (Starts paused on Frame 1 with default Grid 3x2 and Large density)
   const [frames, setFrames] = useState<OpticalDataFrame[]>([]);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasStartedStreaming, setHasStartedStreaming] = useState(false);
   const [speedMs, setSpeedMs] = useState<number>(320); // 320ms normal speed
   const [isEncoding, setIsEncoding] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<OpticalChunkPreset>("medium");
+  const [selectedPreset, setSelectedPreset] = useState<OpticalChunkPreset>("large");
   const [activePayload, setActivePayload] = useState<{ files: File[]; text: string } | null>(null);
-  const [senderLayout, setSenderLayout] = useState<"single" | "grid">("single");
-  const [layoutHint, setLayoutHint] = useState<string | null>(null);
+  const [senderLayout, setSenderLayout] = useState<CameraLayout>("grid-3x2");
 
   // Sender recovery replay state
   const [isReplayOpen, setIsReplayOpen] = useState(false);
@@ -55,17 +65,17 @@ export function CameraStreamCard() {
   const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const [replayIndices, setReplayIndices] = useState<number[] | null>(null);
 
-  // Receiver layout and scanners
-  const [receiverLayout, setReceiverLayout] = useState<"single" | "grid">("single");
+  // Receiver layout and scanners (Default to Grid 3x2)
+  const [receiverLayout, setReceiverLayout] = useState<CameraLayout>("grid-3x2");
   const html5Scanner = useHtml5Scanner();
   const quadScanner = useQuadScanner();
 
   const isCameraActive =
-    receiverLayout === "grid" ? quadScanner.isRunning : html5Scanner.isRunning;
+    receiverLayout !== "single" ? quadScanner.isRunning : html5Scanner.isRunning;
   const isCameraStarting =
-    receiverLayout === "grid" ? false : html5Scanner.isStarting;
+    receiverLayout !== "single" ? false : html5Scanner.isStarting;
   const scannerError =
-    receiverLayout === "grid" ? quadScanner.error : html5Scanner.error;
+    receiverLayout !== "single" ? quadScanner.error : html5Scanner.error;
 
   const [showRecoveryCode, setShowRecoveryCode] = useState(false);
   const [recoveryCodeCopied, setRecoveryCodeCopied] = useState(false);
@@ -198,10 +208,8 @@ export function CameraStreamCard() {
 
   // Frame cycling loop for sender
   useEffect(() => {
-    const totalSteps =
-      senderLayout === "grid"
-        ? Math.ceil(activeFramesList.length / 4)
-        : activeFramesList.length;
+    const perTick = getFramesPerTick(senderLayout);
+    const totalSteps = Math.ceil(activeFramesList.length / perTick);
 
     if (role !== "send" || totalSteps <= 1 || !isPlaying) {
       if (playbackTimerRef.current) {
@@ -213,10 +221,10 @@ export function CameraStreamCard() {
 
     playbackTimerRef.current = setInterval(() => {
       setCurrentFrameIndex((prev) => {
-        if (senderLayout === "grid") {
-          const currentTick = Math.floor(prev / 4);
+        if (perTick > 1) {
+          const currentTick = Math.floor(prev / perTick);
           const nextTick = (currentTick + 1) % totalSteps;
-          return nextTick * 4;
+          return nextTick * perTick;
         }
         return (prev + 1) % totalSteps;
       });
@@ -231,7 +239,7 @@ export function CameraStreamCard() {
   }, [role, activeFramesList.length, isPlaying, speedMs, senderLayout]);
 
   const stopCamera = useCallback(async () => {
-    if (receiverLayout === "grid") {
+    if (receiverLayout !== "single") {
       await quadScanner.stop();
     } else {
       await html5Scanner.stop();
@@ -384,10 +392,14 @@ export function CameraStreamCard() {
       diagnosticsRef.current = { decoded: 0, valid: 0, invalid: 0, last: "none" };
       setDiagnostics({ decoded: 0, valid: 0, invalid: 0, last: "none" });
 
-      if (receiverLayout === "grid") {
-        await quadScanner.start((decodedText) => {
-          processDecodedFrame(decodedText);
-        });
+      if (receiverLayout !== "single") {
+        const is3x2 = receiverLayout === "grid-3x2";
+        await quadScanner.start(
+          (decodedText) => {
+            processDecodedFrame(decodedText);
+          },
+          { cols: is3x2 ? 3 : 2, rows: 2 }
+        );
       } else {
         // Populate camera list
         try {
@@ -431,7 +443,7 @@ export function CameraStreamCard() {
     [isCameraActive, startCamera, stopCamera]
   );
 
-  const handleReceiverLayoutChange = async (newLayout: "single" | "grid") => {
+  const handleReceiverLayoutChange = async (newLayout: CameraLayout) => {
     if (isCameraActive) {
       await stopCamera();
     }
@@ -569,42 +581,28 @@ export function CameraStreamCard() {
                 <div className="text-left w-full sm:w-auto">
                   <div className="text-xs font-bold text-[var(--text)]">QR Density &amp; Layout</div>
                   <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                    {layoutHint || "Smaller is easier to scan, larger is faster"}
+                    Grid 3x2 &amp; Large for maximum speed. Adjust down if camera struggles.
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <SegmentedControl
                     value={senderLayout}
                     onChange={(val) => {
-                      const nextLayout = val as "single" | "grid";
+                      const nextLayout = val as CameraLayout;
                       setSenderLayout(nextLayout);
                       setCurrentFrameIndex(0);
-                      if (nextLayout === "grid" && selectedPreset === "large") {
-                        setSelectedPreset("medium");
-                        setLayoutHint("Large density adjusted to Medium for 2x2 Grid mode.");
-                        if (activePayload) {
-                          encodePayload(activePayload, "medium");
-                        }
-                      } else {
-                        setLayoutHint(null);
-                      }
                     }}
                     options={[
+                      { value: "grid-3x2", label: "Grid 3x2" },
+                      { value: "grid-2x2", label: "Grid 2x2" },
                       { value: "single", label: "Single" },
-                      { value: "grid", label: "Grid 2x2" },
                     ]}
                     ariaLabel="Sender QR layout"
                   />
                   <SegmentedControl
                     value={selectedPreset}
                     onChange={(val) => {
-                      const nextPreset = val as OpticalChunkPreset;
-                      if (senderLayout === "grid" && nextPreset === "large") {
-                        setLayoutHint("Grid 2x2 recommends Small or Medium for reliable camera focus.");
-                      } else {
-                        setLayoutHint(null);
-                      }
-                      handlePresetChange(nextPreset);
+                      handlePresetChange(val as OpticalChunkPreset);
                     }}
                     options={[
                       { value: "small", label: "Small" },
@@ -617,7 +615,7 @@ export function CameraStreamCard() {
               </div>
 
               {/* QR Display Card */}
-              <div className="flex flex-col items-center justify-center p-6 sm:p-8 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl">
+              <div className="flex flex-col items-center justify-center p-4 sm:p-6 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl">
                 {senderLayout === "single" ? (
                   <div className="p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
                     <QRCodeSVG
@@ -626,18 +624,18 @@ export function CameraStreamCard() {
                       level="L"
                       bgColor="#FFFFFF"
                       fgColor="#000000"
-                      marginSize={3}
+                      marginSize={2}
                     />
                   </div>
-                ) : (
-                  <div className="w-full max-w-[420px] mx-auto grid grid-cols-2 gap-2 p-3 bg-white rounded-2xl shadow-sm border border-neutral-200">
+                ) : senderLayout === "grid-2x2" ? (
+                  <div className="w-full max-w-[400px] mx-auto grid grid-cols-2 gap-1.5 p-2 bg-white rounded-2xl shadow-sm border border-neutral-200">
                     {[0, 1, 2, 3].map((offset) => {
                       const tick = Math.floor(currentFrameIndex / 4);
                       const frame = activeFramesList[tick * 4 + offset];
                       return (
                         <div
                           key={offset}
-                          className="aspect-square flex items-center justify-center p-1 rounded-xl bg-white border border-neutral-100"
+                          className="aspect-square flex items-center justify-center p-0.5 rounded-lg bg-white border border-neutral-100 overflow-hidden"
                         >
                           {frame ? (
                             <QRCodeSVG
@@ -646,10 +644,36 @@ export function CameraStreamCard() {
                               level="L"
                               bgColor="#FFFFFF"
                               fgColor="#000000"
-                              marginSize={2}
+                              marginSize={1}
                             />
                           ) : (
-                            <div className="w-full h-full bg-white rounded-lg flex items-center justify-center text-neutral-300 font-mono text-[10px]" />
+                            <div className="w-full h-full bg-white rounded-md flex items-center justify-center text-neutral-300 font-mono text-[10px]" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="w-full max-w-[480px] mx-auto grid grid-cols-3 gap-1 sm:gap-1.5 p-2 bg-white rounded-2xl shadow-sm border border-neutral-200">
+                    {[0, 1, 2, 3, 4, 5].map((offset) => {
+                      const tick = Math.floor(currentFrameIndex / 6);
+                      const frame = activeFramesList[tick * 6 + offset];
+                      return (
+                        <div
+                          key={offset}
+                          className="aspect-square flex items-center justify-center p-0.5 rounded-lg bg-white border border-neutral-100 overflow-hidden"
+                        >
+                          {frame ? (
+                            <QRCodeSVG
+                              value={frame.encodedPayload}
+                              size={140}
+                              level="L"
+                              bgColor="#FFFFFF"
+                              fgColor="#000000"
+                              marginSize={1}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-white rounded-md flex items-center justify-center text-neutral-300 font-mono text-[10px]" />
                           )}
                         </div>
                       );
@@ -670,9 +694,10 @@ export function CameraStreamCard() {
                           : `Frame ${currentFrameIndex + 1} of ${frames.length}`
                       ) : (
                         (() => {
-                          const tick = Math.floor(currentFrameIndex / 4);
-                          const start = tick * 4 + 1;
-                          const end = Math.min(tick * 4 + 4, activeFramesList.length);
+                          const perTick = getFramesPerTick(senderLayout);
+                          const tick = Math.floor(currentFrameIndex / perTick);
+                          const start = tick * perTick + 1;
+                          const end = Math.min(tick * perTick + perTick, activeFramesList.length);
                           const prefix = replayIndices !== null ? "Replay" : "Frames";
                           return start === end
                             ? `${prefix} ${start} of ${activeFramesList.length}`
@@ -688,7 +713,7 @@ export function CameraStreamCard() {
                       totalBytes={frames[0]?.fileSize || 1}
                       frames={frames.length}
                       frameIntervalMs={speedMs}
-                      framesPerTick={senderLayout === "grid" ? 4 : 1}
+                      framesPerTick={getFramesPerTick(senderLayout)}
                     />
                   </div>
 
@@ -698,11 +723,12 @@ export function CameraStreamCard() {
                       className="h-full bg-[var(--accent)] transition-all duration-150"
                       style={{
                         width: `${
-                          senderLayout === "single"
-                            ? ((currentFrameIndex + 1) / activeFramesList.length) * 100
-                            : (Math.min(currentFrameIndex + 4, activeFramesList.length) /
-                                activeFramesList.length) *
-                              100
+                          (Math.min(
+                            currentFrameIndex + getFramesPerTick(senderLayout),
+                            activeFramesList.length
+                          ) /
+                            activeFramesList.length) *
+                          100
                         }%`,
                       }}
                     />
@@ -714,16 +740,11 @@ export function CameraStreamCard() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (senderLayout === "grid") {
-                        const totalTicks = Math.ceil(activeFramesList.length / 4);
-                        const curTick = Math.floor(currentFrameIndex / 4);
-                        const prevTick = (curTick - 1 + totalTicks) % totalTicks;
-                        setCurrentFrameIndex(prevTick * 4);
-                      } else {
-                        setCurrentFrameIndex(
-                          (prev) => (prev - 1 + activeFramesList.length) % activeFramesList.length
-                        );
-                      }
+                      const perTick = getFramesPerTick(senderLayout);
+                      const totalSteps = Math.ceil(activeFramesList.length / perTick);
+                      const curTick = Math.floor(currentFrameIndex / perTick);
+                      const prevTick = (curTick - 1 + totalSteps) % totalSteps;
+                      setCurrentFrameIndex(prevTick * perTick);
                     }}
                     className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
                     title="Previous Frame"
@@ -762,14 +783,11 @@ export function CameraStreamCard() {
                   <button
                     type="button"
                     onClick={() => {
-                      if (senderLayout === "grid") {
-                        const totalTicks = Math.ceil(activeFramesList.length / 4);
-                        const curTick = Math.floor(currentFrameIndex / 4);
-                        const nextTick = (curTick + 1) % totalTicks;
-                        setCurrentFrameIndex(nextTick * 4);
-                      } else {
-                        setCurrentFrameIndex((prev) => (prev + 1) % activeFramesList.length);
-                      }
+                      const perTick = getFramesPerTick(senderLayout);
+                      const totalSteps = Math.ceil(activeFramesList.length / perTick);
+                      const curTick = Math.floor(currentFrameIndex / perTick);
+                      const nextTick = (curTick + 1) % totalSteps;
+                      setCurrentFrameIndex(nextTick * perTick);
                     }}
                     className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
                     title="Next Frame"
@@ -858,7 +876,7 @@ export function CameraStreamCard() {
                             setRecoveryInput(e.target.value);
                             setRecoveryError(null);
                           }}
-                          placeholder="e.g. QSR-811c-22,43-46,120-3z"
+                          placeholder="e.g. river fox 22, 43-46, 120 or 22, 43-46"
                           className="flex-1 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-xs font-mono text-[var(--text)] focus:outline-none"
                         />
                         <button
@@ -927,10 +945,11 @@ export function CameraStreamCard() {
                 <span className="text-xs font-semibold text-[var(--text)]">Scanner Layout</span>
                 <SegmentedControl
                   value={receiverLayout}
-                  onChange={(val) => handleReceiverLayoutChange(val as "single" | "grid")}
+                  onChange={(val) => handleReceiverLayoutChange(val as CameraLayout)}
                   options={[
+                    { value: "grid-3x2", label: "Grid 3x2" },
+                    { value: "grid-2x2", label: "Grid 2x2" },
                     { value: "single", label: "Single" },
-                    { value: "grid", label: "Grid 2x2" },
                   ]}
                   ariaLabel="Receiver scanner layout"
                 />
@@ -940,7 +959,7 @@ export function CameraStreamCard() {
               <div className="relative w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square">
                 {/* Scanner container: always laid out, never display:none */}
                 <div
-                  ref={receiverLayout === "grid" ? quadScanner.containerRef : html5Scanner.containerRef}
+                  ref={receiverLayout !== "single" ? quadScanner.containerRef : html5Scanner.containerRef}
                   className={`relative w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square overflow-hidden rounded-2xl bg-black qs-scanner transition-opacity ${
                     !isCameraActive ? "opacity-0 pointer-events-none" : "opacity-100"
                   }`}
@@ -1088,7 +1107,9 @@ export function CameraStreamCard() {
                                 </p>
                               );
                             }
-                            const code = encodeRecoveryCode(sessionHash, missing);
+                            const wordCode = encodeWordRecoveryCode(sessionHash, missing);
+                            const fallbackCode = encodeRecoveryCode(sessionHash, missing);
+                            const code = wordCode || fallbackCode;
                             if (!code) {
                               return (
                                 <p className="text-xs text-amber-600 dark:text-amber-400">
@@ -1099,8 +1120,8 @@ export function CameraStreamCard() {
                             return (
                               <>
                                 <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-                                  <span>Missing {missing.length} frames</span>
-                                  <span className="font-mono text-[10px]">Type into sender</span>
+                                  <span>Missing {missing.length} frames • Type into sender</span>
+                                  <span className="font-mono text-[10px]">Readable code</span>
                                 </div>
                                 <div className="flex items-center gap-2">
                                   <input
