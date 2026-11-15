@@ -4,6 +4,8 @@ import {
   encodeTextToOpticalFrames,
   parseOpticalDataFrame,
   computePayloadHash,
+  buildParityFrames,
+  getTotalFrameCount,
   OpticalDataCollector,
   OPTICAL_CHUNK_PRESETS,
   type OpticalDataFrame,
@@ -185,5 +187,142 @@ describe("Optical Data Stream Protocol", () => {
         }
       }
     }
+  });
+
+  describe("XOR Parity Recovery", () => {
+    it("should calculate total frames correctly (K + ceil(K / 10))", () => {
+      expect(getTotalFrameCount(0)).toBe(0);
+      expect(getTotalFrameCount(5)).toBe(6);
+      expect(getTotalFrameCount(10)).toBe(11);
+      expect(getTotalFrameCount(11)).toBe(13); // 11 + ceil(1.1) = 11 + 2 = 13
+      expect(getTotalFrameCount(80)).toBe(88);
+    });
+
+    it("should fully recover when dropping any single data frame per group", async () => {
+      // 50 chunks of 10 bytes = 500 bytes -> S = 5 groups. Use random uncompressible bytes.
+      const rawData = new Uint8Array(500);
+      for (let i = 0; i < rawData.length; i++) rawData[i] = Math.floor(Math.random() * 256);
+      const file = new File([rawData], "parity-single.bin", { type: "application/octet-stream" });
+
+      const dataFrames = await encodeFileToOpticalFrames(file, 10);
+      const parityFrames = buildParityFrames(dataFrames, 10);
+      expect(dataFrames.length).toBe(50);
+      expect(parityFrames.length).toBe(5);
+
+      // Drop 1 data frame from each of the 5 groups: e.g. frame 0 (grp 0), 1 (grp 1), 2 (grp 2), 3 (grp 3), 4 (grp 4)
+      const droppedIndices = new Set([0, 1, 2, 3, 4]);
+      const survivingData = dataFrames.filter((f) => !droppedIndices.has(f.chunkIndex));
+
+      const collector = new OpticalDataCollector();
+      for (const df of survivingData) {
+        await collector.add(df.encodedPayload);
+      }
+      expect(collector.getProgress().receivedCount).toBe(45);
+
+      // Ingest parity frames; each group should automatically recover its missing frame
+      let finalRes = null;
+      for (const pf of parityFrames) {
+        finalRes = await collector.add(pf.encodedPayload);
+      }
+
+      expect(finalRes?.status).toBe("completed");
+      if (finalRes?.status === "completed") {
+        const restored = new Uint8Array(await finalRes.payload.blob.arrayBuffer());
+        expect(restored).toEqual(rawData);
+      }
+    });
+
+    it("should fully recover when dropping a burst of 8 consecutive data frames", async () => {
+      // 80 chunks of 10 bytes -> S = 8 groups (stride 8). Use random uncompressible bytes.
+      const rawData = new Uint8Array(800);
+      for (let i = 0; i < rawData.length; i++) rawData[i] = Math.floor(Math.random() * 256);
+      const file = new File([rawData], "parity-burst.bin", { type: "application/octet-stream" });
+
+      const dataFrames = await encodeFileToOpticalFrames(file, 10);
+      const parityFrames = buildParityFrames(dataFrames, 10);
+      expect(dataFrames.length).toBe(80);
+      expect(parityFrames.length).toBe(8);
+
+      // Drop a burst of 8 consecutive frames (indices 24..31).
+      // Since S = 8, indices 24..31 belong to groups 0, 1, 2, 3, 4, 5, 6, 7 (exactly 1 per group!)
+      const droppedIndices = new Set([24, 25, 26, 27, 28, 29, 30, 31]);
+      const survivingData = dataFrames.filter((f) => !droppedIndices.has(f.chunkIndex));
+
+      const collector = new OpticalDataCollector();
+      for (const df of survivingData) {
+        await collector.add(df.encodedPayload);
+      }
+      expect(collector.getProgress().receivedCount).toBe(72);
+
+      let finalRes = null;
+      for (const pf of parityFrames) {
+        finalRes = await collector.add(pf.encodedPayload);
+      }
+
+      expect(finalRes?.status).toBe("completed");
+      if (finalRes?.status === "completed") {
+        const restored = new Uint8Array(await finalRes.payload.blob.arrayBuffer());
+        expect(restored).toEqual(rawData);
+      }
+    });
+
+    it("should NOT recover when dropping 2 frames of the same group with parity alone", async () => {
+      const rawData = new Uint8Array(200);
+      for (let i = 0; i < rawData.length; i++) rawData[i] = i % 256;
+      const file = new File([rawData], "two-lost.bin", { type: "application/octet-stream" });
+
+      const dataFrames = await encodeFileToOpticalFrames(file, 10);
+      const parityFrames = buildParityFrames(dataFrames, 10);
+      // K = 20, S = 2 groups. Frame 0 and Frame 2 both belong to group 0 (0%2 === 2%2 === 0).
+      const droppedIndices = new Set([0, 2]);
+      const survivingData = dataFrames.filter((f) => !droppedIndices.has(f.chunkIndex));
+
+      const collector = new OpticalDataCollector();
+      for (const df of survivingData) {
+        await collector.add(df.encodedPayload);
+      }
+
+      let res = null;
+      for (const pf of parityFrames) {
+        res = await collector.add(pf.encodedPayload);
+      }
+
+      // Should still be in collecting state because group 0 had 2 missing frames
+      expect(res?.status).toBe("collecting");
+      if (res?.status === "collecting") {
+        expect(res.missingIndices).toEqual([0, 2]);
+        expect(res.receivedCount).toBe(18);
+      }
+    });
+
+    it("should restore the last short chunk with the correct length and match original bytes", async () => {
+      // 25 bytes total with chunk size 10 -> chunks: [10 bytes], [10 bytes], [5 bytes (short!)]
+      const rawData = new Uint8Array([
+        1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+        11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+        21, 22, 23, 24, 25,
+      ]);
+      const file = new File([rawData], "short-last.bin", { type: "application/octet-stream" });
+
+      const dataFrames = await encodeFileToOpticalFrames(file, 10);
+      const parityFrames = buildParityFrames(dataFrames, 10);
+      expect(dataFrames.length).toBe(3);
+
+      // Drop the final chunk (index 2) which is only 5 bytes
+      const collector = new OpticalDataCollector();
+      await collector.add(dataFrames[0].encodedPayload);
+      await collector.add(dataFrames[1].encodedPayload);
+
+      // Feed parity frame for group (2 % S)
+      const res = await collector.add(parityFrames[0].encodedPayload);
+      expect(res.status).toBe("completed");
+
+      if (res.status === "completed") {
+        expect(res.payload.fileSize).toBe(25);
+        const restored = new Uint8Array(await res.payload.blob.arrayBuffer());
+        expect(restored.length).toBe(25);
+        expect(restored).toEqual(rawData);
+      }
+    });
   });
 });

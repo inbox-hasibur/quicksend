@@ -12,6 +12,7 @@ export interface EstimateBadgeProps {
   totalBytes: number;
   frames?: number;
   frameIntervalMs?: number;
+  framesPerTick?: number;
   measuredBytesPerSec?: number;
   className?: string;
 }
@@ -21,6 +22,7 @@ export function EstimateBadge({
   totalBytes,
   frames,
   frameIntervalMs,
+  framesPerTick,
   measuredBytesPerSec,
   className = "",
 }: EstimateBadgeProps) {
@@ -31,6 +33,7 @@ export function EstimateBadge({
   const { seconds, approximate } = estimateSeconds(channel, totalBytes, {
     frames,
     frameIntervalMs,
+    framesPerTick,
     measuredBytesPerSec,
   });
 

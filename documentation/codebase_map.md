@@ -293,9 +293,29 @@ flowchart TD
 - **Purpose:** Isolated lifecycle and DOM manager for `html5-qrcode`. Completely separates scanner DOM manipulations from React reconciliation to prevent fatal `removeChild` DOM errors. Supports 2-tick rAF layout settling, zero-dimension prevention, sequential fallback constraints, camera device enumeration, and 3s video playing watchdog.
 - **Exports:** `useHtml5Scanner(): UseHtml5ScannerReturn`, `UseHtml5ScannerReturn`
 
+#### `src/hooks/useQuadScanner.ts`
+- **Purpose:** 2x2 multi-quadrant camera scanner hook. Captures video via `getUserMedia`, runs 10fps loop, and decodes 4 quadrants using native `BarcodeDetector` or `jsQR` quadrant splitting (`decodeQuadrants`). Completely separates video DOM insertions and removals from React reconciliation.
+- **Exports:** `useQuadScanner(): UseQuadScannerReturn`, `UseQuadScannerReturn`
+
 ---
 
 ### 3.4 Protocol & Domain Libraries (`src/lib/`)
+
+#### `src/lib/quadDecode.ts`
+- **Purpose:** 4-quadrant image splitting with 8% overlap padding on inner edges for 2x2 grid QR decoding. Decodes quadrants with `decodeQuadrants` and `jsqrDecodeOne`.
+- **Exports:** `cropImageData`, `decodeQuadrants`, `jsqrDecodeOne`.
+
+#### `src/lib/opticalRecovery.ts`
+- **Purpose:** Optical Transfer typed Recovery Code encoder and decoder. Generates compact codes (`QSR-<hash>-<ranges>-<checksum>`) with base-36 range checksum, strict 600-char limit, and session validation to replay lost frames.
+- **Exports:** `encodeRecoveryCode`, `decodeRecoveryCode`, `formatMissingRanges`, `parseMissingRanges`, `DecodeRecoveryResult`.
+
+#### `src/lib/opticalDataStream.ts`
+- **Purpose:** Optical Data Stream protocol for zero-network air-gapped camera-to-screen transfer. Features sequenced animated QR carousels, FNV-1a checksums, symmetrical compression, stride-grouped XOR parity frames (`buildParityFrames`), and automatic single-packet loss reconstruction in `OpticalDataCollector`.
+- **Exports:** `encodeFileToOpticalFrames`, `encodeTextToOpticalFrames`, `buildParityFrames`, `getTotalFrameCount`, `parseOpticalDataFrame`, `parseOpticalParityFrame`, `computePayloadHash`, `OpticalDataCollector`, `OPTICAL_CHUNK_PRESETS`.
+
+#### `src/lib/transferEstimate.ts`
+- **Purpose:** Universal transfer time estimation engine providing baseline transfer speeds per channel, live measured throughput overrides, optical camera frame calculations (with `framesPerTick` multiplier for 2x2 Grid mode), and human-friendly duration formatting.
+- **Exports:** `estimateSeconds`, `formatDuration`, `estimateCameraFrames`, `getPayloadBytes`, `ChannelId`.
 
 #### `src/lib/wifiQr.ts`
 - **Purpose:** Standardized Wi-Fi configuration string generator (`WIFI:T:WPA;S:...`) and parser recognized by iOS/Android camera apps, with Android intent deep-links.
@@ -363,5 +383,5 @@ flowchart TD
 ---
 
 ## 4. Sprint Status: All Sprints Completed & Production Verified
-All four core sprints (Sprint 1: Foundation & Offline PWA, Sprint 2: Core UI & Mode 1 Internet, Sprint 3: Mode 2 Same Network & Mode 3 Hotspot, Sprint 4: Mode 4 Bluetooth, History & Vercel) along with tactile redesign, dual-mode signaling store, multi-file batch streaming, SHA-256 verification, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, and interactive dark/light mode are fully implemented, verified with 95 passing unit tests across 15 test suites, zero lint warnings, and production build ready.
+All sixteen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, typed recovery codes, and 2x2 grid quadrant decoding) are fully implemented, verified with 172 passing unit tests across 31 test suites, zero lint warnings, and production build ready.
 ```

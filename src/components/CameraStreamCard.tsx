@@ -14,18 +14,21 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useHtml5Scanner } from "@/hooks/useHtml5Scanner";
+import { useQuadScanner } from "@/hooks/useQuadScanner";
 import { Dropzone } from "@/components/Dropzone";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { EstimateBadge } from "@/components/EstimateBadge";
 import {
   encodeFileToOpticalFrames,
   encodeTextToOpticalFrames,
+  buildParityFrames,
   OpticalDataCollector,
   OPTICAL_CHUNK_PRESETS,
   type OpticalChunkPreset,
   type OpticalDataFrame,
   type ReassembledPayload,
 } from "@/lib/opticalDataStream";
+import { encodeRecoveryCode, decodeRecoveryCode } from "@/lib/opticalRecovery";
 import { useTransferHistory } from "@/hooks/useTransferHistory";
 import { formatBytes } from "@/lib/chunker";
 
@@ -43,17 +46,30 @@ export function CameraStreamCard() {
   const [isEncoding, setIsEncoding] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<OpticalChunkPreset>("medium");
   const [activePayload, setActivePayload] = useState<{ files: File[]; text: string } | null>(null);
+  const [senderLayout, setSenderLayout] = useState<"single" | "grid">("single");
+  const [layoutHint, setLayoutHint] = useState<string | null>(null);
 
-  // Receiver state using isolated HTML5 scanner hook
-  const {
-    containerRef,
-    start: startScanner,
-    stop: stopScanner,
-    isRunning: isCameraActive,
-    isStarting: isCameraStarting,
-    error: scannerError,
-    getCameras,
-  } = useHtml5Scanner();
+  // Sender recovery replay state
+  const [isReplayOpen, setIsReplayOpen] = useState(false);
+  const [recoveryInput, setRecoveryInput] = useState("");
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [replayIndices, setReplayIndices] = useState<number[] | null>(null);
+
+  // Receiver layout and scanners
+  const [receiverLayout, setReceiverLayout] = useState<"single" | "grid">("single");
+  const html5Scanner = useHtml5Scanner();
+  const quadScanner = useQuadScanner();
+
+  const isCameraActive =
+    receiverLayout === "grid" ? quadScanner.isRunning : html5Scanner.isRunning;
+  const isCameraStarting =
+    receiverLayout === "grid" ? false : html5Scanner.isStarting;
+  const scannerError =
+    receiverLayout === "grid" ? quadScanner.error : html5Scanner.error;
+
+  const [showRecoveryCode, setShowRecoveryCode] = useState(false);
+  const [recoveryCodeCopied, setRecoveryCodeCopied] = useState(false);
+  const [sessionHash, setSessionHash] = useState<string | null>(null);
 
   const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
@@ -123,22 +139,27 @@ export function CameraStreamCard() {
   } | null>(null);
   const createdBlobUrlsRef = useRef<string[]>([]);
 
-  // Re-encode payload with given chunk preset
+  // Re-encode payload with given chunk preset and parity frames
   const encodePayload = useCallback(
     async (payload: { files: File[]; text: string }, preset: OpticalChunkPreset) => {
       setIsEncoding(true);
       try {
-        let encoded: OpticalDataFrame[] = [];
+        let dataFrames: OpticalDataFrame[] = [];
         const chunkSize = OPTICAL_CHUNK_PRESETS[preset];
         if (payload.files.length > 0) {
-          encoded = await encodeFileToOpticalFrames(payload.files[0], chunkSize);
+          dataFrames = await encodeFileToOpticalFrames(payload.files[0], chunkSize);
         } else if (payload.text.trim()) {
-          encoded = await encodeTextToOpticalFrames(payload.text.trim(), chunkSize);
+          dataFrames = await encodeTextToOpticalFrames(payload.text.trim(), chunkSize);
         }
-        setFrames(encoded);
+        const parityFrames = buildParityFrames(dataFrames, chunkSize);
+        const allFrames = [...dataFrames, ...parityFrames];
+        setFrames(allFrames);
         setCurrentFrameIndex(0);
         setIsPlaying(false);
         setHasStartedStreaming(false);
+        setReplayIndices(null);
+        setRecoveryInput("");
+        setRecoveryError(null);
       } catch (err) {
         console.error("Failed to encode payload to optical frames:", err);
       } finally {
@@ -147,6 +168,13 @@ export function CameraStreamCard() {
     },
     []
   );
+
+  // Active frames displayed: full stream or replayed missing subset
+  const displayedFrames =
+    replayIndices !== null
+      ? frames.filter((f) => !f.isParity && replayIndices.includes(f.chunkIndex))
+      : frames;
+  const activeFramesList = displayedFrames.length > 0 ? displayedFrames : frames;
 
   // Handle payload selection in sender mode
   const handlePayloadSelected = useCallback(
@@ -170,7 +198,12 @@ export function CameraStreamCard() {
 
   // Frame cycling loop for sender
   useEffect(() => {
-    if (role !== "send" || frames.length <= 1 || !isPlaying) {
+    const totalSteps =
+      senderLayout === "grid"
+        ? Math.ceil(activeFramesList.length / 4)
+        : activeFramesList.length;
+
+    if (role !== "send" || totalSteps <= 1 || !isPlaying) {
       if (playbackTimerRef.current) {
         clearInterval(playbackTimerRef.current);
         playbackTimerRef.current = null;
@@ -179,7 +212,14 @@ export function CameraStreamCard() {
     }
 
     playbackTimerRef.current = setInterval(() => {
-      setCurrentFrameIndex((prev) => (prev + 1) % frames.length);
+      setCurrentFrameIndex((prev) => {
+        if (senderLayout === "grid") {
+          const currentTick = Math.floor(prev / 4);
+          const nextTick = (currentTick + 1) % totalSteps;
+          return nextTick * 4;
+        }
+        return (prev + 1) % totalSteps;
+      });
     }, speedMs);
 
     return () => {
@@ -188,7 +228,15 @@ export function CameraStreamCard() {
         playbackTimerRef.current = null;
       }
     };
-  }, [role, frames.length, isPlaying, speedMs]);
+  }, [role, activeFramesList.length, isPlaying, speedMs, senderLayout]);
+
+  const stopCamera = useCallback(async () => {
+    if (receiverLayout === "grid") {
+      await quadScanner.stop();
+    } else {
+      await html5Scanner.stop();
+    }
+  }, [html5Scanner, quadScanner, receiverLayout]);
 
   // Reusable frame processor for camera frames
   const processDecodedFrame = useCallback(
@@ -214,6 +262,11 @@ export function CameraStreamCard() {
 
         // Ingest frame into collector ref directly
         const res = await collectorRef.current.add(decodedText);
+
+        const currentHash = collectorRef.current.getSessionHash();
+        if (currentHash) {
+          setSessionHash(currentHash);
+        }
 
         if (res.status === "invalid") {
           diagnosticsRef.current.invalid++;
@@ -279,7 +332,7 @@ export function CameraStreamCard() {
           completedRef.current = true;
 
           // Await scanner stop before updating finished UI state
-          await stopScanner();
+          await stopCamera();
 
           // Finalize inside try/catch
           try {
@@ -313,7 +366,7 @@ export function CameraStreamCard() {
         );
       }
     },
-    [addHistoryItem, flushDiagnostics, stopScanner]
+    [addHistoryItem, flushDiagnostics, stopCamera]
   );
 
   // Handle receiver camera initialization and scanning
@@ -323,6 +376,7 @@ export function CameraStreamCard() {
       setReceivedPayload(null);
       setScanProgress(null);
       setLastDetected(null);
+      setSessionHash(null);
       completedRef.current = false;
       collectorRef.current.reset();
       lastScannedTextRef.current = "";
@@ -330,31 +384,39 @@ export function CameraStreamCard() {
       diagnosticsRef.current = { decoded: 0, valid: 0, invalid: 0, last: "none" };
       setDiagnostics({ decoded: 0, valid: 0, invalid: 0, last: "none" });
 
-      // Populate camera list
-      try {
-        const cameras = await getCameras();
-        if (cameras.length > 0) {
-          setAvailableCameras(cameras);
-        }
-      } catch {
-        // Ignore enumeration errors
-      }
-
-      const targetCamera = overrideCameraId || selectedCameraId || undefined;
-      await startScanner(
-        (decodedText) => {
+      if (receiverLayout === "grid") {
+        await quadScanner.start((decodedText) => {
           processDecodedFrame(decodedText);
-        },
-        undefined,
-        targetCamera
-      );
-    },
-    [getCameras, processDecodedFrame, selectedCameraId, startScanner]
-  );
+        });
+      } else {
+        // Populate camera list
+        try {
+          const cameras = await html5Scanner.getCameras();
+          if (cameras.length > 0) {
+            setAvailableCameras(cameras);
+          }
+        } catch {
+          // Ignore enumeration errors
+        }
 
-  const stopCamera = useCallback(async () => {
-    await stopScanner();
-  }, [stopScanner]);
+        const targetCamera = overrideCameraId || selectedCameraId || undefined;
+        await html5Scanner.start(
+          (decodedText) => {
+            processDecodedFrame(decodedText);
+          },
+          undefined,
+          targetCamera
+        );
+      }
+    },
+    [
+      html5Scanner,
+      processDecodedFrame,
+      quadScanner,
+      receiverLayout,
+      selectedCameraId,
+    ]
+  );
 
   const handleCameraChange = useCallback(
     async (newCameraId: string) => {
@@ -368,6 +430,47 @@ export function CameraStreamCard() {
     },
     [isCameraActive, startCamera, stopCamera]
   );
+
+  const handleReceiverLayoutChange = async (newLayout: "single" | "grid") => {
+    if (isCameraActive) {
+      await stopCamera();
+    }
+    setReceiverLayout(newLayout);
+  };
+
+  const handleApplyRecoveryCode = () => {
+    if (!recoveryInput.trim()) {
+      setRecoveryError("Please enter a recovery code.");
+      return;
+    }
+    const sessionHash = frames[0]?.hash || "";
+    const decoded = decodeRecoveryCode(recoveryInput.trim(), sessionHash);
+    if (!decoded.ok) {
+      if (decoded.reason === "session") {
+        setRecoveryError("Recovery code is from a different transfer session.");
+      } else if (decoded.reason === "checksum") {
+        setRecoveryError("Recovery code checksum mismatch. Please recheck typing.");
+      } else {
+        setRecoveryError("Invalid recovery code format.");
+      }
+      return;
+    }
+
+    const validIndices = decoded.indices || [];
+    const matching = frames.filter(
+      (f) => !f.isParity && validIndices.includes(f.chunkIndex)
+    );
+    if (matching.length === 0) {
+      setRecoveryError("No matching frames found for this code.");
+      return;
+    }
+
+    setRecoveryError(null);
+    setReplayIndices(validIndices);
+    setCurrentFrameIndex(0);
+    setIsPlaying(true);
+    setHasStartedStreaming(true);
+  };
 
   // Cleanup timers and created Blob URLs when component unmounts
   useEffect(() => {
@@ -461,38 +564,98 @@ export function CameraStreamCard() {
             </div>
           ) : (
             <div className="space-y-5">
-              {/* QR Density Preset Selector */}
+              {/* QR Density and Layout Selector */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl w-full">
                 <div className="text-left w-full sm:w-auto">
-                  <div className="text-xs font-bold text-[var(--text)]">QR density</div>
+                  <div className="text-xs font-bold text-[var(--text)]">QR Density &amp; Layout</div>
                   <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                    Smaller is easier to scan, larger is faster
+                    {layoutHint || "Smaller is easier to scan, larger is faster"}
                   </div>
                 </div>
-                <SegmentedControl
-                  value={selectedPreset}
-                  onChange={(val) => handlePresetChange(val as OpticalChunkPreset)}
-                  options={[
-                    { value: "small", label: "Small" },
-                    { value: "medium", label: "Medium" },
-                    { value: "large", label: "Large" },
-                  ]}
-                  ariaLabel="QR density"
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <SegmentedControl
+                    value={senderLayout}
+                    onChange={(val) => {
+                      const nextLayout = val as "single" | "grid";
+                      setSenderLayout(nextLayout);
+                      setCurrentFrameIndex(0);
+                      if (nextLayout === "grid" && selectedPreset === "large") {
+                        setSelectedPreset("medium");
+                        setLayoutHint("Large density adjusted to Medium for 2x2 Grid mode.");
+                        if (activePayload) {
+                          encodePayload(activePayload, "medium");
+                        }
+                      } else {
+                        setLayoutHint(null);
+                      }
+                    }}
+                    options={[
+                      { value: "single", label: "Single" },
+                      { value: "grid", label: "Grid 2x2" },
+                    ]}
+                    ariaLabel="Sender QR layout"
+                  />
+                  <SegmentedControl
+                    value={selectedPreset}
+                    onChange={(val) => {
+                      const nextPreset = val as OpticalChunkPreset;
+                      if (senderLayout === "grid" && nextPreset === "large") {
+                        setLayoutHint("Grid 2x2 recommends Small or Medium for reliable camera focus.");
+                      } else {
+                        setLayoutHint(null);
+                      }
+                      handlePresetChange(nextPreset);
+                    }}
+                    options={[
+                      { value: "small", label: "Small" },
+                      { value: "medium", label: "Medium" },
+                      { value: "large", label: "Large" },
+                    ]}
+                    ariaLabel="QR density"
+                  />
+                </div>
               </div>
 
               {/* QR Display Card */}
               <div className="flex flex-col items-center justify-center p-6 sm:p-8 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl">
-                <div className="p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
-                  <QRCodeSVG
-                    value={frames[currentFrameIndex]?.encodedPayload || ""}
-                    size={280}
-                    level="L"
-                    bgColor="#FFFFFF"
-                    fgColor="#000000"
-                    marginSize={3}
-                  />
-                </div>
+                {senderLayout === "single" ? (
+                  <div className="p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
+                    <QRCodeSVG
+                      value={activeFramesList[currentFrameIndex]?.encodedPayload || ""}
+                      size={280}
+                      level="L"
+                      bgColor="#FFFFFF"
+                      fgColor="#000000"
+                      marginSize={3}
+                    />
+                  </div>
+                ) : (
+                  <div className="w-full max-w-[420px] mx-auto grid grid-cols-2 gap-2 p-3 bg-white rounded-2xl shadow-sm border border-neutral-200">
+                    {[0, 1, 2, 3].map((offset) => {
+                      const tick = Math.floor(currentFrameIndex / 4);
+                      const frame = activeFramesList[tick * 4 + offset];
+                      return (
+                        <div
+                          key={offset}
+                          className="aspect-square flex items-center justify-center p-1 rounded-xl bg-white border border-neutral-100"
+                        >
+                          {frame ? (
+                            <QRCodeSVG
+                              value={frame.encodedPayload}
+                              size={180}
+                              level="L"
+                              bgColor="#FFFFFF"
+                              fgColor="#000000"
+                              marginSize={2}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-white rounded-lg flex items-center justify-center text-neutral-300 font-mono text-[10px]" />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {/* Frame Counter & Progress Bar */}
                 <div className="w-full max-w-sm mt-5 space-y-2">
@@ -501,7 +664,21 @@ export function CameraStreamCard() {
                       {frames[0]?.fileName}
                     </span>
                     <span className="font-mono tabular-nums text-[11px]">
-                      Frame {currentFrameIndex + 1} of {frames.length}
+                      {senderLayout === "single" ? (
+                        replayIndices !== null
+                          ? `Replay ${currentFrameIndex + 1} of ${activeFramesList.length}`
+                          : `Frame ${currentFrameIndex + 1} of ${frames.length}`
+                      ) : (
+                        (() => {
+                          const tick = Math.floor(currentFrameIndex / 4);
+                          const start = tick * 4 + 1;
+                          const end = Math.min(tick * 4 + 4, activeFramesList.length);
+                          const prefix = replayIndices !== null ? "Replay" : "Frames";
+                          return start === end
+                            ? `${prefix} ${start} of ${activeFramesList.length}`
+                            : `${prefix} ${start} to ${end} of ${activeFramesList.length}`;
+                        })()
+                      )}
                     </span>
                   </div>
 
@@ -511,6 +688,7 @@ export function CameraStreamCard() {
                       totalBytes={frames[0]?.fileSize || 1}
                       frames={frames.length}
                       frameIntervalMs={speedMs}
+                      framesPerTick={senderLayout === "grid" ? 4 : 1}
                     />
                   </div>
 
@@ -519,7 +697,13 @@ export function CameraStreamCard() {
                     <div
                       className="h-full bg-[var(--accent)] transition-all duration-150"
                       style={{
-                        width: `${((currentFrameIndex + 1) / frames.length) * 100}%`,
+                        width: `${
+                          senderLayout === "single"
+                            ? ((currentFrameIndex + 1) / activeFramesList.length) * 100
+                            : (Math.min(currentFrameIndex + 4, activeFramesList.length) /
+                                activeFramesList.length) *
+                              100
+                        }%`,
                       }}
                     />
                   </div>
@@ -529,9 +713,18 @@ export function CameraStreamCard() {
                 <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
                   <button
                     type="button"
-                    onClick={() =>
-                      setCurrentFrameIndex((prev) => (prev - 1 + frames.length) % frames.length)
-                    }
+                    onClick={() => {
+                      if (senderLayout === "grid") {
+                        const totalTicks = Math.ceil(activeFramesList.length / 4);
+                        const curTick = Math.floor(currentFrameIndex / 4);
+                        const prevTick = (curTick - 1 + totalTicks) % totalTicks;
+                        setCurrentFrameIndex(prevTick * 4);
+                      } else {
+                        setCurrentFrameIndex(
+                          (prev) => (prev - 1 + activeFramesList.length) % activeFramesList.length
+                        );
+                      }
+                    }}
                     className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
                     title="Previous Frame"
                     aria-label="Previous Frame"
@@ -568,7 +761,16 @@ export function CameraStreamCard() {
 
                   <button
                     type="button"
-                    onClick={() => setCurrentFrameIndex((prev) => (prev + 1) % frames.length)}
+                    onClick={() => {
+                      if (senderLayout === "grid") {
+                        const totalTicks = Math.ceil(activeFramesList.length / 4);
+                        const curTick = Math.floor(currentFrameIndex / 4);
+                        const nextTick = (curTick + 1) % totalTicks;
+                        setCurrentFrameIndex(nextTick * 4);
+                      } else {
+                        setCurrentFrameIndex((prev) => (prev + 1) % activeFramesList.length);
+                      }
+                    }}
                     className="p-2 rounded-xl text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface)] transition-colors cursor-pointer"
                     title="Next Frame"
                     aria-label="Next Frame"
@@ -629,6 +831,69 @@ export function CameraStreamCard() {
                     </button>
                   </div>
                 </div>
+
+                {/* Collapsible Replay Missing Frames Section */}
+                <div className="w-full max-w-sm mt-4 pt-3 border-t border-[var(--border-hairline)]">
+                  <button
+                    type="button"
+                    onClick={() => setIsReplayOpen((prev) => !prev)}
+                    className="text-xs font-semibold text-[var(--accent)] hover:underline flex items-center justify-between w-full cursor-pointer"
+                  >
+                    <span>Replay missing frames</span>
+                    <span className="text-[10px] text-[var(--text-muted)] font-mono">
+                      {isReplayOpen ? "Hide ▲" : "Show ▼"}
+                    </span>
+                  </button>
+
+                  {isReplayOpen && (
+                    <div className="mt-2.5 space-y-2">
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        Enter the recovery code from the receiver to loop only frames lost to camera shake.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={recoveryInput}
+                          onChange={(e) => {
+                            setRecoveryInput(e.target.value);
+                            setRecoveryError(null);
+                          }}
+                          placeholder="e.g. QSR-811c-22,43-46,120-3z"
+                          className="flex-1 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-xs font-mono text-[var(--text)] focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleApplyRecoveryCode}
+                          className="px-3 py-1.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer"
+                        >
+                          Apply
+                        </button>
+                      </div>
+                      {recoveryError && (
+                        <p className="text-[11px] text-red-500">{recoveryError}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {replayIndices !== null && (
+                    <div className="mt-2.5 p-2 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-between text-xs">
+                      <span className="text-amber-700 dark:text-amber-400 font-medium">
+                        Replaying {replayIndices.length} missing frames
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplayIndices(null);
+                          setCurrentFrameIndex(0);
+                          setRecoveryInput("");
+                        }}
+                        className="text-[11px] font-semibold text-[var(--text)] hover:underline cursor-pointer"
+                      >
+                        Back to full stream
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Reset action */}
@@ -657,11 +922,25 @@ export function CameraStreamCard() {
         <div className="space-y-6">
           {!receivedPayload ? (
             <div className="space-y-4">
+              {/* Receiver Layout Toggle */}
+              <div className="flex items-center justify-between max-w-md mx-auto w-full">
+                <span className="text-xs font-semibold text-[var(--text)]">Scanner Layout</span>
+                <SegmentedControl
+                  value={receiverLayout}
+                  onChange={(val) => handleReceiverLayoutChange(val as "single" | "grid")}
+                  options={[
+                    { value: "single", label: "Single" },
+                    { value: "grid", label: "Grid 2x2" },
+                  ]}
+                  ariaLabel="Receiver scanner layout"
+                />
+              </div>
+
               {/* Preview first and large */}
               <div className="relative w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square">
                 {/* Scanner container: always laid out, never display:none */}
                 <div
-                  ref={containerRef}
+                  ref={receiverLayout === "grid" ? quadScanner.containerRef : html5Scanner.containerRef}
                   className={`relative w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square overflow-hidden rounded-2xl bg-black qs-scanner transition-opacity ${
                     !isCameraActive ? "opacity-0 pointer-events-none" : "opacity-100"
                   }`}
@@ -727,7 +1006,7 @@ export function CameraStreamCard() {
 
                   {/* Camera dropdown and Stop Camera button */}
                   <div className="flex items-center gap-2">
-                    {availableCameras.length > 1 && (
+                    {availableCameras.length > 1 && receiverLayout === "single" && (
                       <select
                         value={selectedCameraId || ""}
                         onChange={(e) => handleCameraChange(e.target.value)}
@@ -787,23 +1066,71 @@ export function CameraStreamCard() {
                     />
                   </div>
 
-                  {/* Visual Chunk Grid */}
-                  <div className="flex flex-wrap gap-1 pt-1">
-                    {Array.from({ length: scanProgress.totalChunks }).map((_, idx) => {
-                      const isCollected = !scanProgress.missingIndices.includes(idx);
-                      return (
-                        <div
-                          key={idx}
-                          className={`w-3.5 h-3.5 rounded-md transition-colors ${
-                            isCollected
-                              ? "bg-emerald-500 shadow-xs"
-                              : "bg-neutral-200 dark:bg-neutral-800"
-                          }`}
-                          title={`Chunk ${idx + 1}`}
-                        />
-                      );
-                    })}
-                  </div>
+                  {/* Missing frames recovery code */}
+                  {scanProgress.totalChunks > 0 && scanProgress.missingIndices.length > 0 && (
+                    <div className="pt-2 flex flex-col items-center">
+                      <button
+                        type="button"
+                        onClick={() => setShowRecoveryCode((prev) => !prev)}
+                        className="text-xs font-semibold text-[var(--accent)] hover:underline cursor-pointer"
+                      >
+                        {showRecoveryCode ? "Hide missing frames code" : "Missing frames code"}
+                      </button>
+
+                      {showRecoveryCode && (
+                        <div className="mt-2.5 p-3 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] w-full text-left space-y-2">
+                          {(() => {
+                            const missing = scanProgress.missingIndices;
+                            if (!sessionHash) {
+                              return (
+                                <p className="text-xs text-[var(--text-muted)]">
+                                  Waiting for stream session hash...
+                                </p>
+                              );
+                            }
+                            const code = encodeRecoveryCode(sessionHash, missing);
+                            if (!code) {
+                              return (
+                                <p className="text-xs text-amber-600 dark:text-amber-400">
+                                  Too many missing. Keep scanning.
+                                </p>
+                              );
+                            }
+                            return (
+                              <>
+                                <div className="flex items-center justify-between text-[11px] text-[var(--text-muted)]">
+                                  <span>Missing {missing.length} frames</span>
+                                  <span className="font-mono text-[10px]">Type into sender</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    readOnly
+                                    value={code}
+                                    className="flex-1 px-2.5 py-1.5 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] font-mono text-xs text-[var(--text)] select-all focus:outline-none"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      try {
+                                        await navigator.clipboard.writeText(code);
+                                        setRecoveryCodeCopied(true);
+                                        setTimeout(() => setRecoveryCodeCopied(false), 2000);
+                                      } catch {}
+                                    }}
+                                    className="px-3 py-1.5 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
+                                  >
+                                    {recoveryCodeCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                    {recoveryCodeCopied ? "Copied" : "Copy"}
+                                  </button>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

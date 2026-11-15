@@ -30,6 +30,7 @@ export interface EstimateOptions {
   measuredBytesPerSec?: number;
   frames?: number;
   frameIntervalMs?: number;
+  framesPerTick?: number;
 }
 
 export interface EstimateResult {
@@ -79,7 +80,8 @@ export function estimateSeconds(
   if (channel === "camera") {
     const frameIntervalMs = opts?.frameIntervalMs ?? 320;
     const framesCount = opts?.frames ?? estimateCameraFrames(totalBytes, 150);
-    const cameraSeconds = (framesCount * frameIntervalMs) / 1000;
+    const framesPerTick = Math.max(1, opts?.framesPerTick ?? 1);
+    const cameraSeconds = (Math.ceil(framesCount / framesPerTick) * frameIntervalMs) / 1000;
     return {
       seconds: cameraSeconds,
       approximate: true,

@@ -315,3 +315,28 @@
   - Added test verifying container is never given `display: none` or hidden classes on `start()`.
   - Verified `stop()` leaves zero children.
 - [x] **Sprint 15 Verification:** 153/153 unit tests passing across 28 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+### Sprint 16: Optical Parity Frames, Typed Recovery Codes & 2x2 Grid Scanning
+- [x] XOR Parity Frame Generation & Automatic Ingestion (`src/lib/opticalDataStream.ts`):
+  - Stride-grouped XOR parity frames: $S = \lceil K / 10 \rceil$ groups with group $g = i \pmod S$ to distribute bursts of camera-shake packet loss.
+  - Parity frame protocol: `QP1|<g>/<S>|<sessionHash>|<base64 xor>[|<lastChunkLen>]`.
+  - Automatic single-packet recovery in `OpticalDataCollector` whenever exactly one data chunk in a stride group is missing.
+  - Added 5 new automated tests in `src/lib/__tests__/opticalDataStream.test.ts` covering stride recovery, burst packet drops, last short chunk reconstruction, and corrupted chunk prevention.
+- [x] Typed Recovery Code System (`src/lib/opticalRecovery.ts` & `src/lib/__tests__/opticalRecovery.test.ts`):
+  - Compact format: `QSR-<hashPrefix>-<ranges>-<checksum>` where ranges is a 1-based comma-separated condensed list (e.g. `22,43-46,120`).
+  - Strict 600-character length limit, case-insensitive whitespace-tolerant decoding, 2-character base-36 range checksum, and session hash validation.
+  - Comprehensive unit test coverage with 6/6 tests.
+- [x] 2x2 Multi-Quadrant Decoding Engine (`src/lib/quadDecode.ts` & `src/hooks/useQuadScanner.ts`):
+  - 4-quadrant image splitting with 8% overlap padding on inner edges.
+  - Quadrant decoding via native `BarcodeDetector` when available, falling back to `jsQR` (`jsqrDecodeOne`).
+  - Isolated DOM video hook with 10 decodes/sec rAF loop and zero React children.
+  - Added unit tests in `src/lib/__tests__/quadDecode.test.ts` and `src/hooks/__tests__/useQuadScanner.test.ts`.
+- [x] Camera Stream UI Enhancements (`src/components/CameraStreamCard.tsx`):
+  - Sender: `Layout: Single / Grid 2x2` segmented control. In Grid mode, renders 4 synchronized `QRCodeSVG` codes with 4 frames per tick ($4t$ to $4t+3$) and blank squares for remainder; automatically adjusts Large density to Medium.
+  - Sender: Collapsible "Replay missing frames" section with typed recovery code input, checksum validation, and dedicated replay loop mode.
+  - Receiver: `Layout: Single / Grid 2x2` segmented control switching between `useHtml5Scanner` and `useQuadScanner`.
+  - Receiver: Removed chunk dots matrix grid, keeping clean progress bar; added "Missing frames code" button generating copyable recovery code with real-time missing count.
+- [x] Transfer Time Estimation Integration (`src/lib/transferEstimate.ts` & `src/components/EstimateBadge.tsx`):
+  - Added `opts.framesPerTick` parameter to `estimateSeconds` and `EstimateBadge` for accurate 4x accelerated ETA calculations in Grid mode.
+- [x] **Sprint 16 Verification:** 172/172 unit tests passing across 31 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+

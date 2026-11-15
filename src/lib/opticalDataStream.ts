@@ -2,6 +2,7 @@
  * Optical Data Stream Protocol for Zero-Network Camera-to-Screen Transfer.
  * Streams files and text as a sequenced carousel of high-contrast QR codes
  * scanned by the opposite device's camera viewfinder.
+ * Includes XOR parity frames for automatic packet recovery and typed recovery codes.
  */
 
 export interface OpticalDataFrame {
@@ -15,6 +16,9 @@ export interface OpticalDataFrame {
   base64Data: string;
   encodedPayload: string;
   hash?: string;
+  isParity?: boolean;
+  parityGroup?: number;
+  totalParityGroups?: number;
 }
 
 export interface ReassembledPayload {
@@ -48,6 +52,23 @@ export function computePayloadHash(bytes: Uint8Array): string {
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+export function base64ToBytes(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i);
+  }
+  return bytes;
+}
+
+export function bytesToBase64(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  return btoa(bin);
 }
 
 /**
@@ -94,12 +115,7 @@ export async function encodeFileToOpticalFrames(
     const end = Math.min(start + chunkSize, dataBytes.length);
     const slice = dataBytes.slice(start, end);
 
-    // Convert slice to base64
-    let binary = "";
-    for (let b = 0; b < slice.length; b++) {
-      binary += String.fromCharCode(slice[b]);
-    }
-    const base64Data = btoa(binary);
+    const base64Data = bytesToBase64(slice);
 
     // Protocol format: QS1|<transferId>|<index>|<total>|<fileName>|<fileSize>|<mimeType>|<isCompressed>|<base64>|<hash>
     const encodedPayload = `QS1|${transferId}|${i}|${totalChunks}|${safeFileName}|${file.size}|${safeMime}|${isCompressed ? 1 : 0}|${base64Data}|${hash}`;
@@ -115,6 +131,7 @@ export async function encodeFileToOpticalFrames(
       base64Data,
       encodedPayload,
       hash,
+      isParity: false,
     });
   }
 
@@ -134,10 +151,77 @@ export async function encodeTextToOpticalFrames(
 }
 
 /**
+ * Builds XOR parity frames across data frames using stride grouping (i % S).
+ * S = ceil(K / 10). Each group g carries the XOR of all zero-padded chunks in group g.
+ */
+export function buildParityFrames(
+  dataFrames: OpticalDataFrame[],
+  chunkSize: number = DEFAULT_CHUNK_RAW_BYTES
+): OpticalDataFrame[] {
+  const K = dataFrames.length;
+  if (K === 0) return [];
+
+  const S = Math.ceil(K / 10);
+  const sessionHash = dataFrames[0]?.hash || computePayloadHash(new Uint8Array(0));
+  const parityFrames: OpticalDataFrame[] = [];
+
+  const lastChunkBytes = base64ToBytes(dataFrames[K - 1].base64Data);
+  const lastChunkLen = lastChunkBytes.length;
+  const lastChunkGroup = (K - 1) % S;
+  const hasShortFinalChunk = lastChunkLen < chunkSize;
+
+  for (let g = 0; g < S; g++) {
+    const groupFrames = dataFrames.filter((_, idx) => idx % S === g);
+    const xorBuffer = new Uint8Array(chunkSize);
+
+    for (const df of groupFrames) {
+      const bytes = base64ToBytes(df.base64Data);
+      for (let b = 0; b < bytes.length; b++) {
+        xorBuffer[b] ^= bytes[b];
+      }
+    }
+
+    const base64Xor = bytesToBase64(xorBuffer);
+    const isLastGroup = g === lastChunkGroup && hasShortFinalChunk;
+    const encodedPayload = isLastGroup
+      ? `QP1|${g}/${S}|${sessionHash}|${base64Xor}|${lastChunkLen}`
+      : `QP1|${g}/${S}|${sessionHash}|${base64Xor}`;
+
+    parityFrames.push({
+      transferId: dataFrames[0]?.transferId || "parity",
+      chunkIndex: K + g,
+      totalChunks: K + S,
+      fileName: dataFrames[0]?.fileName || "parity",
+      fileSize: dataFrames[0]?.fileSize || 0,
+      mimeType: "application/x-parity",
+      isCompressed: false,
+      base64Data: base64Xor,
+      encodedPayload,
+      hash: sessionHash,
+      isParity: true,
+      parityGroup: g,
+      totalParityGroups: S,
+    });
+  }
+
+  return parityFrames;
+}
+
+/**
+ * Calculates total frames including data and parity frames: K + ceil(K / 10).
+ */
+export function getTotalFrameCount(dataFrameCount: number): number {
+  if (dataFrameCount <= 0) return 0;
+  return dataFrameCount + Math.ceil(dataFrameCount / 10);
+}
+
+export const totalFrameCount = getTotalFrameCount;
+
+/**
  * Validates whether a scanned QR string matches the QuickSend optical data frame signature.
  */
 export function isOpticalDataFrame(payload: string): boolean {
-  return typeof payload === "string" && payload.startsWith("QS1|");
+  return typeof payload === "string" && (payload.startsWith("QS1|") || payload.startsWith("QP1|"));
 }
 
 /**
@@ -190,6 +274,64 @@ export function parseOpticalDataFrame(raw: string): OpticalDataFrame | null {
       base64Data,
       encodedPayload: raw,
       hash: frameHash || undefined,
+      isParity: false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface ParsedParityFrame {
+  group: number;
+  totalGroups: number;
+  sessionHash: string;
+  xorBytes: Uint8Array;
+  lastChunkLen?: number;
+}
+
+/**
+ * Parses an incoming optical parity frame (QP1|<g>/<S>|<sessionHash>|<base64 xor>[|<lastChunkLen>]).
+ */
+export function parseOpticalParityFrame(raw: string): ParsedParityFrame | null {
+  try {
+    if (!raw || typeof raw !== "string" || !raw.startsWith("QP1|")) return null;
+    const parts = raw.split("|");
+    if (parts.length < 4) return null;
+
+    const groupParts = parts[1].split("/");
+    if (groupParts.length !== 2) return null;
+    const group = parseInt(groupParts[0], 10);
+    const totalGroups = parseInt(groupParts[1], 10);
+    const sessionHash = parts[2];
+    const base64Data = parts[3];
+
+    if (
+      isNaN(group) ||
+      isNaN(totalGroups) ||
+      group < 0 ||
+      totalGroups <= 0 ||
+      group >= totalGroups ||
+      !sessionHash ||
+      !base64Data
+    ) {
+      return null;
+    }
+
+    let lastChunkLen: number | undefined = undefined;
+    if (parts.length >= 5 && parts[4]) {
+      const len = parseInt(parts[4], 10);
+      if (!isNaN(len) && len >= 0) {
+        lastChunkLen = len;
+      }
+    }
+
+    const xorBytes = base64ToBytes(base64Data);
+    return {
+      group,
+      totalGroups,
+      sessionHash,
+      xorBytes,
+      lastChunkLen,
     };
   } catch {
     return null;
@@ -219,10 +361,11 @@ export type IngestResult =
 
 /**
  * Reactive collector that reassembles frames in any order and triggers completion callback.
+ * Automatically recovers missing data chunks using XOR parity frames.
  */
 export class OpticalDataCollector {
   private transferId: string | null = null;
-  private totalChunks: number = 0;
+  private totalChunks: number = 0; // K data chunks
   private fileName: string = "";
   private fileSize: number = 0;
   private mimeType: string = "";
@@ -230,18 +373,66 @@ export class OpticalDataCollector {
   private expectedHash: string | null = null;
   private completedPayload: ReassembledPayload | null = null;
   private chunks: Map<number, Uint8Array> = new Map();
+  private parityGroups: Map<number, ParsedParityFrame> = new Map();
 
-  /**
-   * Alias for ingestFrame to support both collector.add(frame) and collector.ingestFrame(frame).
-   */
   async add(raw: string): Promise<IngestResult> {
     return this.ingestFrame(raw);
   }
 
-  /**
-   * Ingests a scanned frame string.
-   */
   async ingestFrame(raw: string): Promise<IngestResult> {
+    if (!raw || typeof raw !== "string") return { status: "invalid" };
+
+    if (raw.startsWith("QP1|")) {
+      return this.ingestParityFrame(raw);
+    }
+
+    if (raw.startsWith("QS1|")) {
+      return this.ingestDataFrame(raw);
+    }
+
+    return { status: "invalid" };
+  }
+
+  private async ingestParityFrame(raw: string): Promise<IngestResult> {
+    const parity = parseOpticalParityFrame(raw);
+    if (!parity) return { status: "invalid" };
+
+    if (this.expectedHash && this.expectedHash !== parity.sessionHash) {
+      this.reset();
+    }
+    this.expectedHash = parity.sessionHash;
+    this.parityGroups.set(parity.group, parity);
+
+    if (this.completedPayload) {
+      return { status: "completed", payload: this.completedPayload };
+    }
+
+    if (this.totalChunks > 0) {
+      this.tryRecover();
+      if (this.chunks.size === this.totalChunks) {
+        return await this.reassemble();
+      }
+    }
+
+    const receivedCount = this.chunks.size;
+    const percentage =
+      this.totalChunks > 0
+        ? Math.min(100, Math.round((receivedCount / this.totalChunks) * 100))
+        : 0;
+
+    return {
+      status: "collecting",
+      transferId: this.transferId || "",
+      fileName: this.fileName,
+      fileSize: this.fileSize,
+      totalChunks: this.totalChunks,
+      receivedCount,
+      percentage,
+      missingIndices: this.getMissingIndices(),
+    };
+  }
+
+  private async ingestDataFrame(raw: string): Promise<IngestResult> {
     const frame = parseOpticalDataFrame(raw);
     if (!frame) return { status: "invalid" };
 
@@ -273,32 +464,22 @@ export class OpticalDataCollector {
     // Decode base64 to binary
     if (!this.chunks.has(frame.chunkIndex)) {
       try {
-        const binary = atob(frame.base64Data);
-        const bytes = new Uint8Array(binary.length);
-        for (let i = 0; i < binary.length; i++) {
-          bytes[i] = binary.charCodeAt(i);
-        }
+        const bytes = base64ToBytes(frame.base64Data);
         this.chunks.set(frame.chunkIndex, bytes);
       } catch {
         return { status: "invalid" };
       }
     }
 
-    const receivedCount = this.chunks.size;
-    const percentage = Math.min(100, Math.round((receivedCount / this.totalChunks) * 100));
+    // Attempt parity recovery for any group with 1 missing chunk
+    this.tryRecover();
 
-    // Calculate missing chunk indices
-    const missingIndices: number[] = [];
-    for (let i = 0; i < this.totalChunks; i++) {
-      if (!this.chunks.has(i)) {
-        missingIndices.push(i);
-      }
-    }
-
-    // Check if fully received
     if (this.chunks.size === this.totalChunks) {
       return await this.reassemble();
     }
+
+    const receivedCount = this.chunks.size;
+    const percentage = Math.min(100, Math.round((receivedCount / this.totalChunks) * 100));
 
     return {
       status: "collecting",
@@ -308,8 +489,71 @@ export class OpticalDataCollector {
       totalChunks: this.totalChunks,
       receivedCount,
       percentage,
-      missingIndices,
+      missingIndices: this.getMissingIndices(),
     };
+  }
+
+  /**
+   * Attempts automatic XOR recovery across parity groups with exactly 1 missing chunk.
+   */
+  private tryRecover(): boolean {
+    if (this.totalChunks <= 0 || this.parityGroups.size === 0) {
+      return false;
+    }
+
+    const K = this.totalChunks;
+    const S = Math.ceil(K / 10);
+    let recoveredAny = false;
+
+    for (let g = 0; g < S; g++) {
+      const parity = this.parityGroups.get(g);
+      if (!parity) continue;
+
+      const groupIndices: number[] = [];
+      for (let i = g; i < K; i += S) {
+        groupIndices.push(i);
+      }
+
+      const missingInGroup = groupIndices.filter((idx) => !this.chunks.has(idx));
+
+      if (missingInGroup.length === 1) {
+        const missingIdx = missingInGroup[0];
+        const recovered = new Uint8Array(parity.xorBytes);
+
+        for (const presentIdx of groupIndices) {
+          if (presentIdx !== missingIdx) {
+            const chunkBytes = this.chunks.get(presentIdx)!;
+            for (let b = 0; b < chunkBytes.length; b++) {
+              recovered[b] ^= chunkBytes[b];
+            }
+          }
+        }
+
+        let finalChunkBytes = recovered;
+        if (missingIdx === K - 1 && parity.lastChunkLen !== undefined) {
+          finalChunkBytes = recovered.slice(0, parity.lastChunkLen);
+        }
+
+        this.chunks.set(missingIdx, finalChunkBytes);
+        recoveredAny = true;
+      }
+    }
+
+    return recoveredAny;
+  }
+
+  getMissingIndices(): number[] {
+    const missing: number[] = [];
+    for (let i = 0; i < this.totalChunks; i++) {
+      if (!this.chunks.has(i)) {
+        missing.push(i);
+      }
+    }
+    return missing;
+  }
+
+  getSessionHash(): string | null {
+    return this.expectedHash;
   }
 
   private async reassemble(): Promise<
@@ -395,6 +639,7 @@ export class OpticalDataCollector {
     this.expectedHash = null;
     this.completedPayload = null;
     this.chunks.clear();
+    this.parityGroups.clear();
   }
 
   getProgress() {

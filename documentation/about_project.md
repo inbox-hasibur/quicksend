@@ -65,9 +65,9 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 
 ### Mode 5: Share via Camera (Air-Gapped Optical QR Stream)
 - **Primary Use Case:** Completely air-gapped file and text transfer with **zero networks, zero internet, zero Wi-Fi, and zero Bluetooth**.
-- **Visual Streaming Engine:**
-  - **Sender:** Compresses files with Deflate, slices into compact base64 chunks (`QS1|...`), and cycles an animated high-contrast QR stream with speed controls (Slow 500ms, Normal 320ms, Fast 220ms) and frame scrubbers.
-  - **Receiver:** Points camera viewfinder at sender's screen; reactive `OpticalDataCollector` captures frames in any order, tracks visual progress blocks, reassembles original Blob/file upon 100% completion, verifies data, and triggers download.
+- **Visual Streaming & Parity Engine:**
+  - **Sender:** Compresses files with Deflate, slices into compact base64 chunks (`QS1|...`), appends stride-grouped XOR parity frames (`QP1|...`) for automatic frame loss recovery, and cycles an animated high-contrast QR stream with speed controls (Slow 500ms, Normal 320ms, Fast 220ms) and frame scrubbers. Supports Single QR mode and high-throughput 2x2 Grid mode (4 frames per tick). Includes collapsible "Replay missing frames" section driven by typed recovery codes.
+  - **Receiver:** Points camera viewfinder at sender's screen; reactive `OpticalDataCollector` captures frames in any order, tracks visual progress blocks, reconstructs dropped packets using XOR parity, supports typed recovery codes for replaying lost frames, reassembles original Blob/file upon 100% completion, verifies FNV-1a data checksum, and triggers download. Supports both Single camera scanner (`useHtml5Scanner`) and 2x2 multi-quadrant scanner (`useQuadScanner`).
 
 ---
 
@@ -270,7 +270,8 @@ quicksend/
     │   ├── __tests__/
     │   │   ├── FileTypeBadge.test.tsx
     │   │   ├── SegmentedControl.test.tsx
-    │   │   └── SpeedIndicator.test.tsx
+    │   │   ├── SpeedIndicator.test.tsx
+    │   │   └── UltrasonicCard.test.tsx
     │   ├── AppHeader.tsx
     │   ├── CableTransferCard.tsx
     │   ├── CameraStreamCard.tsx
@@ -291,17 +292,20 @@ quicksend/
     │   ├── SpeedIndicator.tsx
     │   ├── ThemeToggle.tsx
     │   ├── TransferHistoryModal.tsx
-    │   └── TransferModal.tsx
+    │   ├── TransferModal.tsx
+    │   └── UltrasonicCard.tsx
     ├── hooks/
     │   ├── __tests__/
     │   │   ├── useHtml5Scanner.test.ts
     │   │   ├── useLocalDiscovery.test.tsx
+    │   │   ├── useQuadScanner.test.ts
     │   │   ├── useTheme.test.tsx
     │   │   └── useTransferHistory.test.ts
     │   ├── useHtml5Scanner.ts
     │   ├── useLocalDiscovery.ts
     │   ├── useNearbyShare.ts
     │   ├── useNetworkStatus.ts
+    │   ├── useQuadScanner.ts
     │   ├── useTheme.ts
     │   ├── useTransferHistory.ts
     │   └── useWebRTC.ts
@@ -315,9 +319,12 @@ quicksend/
     │   │   ├── modeAvailability.test.ts
     │   │   ├── nearbyShare.test.ts
     │   │   ├── opticalDataStream.test.ts
+    │   │   ├── opticalRecovery.test.ts
     │   │   ├── opticalSdp.test.ts
+    │   │   ├── quadDecode.test.ts
     │   │   ├── signalStore.test.ts
     │   │   ├── transferEstimate.test.ts
+    │   │   ├── ultrasonicStream.test.ts
     │   │   └── wifiQr.test.ts
     │   ├── chunker.ts
     │   ├── codeGenerator.ts
@@ -326,10 +333,13 @@ quicksend/
     │   ├── iceConfig.ts
     │   ├── modeAvailability.ts
     │   ├── opticalDataStream.ts
+    │   ├── opticalRecovery.ts
     │   ├── opticalSdp.ts
+    │   ├── quadDecode.ts
     │   ├── signalStore.ts
     │   ├── signalingClient.ts
     │   ├── transferEstimate.ts
+    │   ├── ultrasonicStream.ts
     │   └── wifiQr.ts
     └── types/
         ├── mode.ts
