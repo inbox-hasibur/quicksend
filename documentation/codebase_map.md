@@ -62,6 +62,7 @@ flowchart TD
         SpeedInd["SpeedIndicator.tsx (Solid High-Contrast Speed Indicator)"]
         HistoryMod["TransferHistoryModal.tsx (Ephemeral Session Transfer Drawer)"]
         FileTypeBdg["FileTypeBadge.tsx (Color-coded file type chips PDF, IMG, DOC, etc.)"]
+        EstimateBdg["EstimateBadge.tsx (Channel Transfer Time Estimation Badge)"]
         SegControl["SegmentedControl.tsx (Tactile Pill Track & Keyboard Navigation)"]
         ThemeTgl["ThemeToggle.tsx (Tactile Dark/Light Mode Toggle)"]
     end
@@ -87,6 +88,7 @@ flowchart TD
         DiskStream["diskStream.ts (File System Access Disk Streaming Fallback)"]
         WifiQr["wifiQr.ts (buildWifiQrString, parseWifiQrString, ANDROID_INTENTS)"]
         OpticalSdp["opticalSdp.ts (encodeOpticalSdp, decodeOpticalSdp, compactSdp)"]
+        TransferEst["transferEstimate.ts (Channel Transfer Time & Duration Formatter)"]
     end
 
     subgraph Src_Types["src/types/ (TypeScript Domain Interfaces)"]

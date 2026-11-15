@@ -12,12 +12,14 @@ import {
   Users,
 } from "lucide-react";
 import { Dropzone } from "@/components/Dropzone";
+import { EstimateBadge } from "@/components/EstimateBadge";
 import { QRCodeDisplay } from "@/components/QRCodeDisplay";
 import { QRScannerModal } from "@/components/QRScannerModal";
 import { TransferModal } from "@/components/TransferModal";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
+import { getPayloadBytes } from "@/lib/transferEstimate";
 import type { TransferRole } from "@/types/mode";
 
 type KeyStrategy = "auto" | "phone" | "keyword" | "qr";
@@ -265,7 +267,13 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               </div>
 
               {/* Payload Dropzone */}
-              <Dropzone onSelectionChange={setSelectedPayload} />
+              <div className="space-y-2">
+                <Dropzone onSelectionChange={setSelectedPayload} />
+                <EstimateBadge
+                  channel="internet"
+                  totalBytes={getPayloadBytes(selectedPayload.files, selectedPayload.text)}
+                />
+              </div>
 
               {/* Primary Action Button */}
               <button

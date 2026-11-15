@@ -15,6 +15,7 @@ import {
 import type { TransferProgressState } from "@/types/transfer";
 import { formatBytes, formatSpeed } from "@/lib/chunker";
 import { FileTypeBadge } from "@/components/FileTypeBadge";
+import { estimateSeconds, formatDuration } from "@/lib/transferEstimate";
 
 interface TransferModalProps {
   progress: TransferProgressState;
@@ -215,39 +216,57 @@ export function TransferModal({
           )}
 
           {/* 2. Transferring view */}
-          {progress.status === "transferring" && (
-            <div className="space-y-3">
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs font-mono text-neutral-500 tabular-nums">
-                  <span className="font-bold text-neutral-800 dark:text-neutral-200">
-                    {progress.progressPercentage}%
-                  </span>
-                  <span className="font-bold text-[var(--accent)]">
-                    {formatSpeed(progress.speedBps)}
-                  </span>
-                </div>
-                <div className="w-full h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
-                  <div
-                    className="h-full bg-[var(--accent)] transition-all duration-150 ease-out rounded-full"
-                    style={{ width: `${progress.progressPercentage}%` }}
-                  />
-                </div>
-                <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400 tabular-nums">
-                  <span>{formatBytes(progress.bytesTransferred)}</span>
-                  <span>{formatBytes(progress.totalBytes)}</span>
-                </div>
-              </div>
+          {progress.status === "transferring" && (() => {
+            const remainingBytes = Math.max(0, progress.totalBytes - progress.bytesTransferred);
+            const { seconds: remainingSeconds } = estimateSeconds("internet", remainingBytes, {
+              measuredBytesPerSec: progress.speedBps,
+            });
+            const remainingDuration =
+              progress.speedBps > 0 && remainingBytes > 0
+                ? formatDuration(remainingSeconds)
+                : null;
 
-              {progress.totalFiles && progress.totalFiles > 1 && progress.totalBatchBytes && (
-                <div className="p-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-indigo-700 dark:text-indigo-300 font-mono flex items-center justify-between">
-                  <span>Batch Progress:</span>
-                  <span className="font-bold">
-                    File {progress.fileIndex || 1} of {progress.totalFiles} ({formatBytes(progress.totalBatchBytes)})
-                  </span>
+            return (
+              <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-mono text-neutral-500 tabular-nums">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-neutral-800 dark:text-neutral-200">
+                        {progress.progressPercentage}%
+                      </span>
+                      {remainingDuration && (
+                        <span className="text-[11px] text-[var(--text-muted)] font-normal">
+                          ETA: ~{remainingDuration}
+                        </span>
+                      )}
+                    </div>
+                    <span className="font-bold text-[var(--accent)]">
+                      {formatSpeed(progress.speedBps)}
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-neutral-100 dark:bg-neutral-800 overflow-hidden">
+                    <div
+                      className="h-full bg-[var(--accent)] transition-all duration-150 ease-out rounded-full"
+                      style={{ width: `${progress.progressPercentage}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400 tabular-nums">
+                    <span>{formatBytes(progress.bytesTransferred)}</span>
+                    <span>{formatBytes(progress.totalBytes)}</span>
+                  </div>
                 </div>
-              )}
-            </div>
-          )}
+
+                {progress.totalFiles && progress.totalFiles > 1 && progress.totalBatchBytes && (
+                  <div className="p-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-100 dark:border-indigo-900/40 text-[11px] text-indigo-700 dark:text-indigo-300 font-mono flex items-center justify-between">
+                    <span>Batch Progress:</span>
+                    <span className="font-bold">
+                      File {progress.fileIndex || 1} of {progress.totalFiles} ({formatBytes(progress.totalBatchBytes)})
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* 3. Completed view */}
           {progress.status === "completed" && (

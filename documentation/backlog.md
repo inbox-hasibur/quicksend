@@ -243,3 +243,28 @@
   - Hash integrity mismatch error test.
   - Preset capacity test ensuring all presets stay within QR bounds (<= 500 chars for large).
 - [x] **Sprint 12 Verification:** 143/143 unit tests passing across 26 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+### Sprint 13: Universal Transfer Time Estimation & Channel Estimate Badges
+- [x] Create Transfer Time Estimation Engine (`src/lib/transferEstimate.ts`):
+  - Baseline default throughput constants: internet (1.5 MB/s), same-network (15 MB/s), hotspot (6 MB/s), bluetooth (0.8 MB/s), cable (40 MB/s), with 1s fixed handshake overhead.
+  - Camera optical transfer calculation based on frames count and frame interval ms (Slow 500ms, Normal 320ms, Fast 220ms) without handshake overhead.
+  - Live measured throughput override (`measuredBytesPerSec`) using actual bytes transferred / speed for exact real-time ETA (`approximate: false`).
+  - Human-friendly duration formatter (`formatDuration`) producing `"under 1 sec"`, `"12 sec"`, `"3 min 20 sec"`, `"1 hr 5 min"`.
+  - Exported `estimateCameraFrames(totalBytes, chunkRawBytes)` and `getPayloadBytes(files, text)` helpers.
+- [x] Create Reusable `EstimateBadge` Component (`src/components/EstimateBadge.tsx`):
+  - Renders compact, neutral `rounded-xl` muted row with Lucide `Clock` icon and text `Estimated time: ~3 min 20 sec (approx.)`.
+  - Automatically hidden when payload size is 0 bytes (`totalBytes <= 0`).
+- [x] Remove Large Payload Advisory Banner (`src/components/CameraStreamCard.tsx`):
+  - Deleted warning banner block and threshold check.
+  - Embedded `EstimateBadge` directly under file name and frame counter, dynamically updating when speed or QR density changes.
+- [x] Add Estimate Badges Across All Channels:
+  - `InternetSharingCard.tsx`: rendered directly below Dropzone using channel `"internet"`.
+  - `SameNetworkCard.tsx`: rendered directly below Dropzone using channel `"same-network"`.
+  - `HotspotAssistantCard.tsx`: rendered directly below Dropzone using channel `"hotspot"`.
+  - `NearbyShareCard.tsx`: rendered directly below Dropzone using channel `"bluetooth"`.
+  - `CableTransferCard.tsx`: rendered directly below Dropzone using channel `"cable"`.
+- [x] TransferModal Live ETA (`src/components/TransferModal.tsx`):
+  - Calculates remaining duration during live transfer using `estimateSeconds("internet", remainingBytes, { measuredBytesPerSec })` and formats with `formatDuration`.
+- [x] Unit Tests (`src/lib/__tests__/transferEstimate.test.ts`):
+  - Validated channel default speeds + 1s overhead, measured speed override, camera frames calculation, duration formatting edge cases, and zero bytes handling.
+- [x] **Sprint 13 Verification:** 148/148 unit tests passing across 27 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.

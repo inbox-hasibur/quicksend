@@ -19,11 +19,13 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Dropzone } from "@/components/Dropzone";
+import { EstimateBadge } from "@/components/EstimateBadge";
 import { TransferModal } from "@/components/TransferModal";
 import { QRScannerModal } from "@/components/QRScannerModal";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useLocalDiscovery, type NearbyPeer } from "@/hooks/useLocalDiscovery";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
+import { getPayloadBytes } from "@/lib/transferEstimate";
 
 function generateLanSessionCode(): string {
   return `lan${Math.floor(100000 + Math.random() * 900000)}`;
@@ -266,6 +268,10 @@ export function SameNetworkCard() {
             setSelectedPayload(payload);
             setErrorMsg(null);
           }}
+        />
+        <EstimateBadge
+          channel="same-network"
+          totalBytes={getPayloadBytes(selectedPayload.files, selectedPayload.text)}
         />
         {targetPeer && (selectedPayload.files.length > 0 || selectedPayload.text.trim().length > 0) && (
           <button

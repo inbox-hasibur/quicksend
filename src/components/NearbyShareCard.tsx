@@ -15,9 +15,11 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { Dropzone } from "@/components/Dropzone";
+import { EstimateBadge } from "@/components/EstimateBadge";
 import { useNearbyShare } from "@/hooks/useNearbyShare";
 import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
 import { ANDROID_INTENTS } from "@/lib/wifiQr";
+import { getPayloadBytes } from "@/lib/transferEstimate";
 
 export function NearbyShareCard() {
   const [selectedPayload, setSelectedPayload] = useState<{ files: File[]; text: string }>({
@@ -125,6 +127,10 @@ export function NearbyShareCard() {
             1. Select Files or Text to Handoff
           </span>
           <Dropzone onSelectionChange={setSelectedPayload} />
+          <EstimateBadge
+            channel="bluetooth"
+            totalBytes={getPayloadBytes(selectedPayload.files, selectedPayload.text)}
+          />
         </div>
 
         <button

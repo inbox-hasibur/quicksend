@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Dropzone } from "@/components/Dropzone";
+import { EstimateBadge } from "@/components/EstimateBadge";
 import { TransferModal } from "@/components/TransferModal";
 import { QRScannerModal } from "@/components/QRScannerModal";
 import { SegmentedControl } from "@/components/SegmentedControl";
@@ -25,6 +26,7 @@ import { SpeedIndicator } from "@/components/SpeedIndicator";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { ANDROID_INTENTS } from "@/lib/wifiQr";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
+import { getPayloadBytes } from "@/lib/transferEstimate";
 
 type CableTab = "network" | "hardware";
 
@@ -239,6 +241,10 @@ export function CableTransferCard() {
               1. Select Files or Text to Send
             </span>
             <Dropzone onSelectionChange={setSelectedPayload} />
+            <EstimateBadge
+              channel="cable"
+              totalBytes={getPayloadBytes(selectedPayload.files, selectedPayload.text)}
+            />
           </div>
 
           {/* 1-Tap Connect / Host Section */}

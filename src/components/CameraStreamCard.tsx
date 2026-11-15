@@ -11,13 +11,13 @@ import {
   Copy,
   Check,
   RotateCcw,
-  AlertTriangle,
   Upload,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Html5Qrcode } from "html5-qrcode";
 import { Dropzone } from "@/components/Dropzone";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { EstimateBadge } from "@/components/EstimateBadge";
 import {
   encodeFileToOpticalFrames,
   encodeTextToOpticalFrames,
@@ -605,19 +605,6 @@ export function CameraStreamCard() {
                 />
               </div>
 
-              {/* Large Payload Advisory Banner (> 300 frames) */}
-              {frames.length > 300 && (
-                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div className="space-y-0.5">
-                    <p className="font-semibold">Large Payload Advisory ({frames.length} frames)</p>
-                    <p className="text-[11px] opacity-90 leading-relaxed">
-                      Optical scanning will take approximately ~{Math.ceil((frames.length * (speedMs / 1000)) / 60)} min. For faster transfer of files over 500 KB, Same Wi-Fi or Internet mode is recommended.
-                    </p>
-                  </div>
-                </div>
-              )}
-
               {/* QR Display Card */}
               <div className="flex flex-col items-center justify-center p-6 sm:p-8 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl">
                 <div className="p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
@@ -640,6 +627,15 @@ export function CameraStreamCard() {
                     <span className="font-mono tabular-nums text-[11px]">
                       Frame {currentFrameIndex + 1} of {frames.length}
                     </span>
+                  </div>
+
+                  <div className="flex justify-center">
+                    <EstimateBadge
+                      channel="camera"
+                      totalBytes={frames[0]?.fileSize || 1}
+                      frames={frames.length}
+                      frameIntervalMs={speedMs}
+                    />
                   </div>
 
                   {/* Progress bar */}

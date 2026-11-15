@@ -272,8 +272,10 @@ quicksend/
     │   │   ├── SegmentedControl.test.tsx
     │   │   └── SpeedIndicator.test.tsx
     │   ├── AppHeader.tsx
+    │   ├── CableTransferCard.tsx
     │   ├── CameraStreamCard.tsx
     │   ├── Dropzone.tsx
+    │   ├── EstimateBadge.tsx
     │   ├── FileTypeBadge.tsx
     │   ├── HotspotAssistantCard.tsx
     │   ├── InternetSharingCard.tsx
@@ -313,6 +315,7 @@ quicksend/
     │   │   ├── opticalDataStream.test.ts
     │   │   ├── opticalSdp.test.ts
     │   │   ├── signalStore.test.ts
+    │   │   ├── transferEstimate.test.ts
     │   │   └── wifiQr.test.ts
     │   ├── chunker.ts
     │   ├── codeGenerator.ts
@@ -324,6 +327,7 @@ quicksend/
     │   ├── opticalSdp.ts
     │   ├── signalStore.ts
     │   ├── signalingClient.ts
+    │   ├── transferEstimate.ts
     │   └── wifiQr.ts
     └── types/
         ├── mode.ts
