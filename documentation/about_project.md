@@ -66,8 +66,8 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 ### Mode 5: Share via Camera (Air-Gapped Optical QR Stream)
 - **Primary Use Case:** Completely air-gapped file and text transfer with **zero networks, zero internet, zero Wi-Fi, and zero Bluetooth**.
 - **Visual Streaming & Parity Engine:**
-  - **Sender:** Compresses files with Deflate, encodes into compact Base45 alphanumeric chunks (`QS2:...`), appends stride-grouped XOR parity frames (`QP2:...`) for automatic frame loss recovery, and cycles an animated high-contrast QR stream with speed controls (Slow 500ms, Normal 320ms, Fast 220ms) and frame scrubbers. Defaults to high-throughput `2x2` Grid layout (4 frames per tick) with `Large` QR density (supports portrait `2x3` 6-frame grid, dynamic aspect-ratio sizing, 2px gap, crispEdges). Includes collapsible "Replay missing frames" section driven by human-readable word recovery codes.
-  - **Receiver:** Points camera viewfinder at sender's screen; reactive `OpticalDataCollector` captures frames in any order, tracks visual progress blocks, reconstructs dropped packets using XOR parity, supports human-friendly word recovery codes for replaying lost frames, reassembles original Blob/file upon 100% completion, verifies FNV-1a data checksum, and triggers download. Supports Auto scanner (`useQuadScanner` with automatic candidate rotation across 2x2, 2x3, and 1x1) and Classic scanner (`useHtml5Scanner`).
+  - **Sender:** Compresses files with Deflate, encodes into compact Base45 alphanumeric chunks (`QS2:...`), appends stride-grouped XOR parity frames (`QP2:...`) for automatic frame loss recovery, and cycles an animated high-contrast QR stream with speed controls (Slow 500ms, Normal 320ms, Fast 220ms) and frame scrubbers. Defaults to reliable `Single` layout with `Medium` QR density (with optional high-throughput `2x2` and portrait `2x3` grids) and real-time duration estimates via `EstimateBadge`. Includes collapsible "Replay missing frames" section driven by human-readable word recovery codes.
+  - **Receiver:** Points camera viewfinder at sender's screen; reactive `OpticalDataCollector` captures frames in any order, tracks visual progress blocks, reconstructs dropped packets using XOR parity, supports human-friendly word recovery codes for replaying lost frames, reassembles original Blob/file upon 100% completion, verifies FNV-1a data checksum, triggers safe auto-download, and renders a prominent "Save / Download File" card action. Supports Auto scanner (`useQuadScanner` starting with `1x1` single-QR auto-detection and rotating to `2x2`/`2x3` with persistent 720p recycled canvas to eliminate tab crashes) and Classic scanner (`useHtml5Scanner`).
 
 ---
 
@@ -272,6 +272,7 @@ quicksend/
     ├── components/
     │   ├── __tests__/
     │   │   ├── CableTransferCard.test.tsx
+    │   │   ├── CameraStreamCard.test.tsx
     │   │   ├── ConnectionDiagnostics.test.tsx
     │   │   ├── FileTypeBadge.test.tsx
     │   │   ├── HotspotAssistantCard.test.tsx

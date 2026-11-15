@@ -58,18 +58,28 @@ self.addEventListener("fetch", (event) => {
       fetch(request)
         .then((response) => {
           // If valid response, clone and cache
-          if (response.status === 200) {
+          if (response && response.status === 200 && (response.type === "basic" || response.type === "default")) {
             const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
           }
-          return response;
+          if (response && (response.ok || response.type === "opaqueredirect")) {
+            return response;
+          }
+          // Server error status: attempt cached shell fallback before failing
+          return caches.match(request, { ignoreSearch: true })
+            .then((cached) => cached || caches.match("/"))
+            .then((shell) => shell || response);
         })
         .catch(async () => {
-          // When offline, serve cached app shell (ignoring query strings like ?room=...)
-          const cached = await caches.match(request, { ignoreSearch: true });
-          if (cached) return cached;
-          const shell = await caches.match("/");
-          if (shell) return shell;
+          try {
+            // When offline or network failed, serve cached app shell
+            const cached = await caches.match(request, { ignoreSearch: true });
+            if (cached) return cached;
+            const shell = await caches.match("/");
+            if (shell) return shell;
+          } catch {
+            // Ignore cache match error
+          }
           return new Response("Offline - QuickSend app shell unavailable", {
             status: 503,
             headers: { "Content-Type": "text/plain" },
@@ -93,13 +103,13 @@ self.addEventListener("fetch", (event) => {
       caches.match(request).then((cachedResponse) => {
         const fetchPromise = fetch(request)
           .then((networkResponse) => {
-            if (networkResponse.status === 200) {
+            if (networkResponse && networkResponse.status === 200) {
               const copy = networkResponse.clone();
-              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
             }
             return networkResponse;
           })
-          .catch(() => cachedResponse);
+          .catch(() => cachedResponse || new Response(null, { status: 404, statusText: "Not Found" }));
 
         return cachedResponse || fetchPromise;
       })
@@ -107,8 +117,24 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Default network with cache fallback
+  // Default network with safe cache and 404 fallback (never returns undefined)
   event.respondWith(
-    fetch(request).catch(() => caches.match(request))
+    fetch(request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200 && (networkResponse.type === "basic" || networkResponse.type === "default")) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
+        }
+        return networkResponse;
+      })
+      .catch(async () => {
+        try {
+          const cached = await caches.match(request);
+          if (cached) return cached;
+        } catch {
+          // Ignore cache match error
+        }
+        return new Response(null, { status: 404, statusText: "Not Found" });
+      })
   );
 });

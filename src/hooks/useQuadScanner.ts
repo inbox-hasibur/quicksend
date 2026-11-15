@@ -3,8 +3,8 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 import { decodeGrid, jsqrDecodeOne } from "@/lib/quadDecode";
 
-export type LayoutCandidate = "2x2" | "2x3" | "1x1";
-export const LAYOUT_CANDIDATES: LayoutCandidate[] = ["2x2", "2x3", "1x1"];
+export type LayoutCandidate = "1x1" | "2x2" | "2x3";
+export const LAYOUT_CANDIDATES: LayoutCandidate[] = ["1x1", "2x2", "2x3"];
 
 /**
  * Pure helper to pick decoding layout based on miss streaks.
@@ -54,12 +54,13 @@ export function useQuadScanner(): UseQuadScannerReturn {
   const streamRef = useRef<MediaStream | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const onDecodeRef = useRef<((decodedText: string) => void) | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [detectedLayout, setDetectedLayout] = useState<string>("2x2");
+  const [detectedLayout, setDetectedLayout] = useState<string>("1x1");
 
-  const lastGoodRef = useRef<LayoutCandidate>("2x2");
+  const lastGoodRef = useRef<LayoutCandidate>("1x1");
   const missStreakRef = useRef(0);
   const rotateIndexRef = useRef(0);
 
@@ -110,6 +111,11 @@ export function useQuadScanner(): UseQuadScannerReturn {
         }
       }
 
+      if (canvasRef.current) {
+        canvasRef.current.width = 0;
+        canvasRef.current.height = 0;
+      }
+
       setIsRunning(false);
     } finally {
       isStoppingRef.current = false;
@@ -123,10 +129,10 @@ export function useQuadScanner(): UseQuadScannerReturn {
       shouldStopRef.current = false;
       setError(null);
       onDecodeRef.current = onDecode;
-      lastGoodRef.current = "2x2";
+      lastGoodRef.current = "1x1";
       missStreakRef.current = 0;
       rotateIndexRef.current = 0;
-      setDetectedLayout("2x2");
+      setDetectedLayout("1x1");
 
       // Ensure any previous session is halted
       await stop();
@@ -251,7 +257,10 @@ export function useQuadScanner(): UseQuadScannerReturn {
         return;
       }
 
-      const canvas = document.createElement("canvas");
+      if (!canvasRef.current && typeof document !== "undefined") {
+        canvasRef.current = document.createElement("canvas");
+      }
+      const canvas = canvasRef.current || document.createElement("canvas");
       const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
       let barcodeDetector: BarcodeDetectorInstance | null = null;
@@ -277,12 +286,26 @@ export function useQuadScanner(): UseQuadScannerReturn {
           if (video.videoWidth > 0 && video.videoHeight > 0) {
             isProcessing = true;
             try {
-              if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+              // Cap maximum decode dimensions to 720px to prevent mobile memory spikes and tab crashes
+              const maxDim = 720;
+              let targetW = video.videoWidth;
+              let targetH = video.videoHeight;
+              if (targetW > maxDim || targetH > maxDim) {
+                if (targetW >= targetH) {
+                  targetH = Math.round((targetH * maxDim) / targetW);
+                  targetW = maxDim;
+                } else {
+                  targetW = Math.round((targetW * maxDim) / targetH);
+                  targetH = maxDim;
+                }
               }
 
-              ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+              if (canvas.width !== targetW || canvas.height !== targetH) {
+                canvas.width = targetW;
+                canvas.height = targetH;
+              }
+
+              ctx?.drawImage(video, 0, 0, targetW, targetH);
 
               let decodedStrings: string[] = [];
 
@@ -355,6 +378,7 @@ export function useQuadScanner(): UseQuadScannerReturn {
       isUnmountedRef.current = true;
       shouldStopRef.current = true;
       stop().catch(() => {});
+      canvasRef.current = null;
     };
   }, [stop]);
 

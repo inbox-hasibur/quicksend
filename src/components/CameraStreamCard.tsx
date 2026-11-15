@@ -49,16 +49,16 @@ export function getFramesPerTick(layout: CameraLayout): number {
 export function CameraStreamCard() {
   const [role, setRole] = useState<OpticalRole>("send");
 
-  // Sender state (Starts paused on Frame 1 with default 2x2 and Large density)
+  // Sender state (Starts paused on Frame 1 with default Single layout and Medium density)
   const [frames, setFrames] = useState<OpticalDataFrame[]>([]);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasStartedStreaming, setHasStartedStreaming] = useState(false);
   const [speedMs, setSpeedMs] = useState<number>(320); // 320ms normal speed
   const [isEncoding, setIsEncoding] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<OpticalChunkPreset>("large");
+  const [selectedPreset, setSelectedPreset] = useState<OpticalChunkPreset>("medium");
   const [activePayload, setActivePayload] = useState<{ files: File[]; text: string } | null>(null);
-  const [senderLayout, setSenderLayout] = useState<CameraLayout>("2x2");
+  const [senderLayout, setSenderLayout] = useState<CameraLayout>("single");
 
   // Sender recovery replay state
   const [isReplayOpen, setIsReplayOpen] = useState(false);
@@ -359,6 +359,22 @@ export function CameraStreamCard() {
               status: "completed",
               textSnippet: res.payload.text?.substring(0, 100),
             });
+
+            // Trigger safe automated download for files
+            if (!res.payload.text) {
+              try {
+                const url = URL.createObjectURL(res.payload.blob);
+                createdBlobUrlsRef.current.push(url);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = res.payload.fileName || "downloaded-file";
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+              } catch (dlErr) {
+                console.debug("Auto download trigger error:", dlErr);
+              }
+            }
           } catch (finalizeErr) {
             setCameraError(
               finalizeErr instanceof Error
@@ -1162,32 +1178,34 @@ export function CameraStreamCard() {
                 )}
               </div>
 
-              <div className="flex flex-wrap justify-center gap-3 pt-2">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2 max-w-sm mx-auto w-full">
                 {receivedPayload.text ? (
                   <button
                     type="button"
                     onClick={handleCopyText}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-xs shadow-xs transition-opacity cursor-pointer"
+                    className="w-full py-3 px-5 rounded-2xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-opacity flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                    {copied ? "Copied!" : "Copy Text"}
+                    {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
+                    <span>{copied ? "Copied to Clipboard!" : "Copy Text"}</span>
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={handleDownloadReceived}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-xs transition-opacity cursor-pointer"
+                    className="w-full py-3 px-5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-xs transition-opacity flex items-center justify-center gap-2 cursor-pointer"
                   >
-                    <Download className="w-4 h-4" /> Save file
+                    <Download className="w-4 h-4" />
+                    <span>Save / Download File</span>
                   </button>
                 )}
 
                 <button
                   type="button"
                   onClick={() => startCamera()}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] font-medium text-xs hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
+                  className="w-full sm:w-auto py-2.5 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] font-semibold text-xs hover:bg-[var(--surface-subtle)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" /> Scan Another File
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Scan Another</span>
                 </button>
               </div>
             </div>

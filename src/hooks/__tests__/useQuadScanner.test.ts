@@ -150,14 +150,18 @@ describe("useQuadScanner Hook", () => {
     });
 
     it("rotates to other candidates when missStreak >= 5", () => {
-      // Candidates are ["2x2", "2x3", "1x1"]. For lastGood="2x2", others are ["2x3", "1x1"]
-      expect(pickLayout("2x2", 5, 0)).toBe("2x3");
-      expect(pickLayout("2x2", 5, 1)).toBe("1x1");
-      expect(pickLayout("2x2", 6, 2)).toBe("2x3");
+      // Candidates are ["1x1", "2x2", "2x3"]. For lastGood="1x1", others are ["2x2", "2x3"]
+      expect(pickLayout("1x1", 5, 0)).toBe("2x2");
+      expect(pickLayout("1x1", 5, 1)).toBe("2x3");
+      expect(pickLayout("1x1", 6, 2)).toBe("2x2");
 
-      // For lastGood="2x3", others are ["2x2", "1x1"]
-      expect(pickLayout("2x3", 5, 0)).toBe("2x2");
-      expect(pickLayout("2x3", 5, 1)).toBe("1x1");
+      // For lastGood="2x2", others are ["1x1", "2x3"]
+      expect(pickLayout("2x2", 5, 0)).toBe("1x1");
+      expect(pickLayout("2x2", 5, 1)).toBe("2x3");
+
+      // For lastGood="2x3", others are ["1x1", "2x2"]
+      expect(pickLayout("2x3", 5, 0)).toBe("1x1");
+      expect(pickLayout("2x3", 5, 1)).toBe("2x2");
     });
 
     it("resets back to lastGood immediately when missStreak resets to 0", () => {

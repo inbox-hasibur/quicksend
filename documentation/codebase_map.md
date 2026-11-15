@@ -206,7 +206,7 @@ flowchart TD
 - **Exports:** `SameNetworkCard(): JSX.Element`
 
 #### `src/components/CameraStreamCard.tsx`
-- **Purpose:** Mode 5 Controller (Via Camera Scan). Zero-network air-gapped file/text streaming via animated sequenced QR frames. Features React 19 lifecycle mutex protection, live webcam scanning with camera selector and multi-tier constraints fallback, compact 66-byte QR chunks (`QRCodeSVG` size 280, margin 3), live diagnostic frame indicator, and "Scan from Screenshot / Image" fallback.
+- **Purpose:** Mode 5 Controller (Via Camera Scan). Zero-network air-gapped file/text streaming via animated sequenced QR frames. Defaults sender to Single layout and Medium density (with 2x2 and 2x3 options) with real-time transfer estimates (`EstimateBadge`), and receiver auto-detection starting with 1x1 single QR. Reassembles multi-frame payloads with XOR parity recovery, triggers automated safe download, and renders a prominent "Save / Download File" card action.
 - **Exports:** `CameraStreamCard(): JSX.Element`
 
 #### `src/components/CableTransferCard.tsx`
@@ -313,7 +313,7 @@ flowchart TD
 - **Exports:** `useHtml5Scanner(): UseHtml5ScannerReturn`, `UseHtml5ScannerReturn`
 
 #### `src/hooks/useQuadScanner.ts`
-- **Purpose:** Multi-layout camera scanner hook supporting 2x2, 2x3, and 1x1 grid decoding. Captures video via `getUserMedia`, runs 10fps loop, and decodes frames using native `BarcodeDetector` or `jsQR` multi-region splitting (`decodeGrid`) with auto-layout candidate rotation (`pickLayout`). Completely separates video DOM insertions and removals from React reconciliation.
+- **Purpose:** Multi-layout camera scanner hook supporting 1x1, 2x2, and 2x3 grid decoding. Captures video via `getUserMedia`, runs 10fps loop, and decodes frames using native `BarcodeDetector` or `jsQR` multi-region splitting (`decodeGrid`) with auto-layout candidate rotation starting with 1x1 single QR. Reuses a single offscreen `<canvas>` with 720p dimension capping to completely prevent memory spikes and browser tab crashes on mobile devices.
 - **Exports:** `useQuadScanner(): UseQuadScannerReturn`, `pickLayout`, `LAYOUT_CANDIDATES`, `UseQuadScannerReturn`.
 
 ---

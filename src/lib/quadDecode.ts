@@ -88,7 +88,10 @@ export function decodeGrid(
 
   for (const rect of rects) {
     if (rect.w <= 0 || rect.h <= 0) continue;
-    const cropped = cropImageData(imageData, rect.x, rect.y, rect.w, rect.h);
+    const cropped =
+      rect.x === 0 && rect.y === 0 && rect.w === W && rect.h === H
+        ? imageData
+        : cropImageData(imageData, rect.x, rect.y, rect.w, rect.h);
     try {
       const decoded = decodeOne(cropped);
       if (decoded && decoded.trim() !== "") {

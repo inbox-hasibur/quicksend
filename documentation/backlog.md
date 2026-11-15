@@ -504,6 +504,24 @@
   - Added test in `useWebRTC.test.ts` verifying starting a sender does not trigger a fatal error after 10 or 30 seconds.
   - Verified full test suite (34 suites, 224 tests passing), zero ESLint warnings, and zero Next.js build errors.
 
+### Sprint 24: Optical Camera Stream Reliability & Tab Crash Elimination
+- [x] Single + Medium Sender Defaults (`src/components/CameraStreamCard.tsx`):
+  - Set default sender layout to `"single"` (with `"2x2"` and `"2x3"` retained as optional layouts) and default density to `"medium"`.
+  - Confirmed absence of large-payload advisory banners, relying cleanly on `EstimateBadge` for duration estimation.
+- [x] Receiver Scanner Auto-Detection & Crash-Free Pipeline (`src/hooks/useQuadScanner.ts`, `src/lib/quadDecode.ts`):
+  - Set `LAYOUT_CANDIDATES` and initial scanner candidate to `"1x1"` so standard webcams and mobile cameras lock onto single QR codes first.
+  - Reused a single offscreen `<canvas>` stored in `canvasRef` rather than allocating new canvas elements on every frame.
+  - Capped maximum decode dimensions to 720px to prevent memory spikes and browser tab crashes ("This page couldn't load") on mobile devices.
+  - Optimized `decodeGrid` in `quadDecode.ts` to skip redundant image cropping on 1x1 full-frame decodes.
+- [x] End-to-End Camera Receive & Download Actions (`src/components/CameraStreamCard.tsx`, `public/sw.js`):
+  - Ingested incoming `QS2:` data and `QP2:` parity frames directly into `OpticalDataCollector`.
+  - Upon 100% completion: cleanly stopped the camera scanner, reassembled the verified `Blob` / UTF-8 text, logged to `useTransferHistory`, safely triggered programmatic file download, and displayed a prominent **"Save / Download File"** card action.
+  - Hardened `public/sw.js` navigation and fetch error catches to never resolve with `undefined` or crash browser tabs.
+- [x] Unit Testing & Verification (`src/components/__tests__/CameraStreamCard.test.tsx`, `src/hooks/__tests__/useQuadScanner.test.ts`):
+  - Added `CameraStreamCard.test.tsx` verifying default Single + Medium layouts without advisory banners, multi-frame `QS2:` receive with parity recovery, clean camera stop, and prominent Save / Download button.
+  - Updated `useQuadScanner.test.ts` candidate rotation tests for `"1x1"` priority.
+  - Full suite verification: 35 test files, 226 tests passing, zero lint warnings, clean build.
+
 
 
 
