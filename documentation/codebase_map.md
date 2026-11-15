@@ -290,7 +290,7 @@ flowchart TD
 - **Exports:** `useNetworkStatus(): boolean`, `useBrowserCapabilities(): BrowserCapabilities`
 
 #### `src/hooks/useHtml5Scanner.ts`
-- **Purpose:** Isolated lifecycle and DOM manager for `html5-qrcode`. Completely separates scanner DOM manipulations from React reconciliation to prevent fatal `removeChild` DOM errors. Supports sequential fallback constraints, camera device enumeration, and image file scanning.
+- **Purpose:** Isolated lifecycle and DOM manager for `html5-qrcode`. Completely separates scanner DOM manipulations from React reconciliation to prevent fatal `removeChild` DOM errors. Supports 2-tick rAF layout settling, zero-dimension prevention, sequential fallback constraints, camera device enumeration, and 3s video playing watchdog.
 - **Exports:** `useHtml5Scanner(): UseHtml5ScannerReturn`, `UseHtml5ScannerReturn`
 
 ---

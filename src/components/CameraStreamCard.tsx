@@ -11,7 +11,6 @@ import {
   Copy,
   Check,
   RotateCcw,
-  Upload,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useHtml5Scanner } from "@/hooks/useHtml5Scanner";
@@ -53,7 +52,6 @@ export function CameraStreamCard() {
     isRunning: isCameraActive,
     isStarting: isCameraStarting,
     error: scannerError,
-    scanFile,
     getCameras,
   } = useHtml5Scanner();
 
@@ -78,9 +76,38 @@ export function CameraStreamCard() {
     missingIndices: number[];
   } | null>(null);
 
+  // Diagnostic line tracking: Decoded | Valid | Invalid | Last
+  const diagnosticsRef = useRef({
+    decoded: 0,
+    valid: 0,
+    invalid: 0,
+    last: "none",
+  });
+  const [diagnostics, setDiagnostics] = useState({
+    decoded: 0,
+    valid: 0,
+    invalid: 0,
+    last: "none",
+  });
+  const lastDiagFlushRef = useRef<number>(0);
+  const diagTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const flushDiagnostics = useCallback(() => {
+    const now = Date.now();
+    if (now - lastDiagFlushRef.current >= 250) {
+      lastDiagFlushRef.current = now;
+      setDiagnostics({ ...diagnosticsRef.current });
+    } else if (!diagTimerRef.current) {
+      diagTimerRef.current = setTimeout(() => {
+        diagTimerRef.current = null;
+        lastDiagFlushRef.current = Date.now();
+        setDiagnostics({ ...diagnosticsRef.current });
+      }, 250 - (now - lastDiagFlushRef.current));
+    }
+  }, []);
+
   const { addHistoryItem } = useTransferHistory();
   const collectorRef = useRef<OpticalDataCollector>(new OpticalDataCollector());
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastScannedTextRef = useRef<string>("");
   const lastScannedTimeRef = useRef<number>(0);
@@ -163,7 +190,7 @@ export function CameraStreamCard() {
     };
   }, [role, frames.length, isPlaying, speedMs]);
 
-  // Reusable frame processor for both live camera frames and image uploads
+  // Reusable frame processor for camera frames
   const processDecodedFrame = useCallback(
     async (decodedText: string) => {
       // Early exit if collection already completed
@@ -172,12 +199,14 @@ export function CameraStreamCard() {
       // Wrap entire success callback in try/catch to avoid crashes
       try {
         const now = Date.now();
+        diagnosticsRef.current.decoded++;
 
         // Ignore identical frame text if received within 100ms
         if (
           decodedText === lastScannedTextRef.current &&
           now - lastScannedTimeRef.current < 100
         ) {
+          flushDiagnostics();
           return;
         }
         lastScannedTextRef.current = decodedText;
@@ -187,16 +216,25 @@ export function CameraStreamCard() {
         const res = await collectorRef.current.add(decodedText);
 
         if (res.status === "invalid") {
+          diagnosticsRef.current.invalid++;
+          diagnosticsRef.current.last = "invalid";
+          flushDiagnostics();
           setLastDetected({ isOptical: false, timestamp: now });
           return;
         }
 
         if (res.status === "error") {
+          diagnosticsRef.current.invalid++;
+          diagnosticsRef.current.last = "error";
+          flushDiagnostics();
           setCameraError(res.error);
           return;
         }
 
         if (res.status === "collecting") {
+          diagnosticsRef.current.valid++;
+          diagnosticsRef.current.last = `Frame ${res.receivedCount} of ${res.totalChunks}`;
+          flushDiagnostics();
           setCameraError(null);
           setLastDetected({
             isOptical: true,
@@ -228,6 +266,10 @@ export function CameraStreamCard() {
             }, 200 - (now - lastUiUpdateRef.current));
           }
         } else if (res.status === "completed") {
+          diagnosticsRef.current.valid++;
+          diagnosticsRef.current.last = `complete (${res.payload.fileName})`;
+          flushDiagnostics();
+
           if (throttleTimerRef.current) {
             clearTimeout(throttleTimerRef.current);
             throttleTimerRef.current = null;
@@ -271,7 +313,7 @@ export function CameraStreamCard() {
         );
       }
     },
-    [addHistoryItem, stopScanner]
+    [addHistoryItem, flushDiagnostics, stopScanner]
   );
 
   // Handle receiver camera initialization and scanning
@@ -285,6 +327,8 @@ export function CameraStreamCard() {
       collectorRef.current.reset();
       lastScannedTextRef.current = "";
       lastScannedTimeRef.current = 0;
+      diagnosticsRef.current = { decoded: 0, valid: 0, invalid: 0, last: "none" };
+      setDiagnostics({ decoded: 0, valid: 0, invalid: 0, last: "none" });
 
       // Populate camera list
       try {
@@ -325,42 +369,16 @@ export function CameraStreamCard() {
     [isCameraActive, startCamera, stopCamera]
   );
 
-  // Fallback screenshot/image file scanner
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setCameraError(null);
-    try {
-      if (isCameraActive) {
-        await stopCamera();
-      }
-
-      const decodedText = await scanFile(file);
-      if (decodedText) {
-        await processDecodedFrame(decodedText);
-      } else {
-        setCameraError("No QR code detected in the uploaded image.");
-      }
-    } catch (err) {
-      setCameraError(
-        err instanceof Error
-          ? err.message
-          : "Could not decode a valid QuickSend QR code from this image. Please ensure the QR is clear and well-lit."
-      );
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
-  };
-
   // Cleanup timers and created Blob URLs when component unmounts
   useEffect(() => {
     return () => {
       if (throttleTimerRef.current) {
         clearTimeout(throttleTimerRef.current);
         throttleTimerRef.current = null;
+      }
+      if (diagTimerRef.current) {
+        clearTimeout(diagTimerRef.current);
+        diagTimerRef.current = null;
       }
       // Revoke created Blob URLs on unmount
       createdBlobUrlsRef.current.forEach((url) => {
@@ -415,6 +433,8 @@ export function CameraStreamCard() {
             setRole(newRole as OpticalRole);
             setReceivedPayload(null);
             setScanProgress(null);
+            diagnosticsRef.current = { decoded: 0, valid: 0, invalid: 0, last: "none" };
+            setDiagnostics({ decoded: 0, valid: 0, invalid: 0, last: "none" });
           }}
           options={[
             { value: "send", label: "Stream / Send" },
@@ -637,130 +657,112 @@ export function CameraStreamCard() {
         <div className="space-y-6">
           {!receivedPayload ? (
             <div className="space-y-4">
-              {/* Viewfinder or Camera Trigger */}
-              <div className="relative flex flex-col items-center justify-center p-6 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl min-h-[340px] w-full">
-                {/* Viewfinder outer box */}
-                <div className="w-full max-w-[320px] min-h-[280px] aspect-square rounded-2xl overflow-hidden bg-black/5 dark:bg-black/30 border border-[var(--border-hairline)] relative flex items-center justify-center">
-                  {/* Isolated scanner container - always mounted, zero React children */}
-                  <div
-                    ref={containerRef}
-                    className={`w-full h-full ${!isCameraActive ? "hidden" : "block"}`}
-                  />
+              {/* Preview first and large */}
+              <div className="relative w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square">
+                {/* Scanner container: always laid out, never display:none */}
+                <div
+                  ref={containerRef}
+                  className={`relative w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square overflow-hidden rounded-2xl bg-black qs-scanner transition-opacity ${
+                    !isCameraActive ? "opacity-0 pointer-events-none" : "opacity-100"
+                  }`}
+                />
 
-                  {/* Sibling overlay when camera is inactive */}
-                  {!isCameraActive && (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xs z-10 space-y-3">
-                      <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shadow-2xs">
-                        <Camera className="w-6 h-6" />
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-xs text-[var(--text)]">Point Camera at QR Stream</h4>
-                        <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-[200px]">
-                          Opens camera to continuously scan sequenced QR frames.
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => startCamera()}
-                        disabled={isCameraStarting}
-                        className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-xs shadow-xs transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {isCameraStarting ? (
-                          <>
-                            <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                            Starting Camera...
-                          </>
-                        ) : (
-                          <>
-                            <Camera className="w-3.5 h-3.5" /> Start Camera Scanner
-                          </>
-                        )}
-                      </button>
+                {/* Sibling overlay when camera is inactive */}
+                {!isCameraActive && (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xs rounded-2xl border border-[var(--border-hairline)] z-10 space-y-3">
+                    <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shadow-2xs">
+                      <Camera className="w-6 h-6" />
                     </div>
-                  )}
-                </div>
-
-                {/* Live Diagnostics & Camera Controls when Camera is Active */}
-                {isCameraActive && (
-                  <div className="mt-4 flex flex-col items-center gap-2.5 w-full max-w-sm">
-                    <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] text-xs shadow-2xs">
-                      <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-xs">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        Camera Active
-                      </span>
-
-                      {lastDetected && (
+                    <div>
+                      <h4 className="font-semibold text-xs text-[var(--text)]">Point Camera at QR Stream</h4>
+                      <p className="text-[11px] text-[var(--text-muted)] mt-0.5 max-w-[200px]">
+                        Opens camera to continuously scan sequenced QR frames.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => startCamera()}
+                      disabled={isCameraStarting}
+                      className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-xs shadow-xs transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                    >
+                      {isCameraStarting ? (
                         <>
-                          <span className="text-[var(--border-hairline)]">•</span>
-                          {lastDetected.isOptical ? (
-                            <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-md text-[11px]">
-                              Frame {lastDetected.frameIndex} of {lastDetected.totalFrames}
-                            </span>
-                          ) : (
-                            <span className="text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md text-[11px]">
-                              Unrecognized QR
-                            </span>
-                          )}
+                          <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                          Starting Camera...
+                        </>
+                      ) : (
+                        <>
+                          <Camera className="w-3.5 h-3.5" /> Start Camera Scanner
                         </>
                       )}
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {availableCameras.length > 1 && (
-                        <select
-                          value={selectedCameraId || ""}
-                          onChange={(e) => handleCameraChange(e.target.value)}
-                          className="text-xs bg-[var(--surface)] text-[var(--text)] border border-[var(--border-hairline)] rounded-xl px-2.5 py-1.5 cursor-pointer shadow-2xs focus:outline-none"
-                          aria-label="Switch Camera"
-                        >
-                          {availableCameras.map((cam) => (
-                            <option key={cam.id} value={cam.id}>
-                              {cam.label}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={stopCamera}
-                        className="px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text-muted)] hover:text-red-500 text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
-                      >
-                        Stop Camera
-                      </button>
-                    </div>
+                    </button>
                   </div>
                 )}
-
-                {(cameraError || scannerError) && (
-                  <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs text-center max-w-sm">
-                    {scannerError || cameraError}
-                  </div>
-                )}
-
-                {/* Image Upload Fallback for non-HTTPS or missing camera */}
-                <div className="mt-4 pt-3 border-t border-[var(--border-hairline)] w-full max-w-xs text-center space-y-2">
-                  <p className="text-[11px] text-[var(--text-muted)]">
-                    Camera unavailable or local HTTP network?
-                  </p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="hidden"
-                    id="optical-image-fallback-input"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] text-xs font-medium hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer shadow-2xs"
-                  >
-                    <Upload className="w-3.5 h-3.5 text-[var(--accent)]" />
-                    <span>Scan from Screenshot / Image</span>
-                  </button>
-                </div>
               </div>
+
+              {/* Camera Active pill */}
+              {isCameraActive && (
+                <div className="flex flex-col items-center gap-2.5 w-full max-w-md mx-auto">
+                  <div className="flex flex-wrap items-center justify-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] text-xs shadow-2xs">
+                    <span className="inline-flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400 font-semibold text-xs">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Camera Active
+                    </span>
+
+                    {lastDetected && (
+                      <>
+                        <span className="text-[var(--border-hairline)]">•</span>
+                        {lastDetected.isOptical ? (
+                          <span className="font-mono text-emerald-600 dark:text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded-md text-[11px]">
+                            Frame {lastDetected.frameIndex} of {lastDetected.totalFrames}
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md text-[11px]">
+                            Unrecognized QR
+                          </span>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Camera dropdown and Stop Camera button */}
+                  <div className="flex items-center gap-2">
+                    {availableCameras.length > 1 && (
+                      <select
+                        value={selectedCameraId || ""}
+                        onChange={(e) => handleCameraChange(e.target.value)}
+                        className="text-xs bg-[var(--surface)] text-[var(--text)] border border-[var(--border-hairline)] rounded-xl px-2.5 py-1.5 cursor-pointer shadow-2xs focus:outline-none"
+                        aria-label="Switch Camera"
+                      >
+                        {availableCameras.map((cam) => (
+                          <option key={cam.id} value={cam.id}>
+                            {cam.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={stopCamera}
+                      className="px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text-muted)] hover:text-red-500 text-xs font-semibold cursor-pointer transition-colors shadow-2xs"
+                    >
+                      Stop Camera
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Diagnostic line: Decoded 0 | Valid 0 | Invalid 0 | Last: none */}
+              <div className="font-mono text-[11px] text-[var(--text-muted)] text-center">
+                Decoded {diagnostics.decoded} | Valid {diagnostics.valid} | Invalid {diagnostics.invalid} | Last: {diagnostics.last}
+              </div>
+
+              {(cameraError || scannerError) && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs text-center max-w-md mx-auto w-full">
+                  {scannerError || cameraError}
+                </div>
+              )}
 
               {/* Live Collection Progress */}
               {scanProgress && (

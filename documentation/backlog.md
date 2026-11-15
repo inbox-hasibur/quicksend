@@ -292,3 +292,26 @@
   - Verified component unmount while running calls `stop()` once.
   - Verified container has zero child nodes after `stop()`.
 - [x] **Sprint 14 Verification:** 152/152 unit tests passing across 28 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+### Sprint 15: Optical Camera Preview Fix, Size Expansion & Diagnostics Line
+- [x] Fix Scanner Container Visibility & Sizing (`src/hooks/useHtml5Scanner.ts`, `src/components/CameraStreamCard.tsx`, `src/components/QRScannerModal.tsx`):
+  - Removed `display: none` / `hidden` class from container when idle; preserved full layout dimensions with `opacity-0 pointer-events-none`.
+  - Added 2-tick `requestAnimationFrame` await in `start()` to guarantee settled layout before `Html5Qrcode` measures dimensions.
+  - Expanded viewfinder container to `relative w-full max-w-md mx-auto aspect-[3/4] sm:aspect-square overflow-hidden rounded-2xl bg-black qs-scanner`, removing the fixed 280px minimum height.
+  - Imperatively created child div given `style.width = "100%"`, `style.height = "100%"`, and `style.position = "relative"`.
+- [x] Viewfinder CSS Rules (`src/app/globals.css`):
+  - Added scoped `.qs-scanner` rules: `video` full cover (`width: 100% !important`, `height: 100% !important`, `object-fit: cover !important`, `display: block !important`), `canvas` hidden (`display: none !important`), full-size scan regions, and hidden shaded regions / overlays.
+- [x] Video Playing Watchdog (`src/hooks/useHtml5Scanner.ts`):
+  - Listens for `"playing"` event on `<video>` or polls up to 3 seconds.
+  - Sets readable error `"Camera started but no video. Tap Stop, then Start again."` and cleanly stops scanner if `videoWidth === 0`.
+- [x] Receiver Diagnostic Line (`src/components/CameraStreamCard.tsx`):
+  - Added small monospace line: `Decoded 0 | Valid 0 | Invalid 0 | Last: none` updated at most 4 times per second via refs and timer throttler.
+- [x] Streamlined Zero-Screenshot Flow:
+  - Removed "Scan from Screenshot / Image" button, file input, and `scanFile` utility.
+  - Clean error notice if `navigator.mediaDevices` is absent: `"Camera needs HTTPS. Open the https site."`.
+- [x] Reorganized Receiver Panel Layout:
+  - Sequence: large preview container first, then "Camera Active" pill, then camera dropdown and Stop button, then diagnostic line, and finally progress bar and frame counter.
+- [x] Automated Unit Tests (`src/hooks/__tests__/useHtml5Scanner.test.ts`):
+  - Added test verifying container is never given `display: none` or hidden classes on `start()`.
+  - Verified `stop()` leaves zero children.
+- [x] **Sprint 15 Verification:** 153/153 unit tests passing across 28 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.

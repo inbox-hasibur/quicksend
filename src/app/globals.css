@@ -194,3 +194,25 @@ body {
 .animate-radar-ping {
   animation: radar-ping 3s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
+
+/* Html5Qrcode Viewfinder Isolation & Preview Styling */
+.qs-scanner video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  display: block !important;
+}
+
+.qs-scanner canvas {
+  display: none !important;
+}
+
+.qs-scanner [id$="__scan_region"] {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.qs-scanner [id*="shaded_region"],
+.qs-scanner [id*="_overlay"] {
+  display: none !important;
+}

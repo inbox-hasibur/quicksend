@@ -16,7 +16,6 @@ export interface UseHtml5ScannerReturn {
   isRunning: boolean;
   isStarting: boolean;
   error: string | null;
-  scanFile: (file: File) => Promise<string>;
   getCameras: () => Promise<Array<{ id: string; label: string }>>;
 }
 
@@ -89,7 +88,6 @@ export function useHtml5Scanner(): UseHtml5ScannerReturn {
     ): Promise<void> => {
       if (isStartingRef.current) return;
       isStartingRef.current = true;
-      shouldStopRef.current = false;
       setIsStarting(true);
       setError(null);
 
@@ -108,18 +106,28 @@ export function useHtml5Scanner(): UseHtml5ScannerReturn {
         return;
       }
 
-      // Check secure context / mediaDevices support (e.g. non-HTTPS LAN IP)
-      if (
-        typeof window !== "undefined" &&
-        window.isSecureContext === false &&
-        !navigator?.mediaDevices &&
-        window.location?.hostname &&
-        window.location.hostname !== "localhost" &&
-        window.location.hostname !== "127.0.0.1"
-      ) {
-        const msg =
-          "Camera access requires HTTPS or localhost. If opening over local IP, use screenshot or image upload.";
+      // Check mediaDevices support
+      if (typeof window !== "undefined" && !navigator?.mediaDevices) {
+        const msg = "Camera needs HTTPS. Open the https site.";
         setError(msg);
+        isStartingRef.current = false;
+        setIsStarting(false);
+        return;
+      }
+
+      // Await two requestAnimationFrame ticks so layout is settled before measurement
+      const raf =
+        typeof requestAnimationFrame === "function"
+          ? requestAnimationFrame
+          : (cb: FrameRequestCallback) => setTimeout(cb, 16);
+
+      await new Promise<void>((resolve) => {
+        raf(() => {
+          raf(() => resolve());
+        });
+      });
+
+      if (shouldStopRef.current || isUnmountedRef.current) {
         isStartingRef.current = false;
         setIsStarting(false);
         return;
@@ -131,6 +139,7 @@ export function useHtml5Scanner(): UseHtml5ScannerReturn {
       child.id = childId;
       child.style.width = "100%";
       child.style.height = "100%";
+      child.style.position = "relative";
       container.appendChild(child);
       childRef.current = child;
 
@@ -144,6 +153,7 @@ export function useHtml5Scanner(): UseHtml5ScannerReturn {
           videoConstraints: {
             width: { ideal: 1280 },
             height: { ideal: 720 },
+            facingMode: "environment",
           },
         };
 
@@ -199,9 +209,59 @@ export function useHtml5Scanner(): UseHtml5ScannerReturn {
 
         if (shouldStopRef.current || isUnmountedRef.current) {
           await stop();
-        } else {
-          setIsRunning(true);
+          return;
         }
+
+        // Wait for video element to fire "playing" or up to 3 seconds
+        await new Promise<void>((resolve) => {
+          const v = container.querySelector("video");
+          if (!v) {
+            const startPoll = Date.now();
+            const pollInterval = setInterval(() => {
+              const pollVideo = container.querySelector("video");
+              if (pollVideo && (pollVideo.videoWidth > 0 || !pollVideo.paused)) {
+                clearInterval(pollInterval);
+                resolve();
+              } else if (Date.now() - startPoll >= 3000) {
+                clearInterval(pollInterval);
+                resolve();
+              }
+            }, 50);
+            return;
+          }
+
+          if (v.videoWidth > 0 && !v.paused) {
+            resolve();
+            return;
+          }
+
+          let done = false;
+          const finish = () => {
+            if (!done) {
+              done = true;
+              v.removeEventListener("playing", finish);
+              clearTimeout(timer);
+              resolve();
+            }
+          };
+
+          const timer = setTimeout(finish, 3000);
+          v.addEventListener("playing", finish, { once: true });
+        });
+
+        if (shouldStopRef.current || isUnmountedRef.current) {
+          await stop();
+          return;
+        }
+
+        const videoEl = container.querySelector("video");
+        if (!videoEl || videoEl.videoWidth === 0) {
+          setError("Camera started but no video. Tap Stop, then Start again.");
+          await stop();
+          return;
+        }
+
+        setIsRunning(true);
       } catch (err) {
         setIsRunning(false);
         const errorMsg =
@@ -226,34 +286,6 @@ export function useHtml5Scanner(): UseHtml5ScannerReturn {
     },
     [stop]
   );
-
-  // Scan QR code from an uploaded image file without affecting live container
-  const scanFile = useCallback(async (file: File): Promise<string> => {
-    const tempDiv = document.createElement("div");
-    const tempId = `html5-temp-file-${++scannerIdCounter}`;
-    tempDiv.id = tempId;
-    tempDiv.style.display = "none";
-    document.body.appendChild(tempDiv);
-
-    try {
-      const fileScanner = new Html5Qrcode(tempId);
-      const decoded = await fileScanner.scanFile(file, true);
-      try {
-        await fileScanner.clear();
-      } catch {
-        // Ignore
-      }
-      return decoded;
-    } finally {
-      if (tempDiv.parentNode) {
-        try {
-          tempDiv.parentNode.removeChild(tempDiv);
-        } catch {
-          // Ignore
-        }
-      }
-    }
-  }, []);
 
   // Enumerate cameras
   const getCameras = useCallback(async () => {
@@ -285,7 +317,6 @@ export function useHtml5Scanner(): UseHtml5ScannerReturn {
     isRunning,
     isStarting,
     error,
-    scanFile,
     getCameras,
   };
 }

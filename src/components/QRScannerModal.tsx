@@ -119,7 +119,9 @@ export function QRScannerModal({
           {/* Scanner container is isolated from React - zero React children */}
           <div
             ref={containerRef}
-            className={`w-full ${!isRunning ? "hidden" : "block"}`}
+            className={`w-full h-full qs-scanner transition-opacity ${
+              !isRunning ? "opacity-0 pointer-events-none" : "opacity-100"
+            }`}
           />
 
           {isStarting && (

@@ -7,7 +7,7 @@ import { useHtml5Scanner, type UseHtml5ScannerReturn } from "../useHtml5Scanner"
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const { mockStart, mockStop, mockClear, mockGetCameras } = vi.hoisted(() => ({
-  mockStart: vi.fn().mockImplementation(async () => undefined),
+  mockStart: vi.fn(),
   mockStop: vi.fn().mockImplementation(async () => undefined),
   mockClear: vi.fn().mockImplementation(async () => undefined),
   mockGetCameras: vi.fn().mockImplementation(async () => []),
@@ -20,7 +20,7 @@ vi.mock("html5-qrcode", () => {
       constructor(elementId: string) {
         this.elementId = elementId;
       }
-      start = mockStart;
+      start = (...args: unknown[]) => mockStart.call(this, ...args);
       stop = mockStop;
       clear = mockClear;
       static getCameras = mockGetCameras;
@@ -47,6 +47,28 @@ describe("useHtml5Scanner Hook", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // Ensure navigator.mediaDevices exists in test environment
+    if (!navigator.mediaDevices) {
+      Object.defineProperty(navigator, "mediaDevices", {
+        value: { getUserMedia: vi.fn() },
+        configurable: true,
+      });
+    }
+
+    mockStart.mockImplementation(async function (this: { elementId?: string }) {
+      if (this.elementId) {
+        const el = document.getElementById(this.elementId);
+        if (el) {
+          const video = document.createElement("video");
+          Object.defineProperty(video, "videoWidth", { value: 1280, writable: true });
+          el.appendChild(video);
+          setTimeout(() => video.dispatchEvent(new Event("playing")), 10);
+        }
+      }
+      return undefined;
+    });
+
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -150,5 +172,24 @@ describe("useHtml5Scanner Hook", () => {
 
     // After stop(), container has zero child nodes
     expect(hookData.containerRef.current?.childNodes.length).toBe(0);
+  });
+
+  it("should never give the container display none when start() is called", async () => {
+    let hookData!: UseHtml5ScannerReturn;
+    await act(async () => {
+      root.render(React.createElement(ScannerConsumer, { onHook: (h) => (hookData = h) }));
+    });
+
+    await act(async () => {
+      await hookData.start(vi.fn());
+    });
+
+    const el = hookData.containerRef.current;
+    expect(el).not.toBeNull();
+    if (el) {
+      expect(el.style.display).not.toBe("none");
+      expect(el.classList.contains("hidden")).toBe(false);
+      expect(el.classList.contains("invisible")).toBe(false);
+    }
   });
 });
