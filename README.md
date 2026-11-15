@@ -10,8 +10,6 @@
     <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-3.4-38B2AC?style=flat-square&logo=tailwind-css" alt="Tailwind CSS" /></a>
     <img src="https://img.shields.io/badge/WebRTC-DTLS%2FSRTP%20Encrypted-F36523?style=flat-square&logo=webrtc" alt="WebRTC Encrypted" />
     <img src="https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-4B5563?style=flat-square" alt="Cross-Platform" />
-    <img src="https://img.shields.io/badge/Tests-221%20Passing-10B981?style=flat-square" alt="Tests" />
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-8B5CF6?style=flat-square" alt="License" /></a>
   </p>
 
   <p>
