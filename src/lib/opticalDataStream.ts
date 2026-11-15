@@ -14,6 +14,7 @@ export interface OpticalDataFrame {
   isCompressed: boolean;
   base64Data: string;
   encodedPayload: string;
+  hash?: string;
 }
 
 export interface ReassembledPayload {
@@ -23,20 +24,43 @@ export interface ReassembledPayload {
   mimeType: string;
   blob: Blob;
   text?: string;
+  hash?: string;
+  hashVerified?: boolean;
 }
 
-export const DEFAULT_CHUNK_RAW_BYTES = 66; // Produces ~88 base64 characters (<= 90 chars max payload), keeping QR modules large and easily scannable on standard webcams
+export const OPTICAL_CHUNK_PRESETS = {
+  small: 66,
+  medium: 150,
+  large: 300,
+} as const;
+
+export type OpticalChunkPreset = keyof typeof OPTICAL_CHUNK_PRESETS;
+
+export const DEFAULT_CHUNK_RAW_BYTES = OPTICAL_CHUNK_PRESETS.medium; // 150 bytes default
+
+/**
+ * Fast 32-bit FNV-1a payload checksum formatted as 8-character hex.
+ */
+export function computePayloadHash(bytes: Uint8Array): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < bytes.length; i++) {
+    hash ^= bytes[i];
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
 
 /**
  * Encodes an ArrayBuffer or Blob into sequenced optical QR frames.
  */
 export async function encodeFileToOpticalFrames(
   file: File,
-  chunkSize = DEFAULT_CHUNK_RAW_BYTES
+  chunkSize: number = DEFAULT_CHUNK_RAW_BYTES
 ): Promise<OpticalDataFrame[]> {
   const transferId = `opt_${Date.now().toString(36).slice(-4)}_${Math.random().toString(36).substring(2, 5)}`;
   const buffer = await file.arrayBuffer();
   const rawBytes = new Uint8Array(buffer);
+  const hash = computePayloadHash(rawBytes);
 
   // Compress if CompressionStream is available
   let dataBytes = rawBytes;
@@ -77,8 +101,8 @@ export async function encodeFileToOpticalFrames(
     }
     const base64Data = btoa(binary);
 
-    // Protocol format: QS1|<transferId>|<index>|<total>|<fileName>|<fileSize>|<mimeType>|<isCompressed>|<base64>
-    const encodedPayload = `QS1|${transferId}|${i}|${totalChunks}|${safeFileName}|${file.size}|${safeMime}|${isCompressed ? 1 : 0}|${base64Data}`;
+    // Protocol format: QS1|<transferId>|<index>|<total>|<fileName>|<fileSize>|<mimeType>|<isCompressed>|<base64>|<hash>
+    const encodedPayload = `QS1|${transferId}|${i}|${totalChunks}|${safeFileName}|${file.size}|${safeMime}|${isCompressed ? 1 : 0}|${base64Data}|${hash}`;
 
     frames.push({
       transferId,
@@ -90,6 +114,7 @@ export async function encodeFileToOpticalFrames(
       isCompressed,
       base64Data,
       encodedPayload,
+      hash,
     });
   }
 
@@ -101,7 +126,7 @@ export async function encodeFileToOpticalFrames(
  */
 export async function encodeTextToOpticalFrames(
   text: string,
-  chunkSize = DEFAULT_CHUNK_RAW_BYTES
+  chunkSize: number = DEFAULT_CHUNK_RAW_BYTES
 ): Promise<OpticalDataFrame[]> {
   const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
   const file = new File([blob], "message.txt", { type: "text/plain" });
@@ -119,42 +144,78 @@ export function isOpticalDataFrame(payload: string): boolean {
  * Parses an incoming optical data frame string.
  */
 export function parseOpticalDataFrame(raw: string): OpticalDataFrame | null {
-  if (!isOpticalDataFrame(raw)) return null;
+  try {
+    if (!raw || typeof raw !== "string" || !raw.startsWith("QS1|")) return null;
 
-  const parts = raw.split("|");
-  if (parts.length < 9) return null;
+    const parts = raw.split("|");
+    if (parts.length < 9) return null;
 
-  const [, transferId, idxStr, totalStr, rawName, sizeStr, rawMime, compStr, base64Data] = parts;
-  const chunkIndex = parseInt(idxStr, 10);
-  const totalChunks = parseInt(totalStr, 10);
-  const fileSize = parseInt(sizeStr, 10);
-  const isCompressed = compStr === "1";
+    const [, transferId, idxStr, totalStr, rawName, sizeStr, rawMime, compStr, base64Data, frameHash] = parts;
+    const chunkIndex = parseInt(idxStr, 10);
+    const totalChunks = parseInt(totalStr, 10);
+    const fileSize = parseInt(sizeStr, 10);
+    const isCompressed = compStr === "1";
 
-  if (isNaN(chunkIndex) || isNaN(totalChunks) || isNaN(fileSize)) {
+    if (
+      isNaN(chunkIndex) ||
+      isNaN(totalChunks) ||
+      isNaN(fileSize) ||
+      chunkIndex < 0 ||
+      totalChunks <= 0 ||
+      chunkIndex >= totalChunks ||
+      fileSize < 0 ||
+      !transferId ||
+      !base64Data
+    ) {
+      return null;
+    }
+
+    let fileName = "payload.bin";
+    let mimeType = "application/octet-stream";
+    try {
+      fileName = decodeURIComponent(rawName);
+      mimeType = decodeURIComponent(rawMime);
+    } catch {
+      // Keep defaults
+    }
+
+    return {
+      transferId,
+      chunkIndex,
+      totalChunks,
+      fileName,
+      fileSize,
+      mimeType,
+      isCompressed,
+      base64Data,
+      encodedPayload: raw,
+      hash: frameHash || undefined,
+    };
+  } catch {
     return null;
   }
-
-  let fileName = "payload.bin";
-  let mimeType = "application/octet-stream";
-  try {
-    fileName = decodeURIComponent(rawName);
-    mimeType = decodeURIComponent(rawMime);
-  } catch {
-    // Keep defaults
-  }
-
-  return {
-    transferId,
-    chunkIndex,
-    totalChunks,
-    fileName,
-    fileSize,
-    mimeType,
-    isCompressed,
-    base64Data,
-    encodedPayload: raw,
-  };
 }
+
+export type IngestResult =
+  | { status: "invalid" }
+  | {
+      status: "collecting";
+      transferId: string;
+      fileName: string;
+      fileSize: number;
+      totalChunks: number;
+      receivedCount: number;
+      percentage: number;
+      missingIndices: number[];
+    }
+  | {
+      status: "completed";
+      payload: ReassembledPayload;
+    }
+  | {
+      status: "error";
+      error: string;
+    };
 
 /**
  * Reactive collector that reassembles frames in any order and triggers completion callback.
@@ -166,39 +227,30 @@ export class OpticalDataCollector {
   private fileSize: number = 0;
   private mimeType: string = "";
   private isCompressed: boolean = false;
+  private expectedHash: string | null = null;
+  private completedPayload: ReassembledPayload | null = null;
   private chunks: Map<number, Uint8Array> = new Map();
 
   /**
-   * Ingests a scanned frame string.
-   * Returns:
-   * - `status: 'collecting'` with current progress
-   * - `status: 'completed'` with the reassembled payload
-   * - `status: 'invalid'` if frame doesn't match current transfer or is corrupt
+   * Alias for ingestFrame to support both collector.add(frame) and collector.ingestFrame(frame).
    */
-  async ingestFrame(
-    raw: string
-  ): Promise<
-    | { status: "invalid" }
-    | {
-        status: "collecting";
-        transferId: string;
-        fileName: string;
-        fileSize: number;
-        totalChunks: number;
-        receivedCount: number;
-        percentage: number;
-        missingIndices: number[];
-      }
-    | {
-        status: "completed";
-        payload: ReassembledPayload;
-      }
-  > {
+  async add(raw: string): Promise<IngestResult> {
+    return this.ingestFrame(raw);
+  }
+
+  /**
+   * Ingests a scanned frame string.
+   */
+  async ingestFrame(raw: string): Promise<IngestResult> {
     const frame = parseOpticalDataFrame(raw);
     if (!frame) return { status: "invalid" };
 
-    // If new transfer encountered, reset collector
-    if (!this.transferId || this.transferId !== frame.transferId) {
+    // Reset collector if new session id or total chunks change
+    if (
+      !this.transferId ||
+      this.transferId !== frame.transferId ||
+      this.totalChunks !== frame.totalChunks
+    ) {
       this.reset();
       this.transferId = frame.transferId;
       this.totalChunks = frame.totalChunks;
@@ -206,6 +258,16 @@ export class OpticalDataCollector {
       this.fileSize = frame.fileSize;
       this.mimeType = frame.mimeType;
       this.isCompressed = frame.isCompressed;
+      this.expectedHash = frame.hash || null;
+    }
+
+    if (frame.hash && !this.expectedHash) {
+      this.expectedHash = frame.hash;
+    }
+
+    // Return cached payload if already completed
+    if (this.completedPayload) {
+      return { status: "completed", payload: this.completedPayload };
     }
 
     // Decode base64 to binary
@@ -235,8 +297,7 @@ export class OpticalDataCollector {
 
     // Check if fully received
     if (this.chunks.size === this.totalChunks) {
-      const payload = await this.reassemble();
-      return { status: "completed", payload };
+      return await this.reassemble();
     }
 
     return {
@@ -251,7 +312,10 @@ export class OpticalDataCollector {
     };
   }
 
-  private async reassemble(): Promise<ReassembledPayload> {
+  private async reassemble(): Promise<
+    | { status: "completed"; payload: ReassembledPayload }
+    | { status: "error"; error: string }
+  > {
     // Calculate total buffer length
     let totalLen = 0;
     for (let i = 0; i < this.totalChunks; i++) {
@@ -272,14 +336,28 @@ export class OpticalDataCollector {
     let finalBytes = merged;
 
     // Decompress if compressed
-    if (this.isCompressed && typeof DecompressionStream !== "undefined") {
-      try {
-        const stream = new Blob([merged]).stream().pipeThrough(new DecompressionStream("deflate"));
-        const decompressedBuffer = await new Response(stream).arrayBuffer();
-        finalBytes = new Uint8Array(decompressedBuffer);
-      } catch {
-        finalBytes = merged;
+    if (this.isCompressed) {
+      if (typeof DecompressionStream !== "undefined") {
+        try {
+          const stream = new Blob([merged]).stream().pipeThrough(new DecompressionStream("deflate"));
+          const decompressedBuffer = await new Response(stream).arrayBuffer();
+          finalBytes = new Uint8Array(decompressedBuffer);
+        } catch {
+          return { status: "error", error: "Decompression failed: stream corrupted" };
+        }
+      } else {
+        return { status: "error", error: "Decompression not supported in this environment" };
       }
+    }
+
+    // Verify hash integrity
+    const calculatedHash = computePayloadHash(finalBytes);
+    let hashVerified = false;
+    if (this.expectedHash) {
+      if (calculatedHash !== this.expectedHash) {
+        return { status: "error", error: "Hash check failed: payload corrupted" };
+      }
+      hashVerified = true;
     }
 
     const blob = new Blob([finalBytes as BlobPart], { type: this.mimeType });
@@ -292,14 +370,19 @@ export class OpticalDataCollector {
       }
     }
 
-    return {
+    const payload: ReassembledPayload = {
       transferId: this.transferId || "unknown",
       fileName: this.fileName || "downloaded-file",
       fileSize: this.fileSize,
       mimeType: this.mimeType,
       blob,
       text,
+      hash: calculatedHash,
+      hashVerified,
     };
+
+    this.completedPayload = payload;
+    return { status: "completed", payload };
   }
 
   reset(): void {
@@ -309,6 +392,8 @@ export class OpticalDataCollector {
     this.fileSize = 0;
     this.mimeType = "";
     this.isCompressed = false;
+    this.expectedHash = null;
+    this.completedPayload = null;
     this.chunks.clear();
   }
 

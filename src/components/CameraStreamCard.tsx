@@ -22,8 +22,8 @@ import {
   encodeFileToOpticalFrames,
   encodeTextToOpticalFrames,
   OpticalDataCollector,
-  isOpticalDataFrame,
-  parseOpticalDataFrame,
+  OPTICAL_CHUNK_PRESETS,
+  type OpticalChunkPreset,
   type OpticalDataFrame,
   type ReassembledPayload,
 } from "@/lib/opticalDataStream";
@@ -42,6 +42,8 @@ export function CameraStreamCard() {
   const [hasStartedStreaming, setHasStartedStreaming] = useState(false);
   const [speedMs, setSpeedMs] = useState<number>(320); // 320ms normal speed
   const [isEncoding, setIsEncoding] = useState(false);
+  const [selectedPreset, setSelectedPreset] = useState<OpticalChunkPreset>("medium");
+  const [activePayload, setActivePayload] = useState<{ files: File[]; text: string } | null>(null);
 
   // Receiver state
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -74,29 +76,65 @@ export function CameraStreamCard() {
   const shouldStopRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastScannedTextRef = useRef<string>("");
+  const lastScannedTimeRef = useRef<number>(0);
+  const lastUiUpdateRef = useRef<number>(0);
+  const throttleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingProgressRef = useRef<{
+    fileName: string;
+    fileSize: number;
+    totalChunks: number;
+    receivedCount: number;
+    percentage: number;
+    missingIndices: number[];
+  } | null>(null);
+  const createdBlobUrlsRef = useRef<string[]>([]);
   const readerElementId = "camera-optical-viewfinder";
 
-  // Handle encoding when payload is selected in sender mode
-  const handlePayloadSelected = useCallback(async (payload: { files: File[]; text: string }) => {
-    setIsEncoding(true);
-    try {
-      let encoded: OpticalDataFrame[] = [];
-      if (payload.files.length > 0) {
-        // Encode primary selected file
-        encoded = await encodeFileToOpticalFrames(payload.files[0]);
-      } else if (payload.text.trim()) {
-        encoded = await encodeTextToOpticalFrames(payload.text.trim());
+  // Re-encode payload with given chunk preset
+  const encodePayload = useCallback(
+    async (payload: { files: File[]; text: string }, preset: OpticalChunkPreset) => {
+      setIsEncoding(true);
+      try {
+        let encoded: OpticalDataFrame[] = [];
+        const chunkSize = OPTICAL_CHUNK_PRESETS[preset];
+        if (payload.files.length > 0) {
+          encoded = await encodeFileToOpticalFrames(payload.files[0], chunkSize);
+        } else if (payload.text.trim()) {
+          encoded = await encodeTextToOpticalFrames(payload.text.trim(), chunkSize);
+        }
+        setFrames(encoded);
+        setCurrentFrameIndex(0);
+        setIsPlaying(false);
+        setHasStartedStreaming(false);
+      } catch (err) {
+        console.error("Failed to encode payload to optical frames:", err);
+      } finally {
+        setIsEncoding(false);
       }
-      setFrames(encoded);
-      setCurrentFrameIndex(0);
-      setIsPlaying(false); // Start paused on Frame 1 by default
-      setHasStartedStreaming(false);
-    } catch (err) {
-      console.error("Failed to encode payload to optical frames:", err);
-    } finally {
-      setIsEncoding(false);
-    }
-  }, []);
+    },
+    []
+  );
+
+  // Handle payload selection in sender mode
+  const handlePayloadSelected = useCallback(
+    async (payload: { files: File[]; text: string }) => {
+      setActivePayload(payload);
+      await encodePayload(payload, selectedPreset);
+    },
+    [encodePayload, selectedPreset]
+  );
+
+  // Handle QR density preset changes
+  const handlePresetChange = useCallback(
+    async (newPreset: OpticalChunkPreset) => {
+      setSelectedPreset(newPreset);
+      if (activePayload) {
+        await encodePayload(activePayload, newPreset);
+      }
+    },
+    [activePayload, encodePayload]
+  );
 
   // Frame cycling loop for sender
   useEffect(() => {
@@ -123,73 +161,112 @@ export function CameraStreamCard() {
   // Reusable frame processor for both live camera frames and image uploads
   const processDecodedFrame = useCallback(
     async (decodedText: string) => {
-      if (!isOpticalDataFrame(decodedText)) {
-        setLastDetected({ isOptical: false, timestamp: Date.now() });
-        return;
-      }
+      // Wrap entire success callback in try/catch to avoid crashes
+      try {
+        const now = Date.now();
 
-      const frame = parseOpticalDataFrame(decodedText);
-      if (frame) {
-        setLastDetected({
-          isOptical: true,
-          frameIndex: frame.chunkIndex + 1,
-          totalFrames: frame.totalChunks,
-          timestamp: Date.now(),
-        });
-      }
+        // Ignore identical frame text if received within 100ms
+        if (
+          decodedText === lastScannedTextRef.current &&
+          now - lastScannedTimeRef.current < 100
+        ) {
+          return;
+        }
+        lastScannedTextRef.current = decodedText;
+        lastScannedTimeRef.current = now;
 
-      const res = await collectorRef.current.ingestFrame(decodedText);
-      if (res.status === "collecting") {
-        setScanProgress({
-          fileName: res.fileName,
-          fileSize: res.fileSize,
-          totalChunks: res.totalChunks,
-          receivedCount: res.receivedCount,
-          percentage: res.percentage,
-          missingIndices: res.missingIndices,
-        });
-      } else if (res.status === "completed") {
-        setReceivedPayload(res.payload);
-        setScanProgress(null);
+        // Ingest frame into collector ref directly
+        const res = await collectorRef.current.add(decodedText);
 
-        // Record to session history
-        addHistoryItem({
-          direction: "received",
-          mode: "Via Camera",
-          itemType: res.payload.text ? "text" : "file",
-          name: res.payload.fileName,
-          size: res.payload.fileSize,
-          status: "completed",
-          textSnippet: res.payload.text?.substring(0, 100),
-        });
-
-        // Stop scanner cleanly
-        if (scannerRef.current) {
-          try {
-            await scannerRef.current.stop();
-            await scannerRef.current.clear();
-          } catch {
-            // Ignore stop errors
-          }
-          scannerRef.current = null;
-          setIsCameraActive(false);
+        if (res.status === "invalid") {
+          setLastDetected({ isOptical: false, timestamp: now });
+          return;
         }
 
-        // Auto-trigger download for files
-        if (!res.payload.text) {
+        if (res.status === "error") {
+          setCameraError(res.error);
+          return;
+        }
+
+        if (res.status === "collecting") {
+          setCameraError(null);
+          setLastDetected({
+            isOptical: true,
+            frameIndex: res.receivedCount,
+            totalFrames: res.totalChunks,
+            timestamp: now,
+          });
+
+          // Schedule throttled state update (max 5 updates per second = 200ms)
+          pendingProgressRef.current = {
+            fileName: res.fileName,
+            fileSize: res.fileSize,
+            totalChunks: res.totalChunks,
+            receivedCount: res.receivedCount,
+            percentage: res.percentage,
+            missingIndices: res.missingIndices,
+          };
+
+          if (now - lastUiUpdateRef.current >= 200) {
+            lastUiUpdateRef.current = now;
+            setScanProgress(pendingProgressRef.current);
+          } else if (!throttleTimerRef.current) {
+            throttleTimerRef.current = setTimeout(() => {
+              throttleTimerRef.current = null;
+              lastUiUpdateRef.current = Date.now();
+              if (pendingProgressRef.current) {
+                setScanProgress(pendingProgressRef.current);
+              }
+            }, 200 - (now - lastUiUpdateRef.current));
+          }
+        } else if (res.status === "completed") {
+          if (throttleTimerRef.current) {
+            clearTimeout(throttleTimerRef.current);
+            throttleTimerRef.current = null;
+          }
+
+          // Stop camera scanner first
+          if (scannerRef.current) {
+            try {
+              await scannerRef.current.stop();
+              await scannerRef.current.clear();
+            } catch {
+              // Ignore stop errors
+            }
+            scannerRef.current = null;
+            setIsCameraActive(false);
+          }
+
+          // Finalize inside try/catch
           try {
-            const url = URL.createObjectURL(res.payload.blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = res.payload.fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 15000);
-          } catch {
-            // Ignore programmatic click block
+            setReceivedPayload(res.payload);
+            setScanProgress(null);
+            setCameraError(null);
+
+            // Record to session history
+            addHistoryItem({
+              direction: "received",
+              mode: "Via Camera",
+              itemType: res.payload.text ? "text" : "file",
+              name: res.payload.fileName,
+              size: res.payload.fileSize,
+              status: "completed",
+              textSnippet: res.payload.text?.substring(0, 100),
+            });
+          } catch (finalizeErr) {
+            setCameraError(
+              finalizeErr instanceof Error
+                ? finalizeErr.message
+                : "Failed to finalize received payload."
+            );
           }
         }
+      } catch (err) {
+        setCameraError(
+          err instanceof Error
+            ? err.message
+            : "An unexpected error occurred while processing optical frame."
+        );
       }
     },
     [addHistoryItem]
@@ -207,6 +284,8 @@ export function CameraStreamCard() {
       setScanProgress(null);
       setLastDetected(null);
       collectorRef.current.reset();
+      lastScannedTextRef.current = "";
+      lastScannedTimeRef.current = 0;
 
       // Check secure context / mediaDevices support (e.g. non-HTTPS local IP)
       if (
@@ -251,16 +330,13 @@ export function CameraStreamCard() {
         const scanner = new Html5Qrcode(readerElementId);
         scannerRef.current = scanner;
 
-        const config = {
-          fps: 20,
-          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-            const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-            const edge = Math.floor(minEdge * 0.9);
-            return { width: edge, height: edge };
-          },
-          aspectRatio: 1.0,
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true,
+        // Html5Qrcode config: fps 15, no qrbox restriction (scan full frame), disableFlip true, ideal 1280x720
+        const scanConfig = {
+          fps: 15,
+          disableFlip: true,
+          videoConstraints: {
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
           },
         };
 
@@ -269,7 +345,7 @@ export function CameraStreamCard() {
         if (targetCamera) {
           await scanner.start(
             targetCamera,
-            config,
+            scanConfig,
             (decodedText) => {
               processDecodedFrame(decodedText);
             },
@@ -280,7 +356,7 @@ export function CameraStreamCard() {
           try {
             await scanner.start(
               { facingMode: "environment" },
-              config,
+              scanConfig,
               (decodedText) => {
                 processDecodedFrame(decodedText);
               },
@@ -291,7 +367,7 @@ export function CameraStreamCard() {
             try {
               await scanner.start(
                 { facingMode: "user" },
-                config,
+                scanConfig,
                 (decodedText) => {
                   processDecodedFrame(decodedText);
                 },
@@ -303,7 +379,7 @@ export function CameraStreamCard() {
               if (cameras.length > 0) {
                 await scanner.start(
                   cameras[0].id,
-                  config,
+                  scanConfig,
                   (decodedText) => {
                     processDecodedFrame(decodedText);
                   },
@@ -313,7 +389,7 @@ export function CameraStreamCard() {
                 // 4. Last resort: empty constraints
                 await scanner.start(
                   {},
-                  config,
+                  scanConfig,
                   (decodedText) => {
                     processDecodedFrame(decodedText);
                   },
@@ -413,7 +489,7 @@ export function CameraStreamCard() {
     }
   };
 
-  // Cleanup camera when component unmounts
+  // Cleanup camera and created Blob URLs when component unmounts
   useEffect(() => {
     isUnmountedRef.current = false;
     return () => {
@@ -426,19 +502,30 @@ export function CameraStreamCard() {
           .then(() => scannerRef.current?.clear())
           .catch(() => {});
       }
+      if (throttleTimerRef.current) {
+        clearTimeout(throttleTimerRef.current);
+        throttleTimerRef.current = null;
+      }
+      // Revoke created Blob URLs on unmount
+      createdBlobUrlsRef.current.forEach((url) => {
+        try {
+          URL.revokeObjectURL(url);
+        } catch {}
+      });
+      createdBlobUrlsRef.current = [];
     };
   }, []);
 
   const handleDownloadReceived = () => {
     if (!receivedPayload) return;
     const url = URL.createObjectURL(receivedPayload.blob);
+    createdBlobUrlsRef.current.push(url);
     const a = document.createElement("a");
     a.href = url;
     a.download = receivedPayload.fileName;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
   const handleCopyText = async () => {
@@ -498,6 +585,26 @@ export function CameraStreamCard() {
             </div>
           ) : (
             <div className="space-y-5">
+              {/* QR Density Preset Selector */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3.5 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl w-full">
+                <div className="text-left w-full sm:w-auto">
+                  <div className="text-xs font-bold text-[var(--text)]">QR density</div>
+                  <div className="text-[11px] text-[var(--text-muted)] mt-0.5">
+                    Smaller is easier to scan, larger is faster
+                  </div>
+                </div>
+                <SegmentedControl
+                  value={selectedPreset}
+                  onChange={(val) => handlePresetChange(val as OpticalChunkPreset)}
+                  options={[
+                    { value: "small", label: "Small" },
+                    { value: "medium", label: "Medium" },
+                    { value: "large", label: "Large" },
+                  ]}
+                  ariaLabel="QR density"
+                />
+              </div>
+
               {/* Large Payload Advisory Banner (> 300 frames) */}
               {frames.length > 300 && (
                 <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs flex items-start gap-2.5">
@@ -810,7 +917,7 @@ export function CameraStreamCard() {
                       </span>
                     </div>
                     <span className="font-mono tabular-nums text-[var(--accent)] font-semibold">
-                      {scanProgress.receivedCount} / {scanProgress.totalChunks} Chunks ({scanProgress.percentage}%)
+                      Received {scanProgress.receivedCount} of {scanProgress.totalChunks} frames ({scanProgress.percentage}%)
                     </span>
                   </div>
 
@@ -887,7 +994,7 @@ export function CameraStreamCard() {
                     onClick={handleDownloadReceived}
                     className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs shadow-xs transition-opacity cursor-pointer"
                   >
-                    <Download className="w-4 h-4" /> Save / Download File
+                    <Download className="w-4 h-4" /> Save file
                   </button>
                 )}
 

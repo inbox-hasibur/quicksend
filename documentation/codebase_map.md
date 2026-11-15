@@ -36,6 +36,7 @@ flowchart TD
         Layout["layout.tsx (Root Shell, Font Injection)"]
         Page["page.tsx (5-Mode Home Hub & URL Param Receiver)"]
         Manifest["manifest.ts (PWA Web App Manifest)"]
+        ErrBoundary["error.tsx (Client Error Boundary & Crash Guard)"]
         HealthAPI["api/health/route.ts (Health Check & Runtime Telemetry)"]
         SignalAPI["api/signal/route.ts (Room Signaling & Ephemeral Relay)"]
         DiscoverAPI["api/discover/route.ts (Same Wi-Fi Local Discovery & Presence)"]

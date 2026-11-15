@@ -2,164 +2,188 @@ import { describe, it, expect } from "vitest";
 import {
   encodeFileToOpticalFrames,
   encodeTextToOpticalFrames,
-  isOpticalDataFrame,
   parseOpticalDataFrame,
+  computePayloadHash,
   OpticalDataCollector,
+  OPTICAL_CHUNK_PRESETS,
+  type OpticalDataFrame,
 } from "@/lib/opticalDataStream";
 
 describe("Optical Data Stream Protocol", () => {
-  it("should encode plain text into valid sequenced optical frames", async () => {
-    const text = "Hello QuickSend Optical Stream! Air-gapped file sharing with zero network.";
-    const frames = await encodeTextToOpticalFrames(text, 20); // Small chunk size to force multiple frames
+  /**
+   * Helper to simulate real-world webcam scanning conditions:
+   * Shuffled order + 30% duplicate frames + first 5 frames looped at the end.
+   */
+  function buildTortureSequence(frames: OpticalDataFrame[]): string[] {
+    const shuffled = [...frames].sort(() => Math.random() - 0.5);
+    const dupCount = Math.max(1, Math.floor(frames.length * 0.3));
+    const duplicates = frames.slice(0, dupCount).map((f) => f.encodedPayload);
+    const combined = [...shuffled.map((f) => f.encodedPayload), ...duplicates].sort(
+      () => Math.random() - 0.5
+    );
+    const loopedEnd = frames.slice(0, Math.min(5, frames.length)).map((f) => f.encodedPayload);
+    return [...combined, ...loopedEnd];
+  }
 
-    expect(frames.length).toBeGreaterThan(1);
-    expect(frames[0].chunkIndex).toBe(0);
-    expect(frames[0].totalChunks).toBe(frames.length);
-    expect(isOpticalDataFrame(frames[0].encodedPayload)).toBe(true);
+  it("should perform full round-trip for 20KB random binary file with shuffled, duplicate, and looped frames", async () => {
+    // 20KB random bytes
+    const randomBytes = new Uint8Array(20480);
+    for (let i = 0; i < randomBytes.length; i++) {
+      randomBytes[i] = Math.floor(Math.random() * 256);
+    }
+    const expectedHash = computePayloadHash(randomBytes);
+    const file = new File([randomBytes], "random-20kb.bin", {
+      type: "application/octet-stream",
+    });
 
-    const parsed = parseOpticalDataFrame(frames[0].encodedPayload);
-    expect(parsed).not.toBeNull();
-    expect(parsed?.fileName).toBe("message.txt");
-    expect(parsed?.totalChunks).toBe(frames.length);
-  });
-
-  it("should reassemble frames received in out-of-order sequence", async () => {
-    const originalText = "The quick brown fox jumps over the lazy dog. 1234567890! Special: &%#$";
-    const frames = await encodeTextToOpticalFrames(originalText, 15);
-    expect(frames.length).toBeGreaterThan(2);
+    // Run real sender encoder
+    const frames = await encodeFileToOpticalFrames(file);
+    expect(frames.length).toBeGreaterThan(10);
 
     const collector = new OpticalDataCollector();
-
-    // Shuffle frames out of order
-    const shuffled = [...frames].sort(() => Math.random() - 0.5);
+    const tortureSequence = buildTortureSequence(frames);
 
     let completedPayload = null;
-    for (let i = 0; i < shuffled.length; i++) {
-      const result = await collector.ingestFrame(shuffled[i].encodedPayload);
-      if (result.status === "completed") {
-        completedPayload = result.payload;
+    for (const rawFrame of tortureSequence) {
+      const res = await collector.add(rawFrame);
+      if (res.status === "completed") {
+        completedPayload = res.payload;
       }
     }
 
     expect(completedPayload).not.toBeNull();
-    expect(completedPayload?.text).toBe(originalText);
-    expect(completedPayload?.fileName).toBe("message.txt");
+    expect(completedPayload?.fileName).toBe("random-20kb.bin");
+    expect(completedPayload?.fileSize).toBe(20480);
+    expect(completedPayload?.hashVerified).toBe(true);
+    expect(completedPayload?.hash).toBe(expectedHash);
+
+    const restoredBuf = await completedPayload!.blob.arrayBuffer();
+    const restoredBytes = new Uint8Array(restoredBuf);
+    expect(restoredBytes.length).toBe(randomBytes.length);
+    expect(restoredBytes).toEqual(randomBytes);
   });
 
-  it("should tolerate duplicate frames without double counting", async () => {
-    const text = "Testing duplicate frame ingestion in optical stream.";
-    const frames = await encodeTextToOpticalFrames(text, 20);
+  it("should perform full round-trip for short text payload with torture sequence", async () => {
+    const shortText = "QuickSend 100% offline optical beam message payload";
+    const frames = await encodeTextToOpticalFrames(shortText, 15);
+    expect(frames.length).toBeGreaterThan(2);
 
     const collector = new OpticalDataCollector();
+    const tortureSequence = buildTortureSequence(frames);
 
-    // Ingest frame 0 multiple times
-    await collector.ingestFrame(frames[0].encodedPayload);
-    const progressAfterDup = await collector.ingestFrame(frames[0].encodedPayload);
-
-    if (progressAfterDup.status === "collecting") {
-      expect(progressAfterDup.receivedCount).toBe(1);
-    }
-  });
-
-  it("should encode and reassemble binary file accurately", async () => {
-    const binaryData = new Uint8Array([0xde, 0xad, 0xbe, 0xef, 0x01, 0x02, 0x03, 0x04, 0x42]);
-    const file = new File([binaryData], "test-binary.dat", { type: "application/octet-stream" });
-
-    const frames = await encodeFileToOpticalFrames(file, 4);
-    expect(frames.length).toBe(3);
-
-    const collector = new OpticalDataCollector();
-    let completed = null;
-    for (const frame of frames) {
-      const res = await collector.ingestFrame(frame.encodedPayload);
+    let completedPayload = null;
+    for (const rawFrame of tortureSequence) {
+      const res = await collector.add(rawFrame);
       if (res.status === "completed") {
-        completed = res.payload;
+        completedPayload = res.payload;
       }
     }
 
-    expect(completed).not.toBeNull();
-    expect(completed?.fileName).toBe("test-binary.dat");
-    const reassembledBuf = await completed!.blob.arrayBuffer();
-    expect(new Uint8Array(reassembledBuf)).toEqual(binaryData);
+    expect(completedPayload).not.toBeNull();
+    expect(completedPayload?.text).toBe(shortText);
+    expect(completedPayload?.hashVerified).toBe(true);
   });
 
-  it("should perform full round-trip with multi-byte UTF-8, out-of-order delivery, and duplicate frames", async () => {
-    const complexText = "🌟 QuickSend Optical 2.0: Bengali (বাংলা), Japanese (日本語), Arabic (العربية), & Emojis! 🚀⚡🔥";
-    const frames = await encodeTextToOpticalFrames(complexText, 25);
-    expect(frames.length).toBeGreaterThan(3);
+  it("should reset collector cleanly when second session arrives after incomplete first session", async () => {
+    const sessionABytes = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]);
+    const fileA = new File([sessionABytes], "fileA.bin", { type: "application/octet-stream" });
+    const framesA = await encodeFileToOpticalFrames(fileA, 2);
+    expect(framesA.length).toBe(4);
+
+    const sessionBBytes = new Uint8Array([10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
+    const fileB = new File([sessionBBytes], "fileB.bin", { type: "application/octet-stream" });
+    const framesB = await encodeFileToOpticalFrames(fileB, 3);
 
     const collector = new OpticalDataCollector();
 
-    // Create a sequence with reversed order AND duplicates
-    const mixedDelivery = [
-      ...frames.slice().reverse(),
-      frames[1], // duplicate
-      frames[0], // duplicate
-      frames[Math.floor(frames.length / 2)], // duplicate
+    // Ingest only half of Session A (incomplete)
+    const resA0 = await collector.add(framesA[0].encodedPayload);
+    expect(resA0.status).toBe("collecting");
+    const resA1 = await collector.add(framesA[1].encodedPayload);
+    expect(resA1.status).toBe("collecting");
+
+    // Ingest all frames of Session B (should automatically reset and complete B)
+    let finalPayloadB = null;
+    for (const frame of framesB) {
+      const res = await collector.add(frame.encodedPayload);
+      if (res.status === "completed") {
+        finalPayloadB = res.payload;
+      }
+    }
+
+    expect(finalPayloadB).not.toBeNull();
+    expect(finalPayloadB?.fileName).toBe("fileB.bin");
+    expect(finalPayloadB?.fileSize).toBe(sessionBBytes.length);
+    const restoredB = new Uint8Array(await finalPayloadB!.blob.arrayBuffer());
+    expect(restoredB).toEqual(sessionBBytes);
+  });
+
+  it("should never throw on garbage or corrupted input and return null", () => {
+    const garbageInputs = [
+      "",
+      "random string",
+      "QS1|incomplete",
+      "QS1||||||||",
+      "QS1|t1|not_number|total|name|size|mime|0|data",
+      "QS1|t1|0|5|name|-1|mime|0|data",
+      "QS1|t1|10|5|name|100|mime|0|data", // index >= total
+      null as unknown as string,
+      undefined as unknown as string,
     ];
 
-    let finalPayload = null;
-    for (const frame of mixedDelivery) {
-      const res = await collector.ingestFrame(frame.encodedPayload);
-      if (res.status === "completed") {
-        finalPayload = res.payload;
+    for (const input of garbageInputs) {
+      expect(() => parseOpticalDataFrame(input)).not.toThrow();
+      expect(parseOpticalDataFrame(input)).toBeNull();
+    }
+
+    // Invalid URI sequence must not throw
+    expect(() => parseOpticalDataFrame("QS1|t1|0|1|bad_%E0%A4%A|10|mime|0|data")).not.toThrow();
+  });
+
+  it("should return a clear error value (not exception) when payload hash check fails", async () => {
+    const data = new Uint8Array([10, 20, 30, 40, 50]);
+    const file = new File([data], "hash-test.dat", { type: "application/octet-stream" });
+    const frames = await encodeFileToOpticalFrames(file, 2);
+
+    // Tamper with base64 data in frame 0
+    const parts = frames[0].encodedPayload.split("|");
+    parts[8] = btoa("corrupted"); // modify base64
+    const tamperedPayload = parts.join("|");
+
+    const collector = new OpticalDataCollector();
+    await collector.add(tamperedPayload);
+    let errorResult = null;
+    for (let i = 1; i < frames.length; i++) {
+      const res = await collector.add(frames[i].encodedPayload);
+      if (res.status === "error") {
+        errorResult = res;
       }
     }
 
-    expect(finalPayload).not.toBeNull();
-    expect(finalPayload?.text).toBe(complexText);
-    expect(finalPayload?.mimeType).toBe("text/plain");
+    expect(errorResult).not.toBeNull();
+    expect(errorResult?.status).toBe("error");
+    expect(errorResult?.error).toContain("Hash check failed");
   });
 
-  it("should correctly reset collector state when a frame from a new transfer arrives", async () => {
-    const textA = "Transfer A Payload";
-    const textB = "Transfer B Payload";
-
-    const framesA = await encodeTextToOpticalFrames(textA, 10);
-    const framesB = await encodeTextToOpticalFrames(textB, 10);
-
-    const collector = new OpticalDataCollector();
-
-    // Ingest first frame of transfer A
-    const resA = await collector.ingestFrame(framesA[0].encodedPayload);
-    expect(resA.status).toBe("collecting");
-    if (resA.status === "collecting") {
-      expect(resA.transferId).toBe(framesA[0].transferId);
+  it("should ensure all OPTICAL_CHUNK_PRESETS produce frames within QR capacity (<= 500 chars for large)", async () => {
+    const payload10k = new Uint8Array(10240);
+    for (let i = 0; i < payload10k.length; i++) {
+      payload10k[i] = (i * 37) % 256;
     }
+    const testFile = new File([payload10k], "capacity-test.bin", {
+      type: "application/octet-stream",
+    });
 
-    // Ingest first frame of transfer B (should reset and track B)
-    const resB = await collector.ingestFrame(framesB[0].encodedPayload);
-    expect(resB.status).toBe("collecting");
-    if (resB.status === "collecting") {
-      expect(resB.transferId).toBe(framesB[0].transferId);
-      expect(resB.receivedCount).toBe(1);
-    }
-  });
+    for (const [presetName, chunkSize] of Object.entries(OPTICAL_CHUNK_PRESETS)) {
+      const frames = await encodeFileToOpticalFrames(testFile, chunkSize);
+      expect(frames.length).toBeGreaterThan(0);
 
-  it("should generate compact frames with DEFAULT_CHUNK_RAW_BYTES for high webcam scannability", async () => {
-    const data = Array.from(
-      { length: 25 },
-      (_, i) => `Record ${i}: QuickSend optical streaming payload with high entropy ${(i * 9973).toString(36)}`
-    ).join("\n");
-    const frames = await encodeTextToOpticalFrames(data);
-
-    expect(frames.length).toBeGreaterThan(1);
-    for (const frame of frames) {
-      // Base64 chunk length for 66 raw bytes is at most 88 characters
-      expect(frame.base64Data.length).toBeLessThanOrEqual(92);
-      expect(frame.encodedPayload.startsWith("QS1|")).toBe(true);
-    }
-
-    const collector = new OpticalDataCollector();
-    let reassembled = null;
-    for (const frame of frames) {
-      const res = await collector.ingestFrame(frame.encodedPayload);
-      if (res.status === "completed") {
-        reassembled = res.payload;
+      for (const frame of frames) {
+        expect(frame.encodedPayload.startsWith("QS1|")).toBe(true);
+        if (presetName === "large") {
+          expect(frame.encodedPayload.length).toBeLessThanOrEqual(500);
+        }
       }
     }
-
-    expect(reassembled).not.toBeNull();
-    expect(reassembled?.text).toBe(data);
   });
 });

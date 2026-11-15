@@ -212,3 +212,34 @@
 - [x] Multi-tone FSK acoustic transmission via Web Audio API oscillators (18,000–19,800 Hz near-ultrasonic and 1,500–3,000 Hz audible chirp presets) with real-time microphone AnalyserNode (4096-point FFT) decoder and live spectrum canvas visualizer.
 - [x] Add unit tests in `src/lib/__tests__/ultrasonicStream.test.ts`, `src/components/__tests__/CableTransferCard.test.tsx`, and `src/components/__tests__/UltrasonicCard.test.tsx`.
 - [x] **Sprint 11 Verification:** 142/142 unit tests passing across 26 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+### Sprint 12: Optical Camera Scan Hardening & Error Boundary Crash Guard
+- [x] Harden Optical Data Stream Protocol (`src/lib/opticalDataStream.ts`):
+  - FNV-1a checksum calculation embedded in 10th pipe field of frame format (`QS1|<transferId>|<index>|<total>|<fileName>|<fileSize>|<mimeType>|<isCompressed>|<base64>|<hash>`).
+  - Symmetrical compression/decompression algorithm using `deflate` with raw fallback when compressed size is not smaller.
+  - Robust exception-free frame parser (`parseOpticalDataFrame`) returning `null` on corrupt/garbage input without throwing.
+  - Collector session reset: automatically resets chunks and expected hash when session id or total frames change, preventing cross-session pollution.
+  - Integrity check: computes reconstructed hash and returns `{ status: "error", error: "..." }` on mismatch (not an unhandled exception).
+  - Exported chunk size presets: `OPTICAL_CHUNK_PRESETS` (`small: 66`, `medium: 150`, `large: 300`) with medium default.
+  - Collector caching: caches completed payload so duplicate carousel frames do not trigger expensive repeated decompressions.
+  - Dual collector API: supports both `collector.add(raw)` and `collector.ingestFrame(raw)`.
+- [x] Harden Receiver Camera Scanner (`src/components/CameraStreamCard.tsx`):
+  - Collector kept strictly in `useRef(new OpticalDataCollector())` to eliminate stale closure bugs in scanner callbacks.
+  - Sub-100ms duplicate frame suppression to reduce CPU load.
+  - Throttled progress updates (max 5 state dispatches per second / 200ms) eliminating UI stutter and frame drops.
+  - Try/catch wrapped callback displaying readable diagnostics in place of crashes.
+  - Safe completion sequence: stops camera scanner before finalization, sets payload in state, records history, and surfaces primary "Save file" button (avoiding mobile browser programmatic download blocks).
+  - Copy button for text snippets and Blob URL cleanup on unmount via ref tracking.
+  - Display progress as `"Received X of Y frames (Z%)"` with percentage progress bar.
+  - Html5Qrcode video constraints: `fps: 15`, no `qrbox` restriction (scanning full frame), `disableFlip: true`, ideal 1280x720.
+  - Sender UI: 3-option segmented selector "Small / Medium / Large" labeled "QR density" with hint "Smaller is easier to scan, larger is faster", rebuilding stream from Frame 1 on change.
+- [x] Application Crash Guard (`src/app/error.tsx`):
+  - Created client error boundary displaying human-readable failure notice, a Reload button, and logging error to `console.error`.
+- [x] Automated Tests (`src/lib/__tests__/opticalDataStream.test.ts`):
+  - 20KB random binary file round-trip test with shuffled delivery, 30% duplicates, and first 5 frames looped at the end.
+  - Short text torture round-trip test.
+  - Session reset test after incomplete first session.
+  - Garbage input parser resilience test.
+  - Hash integrity mismatch error test.
+  - Preset capacity test ensuring all presets stay within QR bounds (<= 500 chars for large).
+- [x] **Sprint 12 Verification:** 143/143 unit tests passing across 26 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.

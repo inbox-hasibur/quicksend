@@ -259,6 +259,7 @@ quicksend/
     │   │       ├── __tests__/
     │   │       │   └── route.test.ts
     │   │       └── route.ts
+    │   ├── error.tsx
     │   ├── favicon.ico
     │   ├── globals.css
     │   ├── icon.svg
