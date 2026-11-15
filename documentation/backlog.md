@@ -268,3 +268,27 @@
 - [x] Unit Tests (`src/lib/__tests__/transferEstimate.test.ts`):
   - Validated channel default speeds + 1s overhead, measured speed override, camera frames calculation, duration formatting edge cases, and zero bytes handling.
 - [x] **Sprint 13 Verification:** 148/148 unit tests passing across 27 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+### Sprint 14: Isolated Html5Qrcode Scanner Lifecycle & DOM Error Protection
+- [x] Create Isolated Scanner Hook (`src/hooks/useHtml5Scanner.ts`):
+  - Manages `Html5Qrcode` lifecycle inside an unmanaged child DOM node created with `document.createElement`, detached cleanly on stop/clear.
+  - Zero React children inside `containerRef`: completely isolates `Html5Qrcode` DOM insertions and removals from React's reconciliation engine.
+  - Safe mutex-guarded `stop()`: handles multiple stop invocations, missing parent node exceptions, and auto-cleanup on unmount.
+  - Secure context detection: guards camera calls against non-HTTPS local IP access with actionable guidance.
+  - File upload scanner (`scanFile`) and camera device enumeration (`getCameras`).
+- [x] Integrate Hook in `src/components/CameraStreamCard.tsx`:
+  - Replaced direct `Html5Qrcode` usage with `useHtml5Scanner()`.
+  - Added `completedRef` guard to ignore subsequent frames once reassembly finishes.
+  - Awaits `stopScanner()` before updating React state to the finished payload UI.
+  - Separated scanner container from overlay and button siblings; added `translate="no"` on root container.
+- [x] Integrate Hook in `src/components/QRScannerModal.tsx`:
+  - Replaced direct `Html5Qrcode` with `useHtml5Scanner()`.
+  - Empty container div with sibling status overlays; added `translate="no"` on root modal.
+- [x] Add Anti-Translation Meta Tag (`src/app/layout.tsx`):
+  - Added `<meta name="google" content="notranslate" />` to `<head>` to prevent browser translation extensions from mutating React text nodes.
+- [x] Automated Unit Tests (`src/hooks/__tests__/useHtml5Scanner.test.ts`):
+  - Verified calling `stop()` twice does not throw.
+  - Verified `stop()` does not throw when child div was already detached from DOM.
+  - Verified component unmount while running calls `stop()` once.
+  - Verified container has zero child nodes after `stop()`.
+- [x] **Sprint 14 Verification:** 152/152 unit tests passing across 28 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.

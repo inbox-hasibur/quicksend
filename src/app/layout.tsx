@@ -34,6 +34,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        <meta name="google" content="notranslate" />
         <Script
           id="theme-initializer"
           strategy="beforeInteractive"

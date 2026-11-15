@@ -14,7 +14,7 @@ import {
   Upload,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import { Html5Qrcode } from "html5-qrcode";
+import { useHtml5Scanner } from "@/hooks/useHtml5Scanner";
 import { Dropzone } from "@/components/Dropzone";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { EstimateBadge } from "@/components/EstimateBadge";
@@ -45,12 +45,22 @@ export function CameraStreamCard() {
   const [selectedPreset, setSelectedPreset] = useState<OpticalChunkPreset>("medium");
   const [activePayload, setActivePayload] = useState<{ files: File[]; text: string } | null>(null);
 
-  // Receiver state
-  const [isCameraActive, setIsCameraActive] = useState(false);
-  const [isCameraStarting, setIsCameraStarting] = useState(false);
+  // Receiver state using isolated HTML5 scanner hook
+  const {
+    containerRef,
+    start: startScanner,
+    stop: stopScanner,
+    isRunning: isCameraActive,
+    isStarting: isCameraStarting,
+    error: scannerError,
+    scanFile,
+    getCameras,
+  } = useHtml5Scanner();
+
   const [availableCameras, setAvailableCameras] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedCameraId, setSelectedCameraId] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const completedRef = useRef(false);
   const [lastDetected, setLastDetected] = useState<{
     isOptical: boolean;
     frameIndex?: number;
@@ -70,10 +80,6 @@ export function CameraStreamCard() {
 
   const { addHistoryItem } = useTransferHistory();
   const collectorRef = useRef<OpticalDataCollector>(new OpticalDataCollector());
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const isStartingRef = useRef(false);
-  const isUnmountedRef = useRef(false);
-  const shouldStopRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const playbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastScannedTextRef = useRef<string>("");
@@ -89,7 +95,6 @@ export function CameraStreamCard() {
     missingIndices: number[];
   } | null>(null);
   const createdBlobUrlsRef = useRef<string[]>([]);
-  const readerElementId = "camera-optical-viewfinder";
 
   // Re-encode payload with given chunk preset
   const encodePayload = useCallback(
@@ -161,6 +166,9 @@ export function CameraStreamCard() {
   // Reusable frame processor for both live camera frames and image uploads
   const processDecodedFrame = useCallback(
     async (decodedText: string) => {
+      // Early exit if collection already completed
+      if (completedRef.current) return;
+
       // Wrap entire success callback in try/catch to avoid crashes
       try {
         const now = Date.now();
@@ -225,17 +233,11 @@ export function CameraStreamCard() {
             throttleTimerRef.current = null;
           }
 
-          // Stop camera scanner first
-          if (scannerRef.current) {
-            try {
-              await scannerRef.current.stop();
-              await scannerRef.current.clear();
-            } catch {
-              // Ignore stop errors
-            }
-            scannerRef.current = null;
-            setIsCameraActive(false);
-          }
+          // First mark completed so callback ignores any further frames
+          completedRef.current = true;
+
+          // Await scanner stop before updating finished UI state
+          await stopScanner();
 
           // Finalize inside try/catch
           try {
@@ -269,179 +271,46 @@ export function CameraStreamCard() {
         );
       }
     },
-    [addHistoryItem]
+    [addHistoryItem, stopScanner]
   );
 
   // Handle receiver camera initialization and scanning
   const startCamera = useCallback(
     async (overrideCameraId?: string) => {
-      if (isStartingRef.current) return;
-      isStartingRef.current = true;
-      shouldStopRef.current = false;
-      setIsCameraStarting(true);
       setCameraError(null);
       setReceivedPayload(null);
       setScanProgress(null);
       setLastDetected(null);
+      completedRef.current = false;
       collectorRef.current.reset();
       lastScannedTextRef.current = "";
       lastScannedTimeRef.current = 0;
 
-      // Check secure context / mediaDevices support (e.g. non-HTTPS local IP)
-      if (
-        typeof window !== "undefined" &&
-        !navigator?.mediaDevices &&
-        !window.isSecureContext
-      ) {
-        setCameraError(
-          "Camera access requires HTTPS or localhost. If opening over local IP, use 'Scan from Screenshot / Image' below."
-        );
-        isStartingRef.current = false;
-        setIsCameraStarting(false);
-        return;
-      }
-
+      // Populate camera list
       try {
-        if (scannerRef.current) {
-          try {
-            await scannerRef.current.stop();
-            await scannerRef.current.clear();
-          } catch {
-            // Ignore stop errors
-          }
-          scannerRef.current = null;
+        const cameras = await getCameras();
+        if (cameras.length > 0) {
+          setAvailableCameras(cameras);
         }
-
-        // Enumerate cameras if supported
-        try {
-          const cameras = await Html5Qrcode.getCameras();
-          if (cameras && cameras.length > 0) {
-            setAvailableCameras(
-              cameras.map((c, i) => ({
-                id: c.id,
-                label: c.label || `Camera ${i + 1}`,
-              }))
-            );
-          }
-        } catch {
-          // Ignore camera enumeration failure
-        }
-
-        const scanner = new Html5Qrcode(readerElementId);
-        scannerRef.current = scanner;
-
-        // Html5Qrcode config: fps 15, no qrbox restriction (scan full frame), disableFlip true, ideal 1280x720
-        const scanConfig = {
-          fps: 15,
-          disableFlip: true,
-          videoConstraints: {
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-        };
-
-        const targetCamera = overrideCameraId || selectedCameraId;
-
-        if (targetCamera) {
-          await scanner.start(
-            targetCamera,
-            scanConfig,
-            (decodedText) => {
-              processDecodedFrame(decodedText);
-            },
-            () => {}
-          );
-        } else {
-          // 1. Try environment (back) camera first
-          try {
-            await scanner.start(
-              { facingMode: "environment" },
-              scanConfig,
-              (decodedText) => {
-                processDecodedFrame(decodedText);
-              },
-              () => {}
-            );
-          } catch {
-            // 2. Fallback to user (front/laptop) camera
-            try {
-              await scanner.start(
-                { facingMode: "user" },
-                scanConfig,
-                (decodedText) => {
-                  processDecodedFrame(decodedText);
-                },
-                () => {}
-              );
-            } catch {
-              // 3. Fallback to first available enumerated camera
-              const cameras = await Html5Qrcode.getCameras().catch(() => []);
-              if (cameras.length > 0) {
-                await scanner.start(
-                  cameras[0].id,
-                  scanConfig,
-                  (decodedText) => {
-                    processDecodedFrame(decodedText);
-                  },
-                  () => {}
-                );
-              } else {
-                // 4. Last resort: empty constraints
-                await scanner.start(
-                  {},
-                  scanConfig,
-                  (decodedText) => {
-                    processDecodedFrame(decodedText);
-                  },
-                  () => {}
-                );
-              }
-            }
-          }
-        }
-
-        if (shouldStopRef.current || isUnmountedRef.current) {
-          try {
-            await scanner.stop();
-            await scanner.clear();
-          } catch {}
-          scannerRef.current = null;
-          setIsCameraActive(false);
-        } else {
-          setIsCameraActive(true);
-        }
-      } catch (err) {
-        setIsCameraActive(false);
-        setCameraError(
-          err instanceof Error
-            ? err.message
-            : "Camera access was denied or is not available. Please allow camera permissions or upload a QR screenshot below."
-        );
-      } finally {
-        isStartingRef.current = false;
-        setIsCameraStarting(false);
+      } catch {
+        // Ignore enumeration errors
       }
+
+      const targetCamera = overrideCameraId || selectedCameraId || undefined;
+      await startScanner(
+        (decodedText) => {
+          processDecodedFrame(decodedText);
+        },
+        undefined,
+        targetCamera
+      );
     },
-    [processDecodedFrame, selectedCameraId]
+    [getCameras, processDecodedFrame, selectedCameraId, startScanner]
   );
 
   const stopCamera = useCallback(async () => {
-    if (isStartingRef.current) {
-      shouldStopRef.current = true;
-      return;
-    }
-    if (scannerRef.current) {
-      try {
-        await scannerRef.current.stop();
-        await scannerRef.current.clear();
-      } catch {
-        // Ignore
-      }
-      scannerRef.current = null;
-    }
-    setIsCameraActive(false);
-    setIsCameraStarting(false);
-  }, []);
+    await stopScanner();
+  }, [stopScanner]);
 
   const handleCameraChange = useCallback(
     async (newCameraId: string) => {
@@ -463,14 +332,11 @@ export function CameraStreamCard() {
 
     setCameraError(null);
     try {
-      if (scannerRef.current && isCameraActive) {
+      if (isCameraActive) {
         await stopCamera();
       }
 
-      const tempScanner = scannerRef.current || new Html5Qrcode(readerElementId);
-      scannerRef.current = tempScanner;
-
-      const decodedText = await tempScanner.scanFile(file, true);
+      const decodedText = await scanFile(file);
       if (decodedText) {
         await processDecodedFrame(decodedText);
       } else {
@@ -489,19 +355,9 @@ export function CameraStreamCard() {
     }
   };
 
-  // Cleanup camera and created Blob URLs when component unmounts
+  // Cleanup timers and created Blob URLs when component unmounts
   useEffect(() => {
-    isUnmountedRef.current = false;
     return () => {
-      isUnmountedRef.current = true;
-      if (isStartingRef.current) {
-        shouldStopRef.current = true;
-      } else if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .then(() => scannerRef.current?.clear())
-          .catch(() => {});
-      }
       if (throttleTimerRef.current) {
         clearTimeout(throttleTimerRef.current);
         throttleTimerRef.current = null;
@@ -540,7 +396,7 @@ export function CameraStreamCard() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" translate="no">
       {/* Header & Role Switcher */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-[var(--border-hairline)]">
         <div>
@@ -783,11 +639,15 @@ export function CameraStreamCard() {
             <div className="space-y-4">
               {/* Viewfinder or Camera Trigger */}
               <div className="relative flex flex-col items-center justify-center p-6 bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-2xl min-h-[340px] w-full">
-                {/* Always-mounted viewfinder container to prevent zero-dimension crashes */}
-                <div
-                  id={readerElementId}
-                  className="w-full max-w-[320px] min-h-[280px] aspect-square rounded-2xl overflow-hidden bg-black/5 dark:bg-black/30 border border-[var(--border-hairline)] relative"
-                >
+                {/* Viewfinder outer box */}
+                <div className="w-full max-w-[320px] min-h-[280px] aspect-square rounded-2xl overflow-hidden bg-black/5 dark:bg-black/30 border border-[var(--border-hairline)] relative flex items-center justify-center">
+                  {/* Isolated scanner container - always mounted, zero React children */}
+                  <div
+                    ref={containerRef}
+                    className={`w-full h-full ${!isCameraActive ? "hidden" : "block"}`}
+                  />
+
+                  {/* Sibling overlay when camera is inactive */}
                   {!isCameraActive && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center p-4 text-center bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xs z-10 space-y-3">
                       <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shadow-2xs">
@@ -872,9 +732,9 @@ export function CameraStreamCard() {
                   </div>
                 )}
 
-                {cameraError && (
+                {(cameraError || scannerError) && (
                   <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 text-xs text-center max-w-sm">
-                    {cameraError}
+                    {scannerError || cameraError}
                   </div>
                 )}
 

@@ -294,9 +294,11 @@ quicksend/
     │   └── TransferModal.tsx
     ├── hooks/
     │   ├── __tests__/
+    │   │   ├── useHtml5Scanner.test.ts
     │   │   ├── useLocalDiscovery.test.tsx
     │   │   ├── useTheme.test.tsx
     │   │   └── useTransferHistory.test.ts
+    │   ├── useHtml5Scanner.ts
     │   ├── useLocalDiscovery.ts
     │   ├── useNearbyShare.ts
     │   ├── useNetworkStatus.ts

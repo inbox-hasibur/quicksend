@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { useEffect, useRef, useCallback } from "react";
 import { Camera, X, AlertCircle, RefreshCw } from "lucide-react";
 import { normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
 import { isOpticalSdp } from "@/lib/opticalSdp";
+import { useHtml5Scanner } from "@/hooks/useHtml5Scanner";
 
 interface QRScannerModalProps {
   isOpen: boolean;
@@ -19,106 +19,78 @@ export function QRScannerModal({
   onScanSuccess,
   keepOpenOnScan = false,
 }: QRScannerModalProps) {
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [isStarting, setIsStarting] = useState(true);
-  const scannerRef = useRef<Html5Qrcode | null>(null);
-  const readerId = "qr-reader-viewport";
+  const { containerRef, start, stop, isRunning, isStarting, error: scannerError } = useHtml5Scanner();
+  const completedRef = useRef(false);
+
+  const handleDecode = useCallback(
+    async (decodedText: string) => {
+      if (completedRef.current) return;
+
+      // Check if scanned text is an optical SDP frame or package
+      if (isOpticalSdp(decodedText)) {
+        if (!keepOpenOnScan) {
+          completedRef.current = true;
+          await stop();
+          onScanSuccess(decodedText);
+          onClose();
+        } else {
+          onScanSuccess(decodedText);
+        }
+        return;
+      }
+
+      // Check if scanned text contains a room query param (e.g. https://.../?room=834291)
+      let extractedCode = "";
+      try {
+        if (decodedText.includes("room=")) {
+          const url = new URL(decodedText);
+          extractedCode = url.searchParams.get("room") || "";
+        } else {
+          extractedCode = decodedText;
+        }
+      } catch {
+        extractedCode = decodedText;
+      }
+
+      const clean = normalizeRoomCode(extractedCode);
+      if (isValidRoomCode(clean)) {
+        completedRef.current = true;
+        await stop();
+        onScanSuccess(clean);
+        onClose();
+      }
+    },
+    [keepOpenOnScan, onClose, onScanSuccess, stop]
+  );
 
   useEffect(() => {
     if (!isOpen) return;
+    completedRef.current = false;
 
-    let isSubscribed = true;
-
-    const startScanner = async () => {
-      try {
-        setIsStarting(true);
-        setErrorMsg(null);
-        const scanner = new Html5Qrcode(readerId);
-        scannerRef.current = scanner;
-
-        const config = {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-        };
-
-        await scanner.start(
-          { facingMode: "environment" },
-          config,
-          (decodedText) => {
-            if (!isSubscribed) return;
-
-            // Check if scanned text is an optical SDP frame or package
-            if (isOpticalSdp(decodedText)) {
-              onScanSuccess(decodedText);
-              if (!keepOpenOnScan) {
-                scanner.stop().catch(() => {});
-                onClose();
-              }
-              return;
-            }
-
-            // Check if scanned text contains a room query param (e.g. https://.../?room=834291)
-            let extractedCode = "";
-            try {
-              if (decodedText.includes("room=")) {
-                const url = new URL(decodedText);
-                extractedCode = url.searchParams.get("room") || "";
-              } else {
-                extractedCode = decodedText;
-              }
-            } catch {
-              extractedCode = decodedText;
-            }
-
-            const clean = normalizeRoomCode(extractedCode);
-            if (isValidRoomCode(clean)) {
-              scanner.stop().catch(() => {});
-              onScanSuccess(clean);
-              onClose();
-            }
-          },
-          () => {
-            // Frame scan failure (ignore continuous frame attempts)
-          }
-        );
-
-        if (isSubscribed) {
-          setIsStarting(false);
-        }
-      } catch (err) {
-        if (isSubscribed) {
-          setIsStarting(false);
-          setErrorMsg(
-            err instanceof Error
-              ? err.message
-              : "Unable to access camera. Please verify camera permissions or type the 6-digit PIN manually."
-          );
-        }
-      }
+    const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0,
     };
 
     // Fast microtask delay to ensure modal DOM container is mounted
-    const timeout = setTimeout(startScanner, 50);
+    const timeout = setTimeout(() => {
+      start(handleDecode, config).catch(() => {});
+    }, 50);
 
     return () => {
-      isSubscribed = false;
       clearTimeout(timeout);
-      if (scannerRef.current) {
-        scannerRef.current
-          .stop()
-          .catch(() => {})
-          .finally(() => {
-            scannerRef.current = null;
-          });
-      }
+      stop().catch(() => {});
     };
-  }, [isOpen, onClose, onScanSuccess, keepOpenOnScan]);
+  }, [isOpen, handleDecode, start, stop]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
+      translate="no"
+    >
       <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
@@ -144,7 +116,11 @@ export function QRScannerModal({
 
         {/* Viewport Area */}
         <div className="relative overflow-hidden rounded-xl bg-black min-h-[280px] flex items-center justify-center">
-          <div id={readerId} className="w-full" />
+          {/* Scanner container is isolated from React - zero React children */}
+          <div
+            ref={containerRef}
+            className={`w-full ${!isRunning ? "hidden" : "block"}`}
+          />
 
           {isStarting && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/80 text-white gap-2">
@@ -153,10 +129,10 @@ export function QRScannerModal({
             </div>
           )}
 
-          {errorMsg && (
+          {scannerError && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-neutral-950/90 text-white p-6 text-center gap-2">
               <AlertCircle className="h-8 w-8 text-amber-400" />
-              <p className="text-xs text-neutral-300 leading-relaxed">{errorMsg}</p>
+              <p className="text-xs text-neutral-300 leading-relaxed">{scannerError}</p>
               <button
                 type="button"
                 onClick={onClose}

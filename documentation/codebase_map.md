@@ -289,6 +289,10 @@ flowchart TD
 - **Purpose:** Hydration-safe network and browser capability detection hooks built with `useSyncExternalStore`.
 - **Exports:** `useNetworkStatus(): boolean`, `useBrowserCapabilities(): BrowserCapabilities`
 
+#### `src/hooks/useHtml5Scanner.ts`
+- **Purpose:** Isolated lifecycle and DOM manager for `html5-qrcode`. Completely separates scanner DOM manipulations from React reconciliation to prevent fatal `removeChild` DOM errors. Supports sequential fallback constraints, camera device enumeration, and image file scanning.
+- **Exports:** `useHtml5Scanner(): UseHtml5ScannerReturn`, `UseHtml5ScannerReturn`
+
 ---
 
 ### 3.4 Protocol & Domain Libraries (`src/lib/`)
