@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   Globe,
@@ -39,6 +39,17 @@ export function ModeSelector() {
   const handleSelectMode = (mode: TransferMode | null) => {
     setSelectedModeOverride(mode === null ? "home" : mode);
   };
+
+  // Listen for global reset to home hub from AppHeader brand link
+  useEffect(() => {
+    const handleGoHome = () => {
+      setSelectedModeOverride("home");
+    };
+    window.addEventListener("quicksend:go-home", handleGoHome);
+    return () => {
+      window.removeEventListener("quicksend:go-home", handleGoHome);
+    };
+  }, []);
 
   const getModeTheme = (mode: TransferMode) => {
     switch (mode) {

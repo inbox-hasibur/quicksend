@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { waitForDrain, type DrainableChannel } from "../useWebRTC";
+import React, { act } from "react";
+import { createRoot, Root } from "react-dom/client";
+import { waitForDrain, useWebRTC, type DrainableChannel } from "../useWebRTC";
+
+// @ts-expect-error React act environment flag
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 describe("waitForDrain", () => {
   beforeEach(() => {
@@ -118,5 +123,101 @@ describe("waitForDrain", () => {
       "bufferedamountlow",
       expect.any(Function)
     );
+  });
+});
+
+describe("useWebRTC hook", () => {
+  let container: HTMLDivElement;
+  let root: Root;
+  let currentHook: ReturnType<typeof useWebRTC>;
+
+  function HookTester() {
+    currentHook = useWebRTC("internet");
+    return null;
+  }
+
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: "ok" }),
+    }));
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    if (typeof globalThis.RTCPeerConnection === "undefined") {
+      class MockRTCPeerConnection {
+        iceConnectionState = "new";
+        iceGatheringState = "new";
+        signalingState = "stable";
+        connectionState = "new";
+        restartIce = vi.fn();
+        createDataChannel = vi.fn().mockReturnValue({
+          binaryType: "arraybuffer",
+          readyState: "connecting",
+          send: vi.fn(),
+          close: vi.fn(),
+          bufferedAmount: 0,
+          bufferedAmountLowThreshold: 0,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        });
+        createOffer = vi.fn().mockResolvedValue({ type: "offer", sdp: "mock-sdp" });
+        setLocalDescription = vi.fn().mockResolvedValue(undefined);
+        setRemoteDescription = vi.fn().mockResolvedValue(undefined);
+        createAnswer = vi.fn().mockResolvedValue({ type: "answer", sdp: "mock-sdp" });
+        addIceCandidate = vi.fn().mockResolvedValue(undefined);
+        close = vi.fn();
+      }
+      // @ts-expect-error Assigning mock to global
+      globalThis.RTCPeerConnection = MockRTCPeerConnection;
+    }
+  });
+
+  afterEach(async () => {
+    await act(async () => {
+      root.unmount();
+    });
+    container.remove();
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it("does not prematurely fail with a 10s ICE timeout when waiting for connection", async () => {
+    vi.useFakeTimers();
+
+    await act(async () => {
+      root.render(React.createElement(HookTester));
+    });
+
+    expect(currentHook.progress.status).toBe("idle");
+
+    await act(async () => {
+      currentHook.startSender();
+    });
+
+    expect(currentHook.progress.status).toBe("connecting");
+
+    // Advance by 12 seconds (past old 10-second timeout threshold)
+    await act(async () => {
+      vi.advanceTimersByTime(12000);
+    });
+
+    // It must remain connecting, NOT transition to error
+    expect(currentHook.progress.status).toBe("connecting");
+
+    // Advance further to 30 seconds
+    await act(async () => {
+      vi.advanceTimersByTime(18000);
+    });
+
+    expect(currentHook.progress.status).toBe("connecting");
+
+    // Clean up cleanly
+    await act(async () => {
+      currentHook.cleanup();
+    });
+
+    expect(currentHook.progress.status).toBe("idle");
   });
 });

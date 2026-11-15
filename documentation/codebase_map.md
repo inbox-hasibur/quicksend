@@ -254,11 +254,12 @@ flowchart TD
 - **Exports:** `QRScannerModal({ isOpen, onClose, onScanSuccess }: QRScannerModalProps): JSX.Element | null`
 
 #### `src/components/TransferModal.tsx`
-- **Purpose:** Multi-state transfer progress dialog:
-  1. *Waiting for Acceptance:* Receiver prompt with file/text preview and Accept/Decline actions.
-  2. *Transferring:* Live progress bar, throughput speed (MB/s), and byte counts.
-  3. *Completed:* Auto-download confirmation for files, or one-click copy button for text snippets.
-  4. *Error / Declined:* Informative status feedback.
+- **Purpose:** Multi-state transfer progress dialog with universal cancellation:
+  1. *Connecting:* Early modal display during connection establishment with clear "Cancel Transfer" button.
+  2. *Waiting for Acceptance:* Receiver prompt with file/text preview and Accept / Cancel Transfer actions.
+  3. *Transferring:* Live progress bar, throughput speed (MB/s), byte counts, and active "Cancel Transfer" action.
+  4. *Completed:* Auto-download confirmation for files, or one-click copy button for text snippets.
+  5. *Error / Declined:* Informative status feedback with immediate dismiss via close button or Escape key.
 - **Exports:** `TransferModal({ progress, onAccept, onReject, onClose }: TransferModalProps): JSX.Element | null`
 
 #### `src/components/FileTypeBadge.tsx`
@@ -266,7 +267,7 @@ flowchart TD
 - **Exports:** `FileTypeBadge({ name, mimeType, className }: FileTypeBadgeProps): JSX.Element`
 
 #### `src/components/AppHeader.tsx`
-- **Purpose:** Soft glass header (`.glass-card`) displaying formatted client-side date (`useSyncExternalStore`), bold "QuickSend" title with Zap icon, session transfer history drawer toggle with counter badge, and live network status badge.
+- **Purpose:** Soft glass header (`.glass-card`) displaying formatted client-side date (`useSyncExternalStore`), clickable bold "QuickSend" title with Zap icon that dispatches `quicksend:go-home` and navigates to `/` (clearing `?room=`), session transfer history drawer toggle with counter badge, and live network status badge.
 - **Exports:** `AppHeader(): JSX.Element`
 
 #### `src/components/ModeSelector.tsx`
@@ -296,7 +297,7 @@ flowchart TD
 ### 3.3 Custom Hooks (`src/hooks/`)
 
 #### `src/hooks/useWebRTC.ts`
-- **Purpose:** Complete WebRTC peer connection and DataChannel manager. Orchestrates signaling exchange, candidate queuing, 64KB binary chunk slicing with buffer backpressure via `waitForDrain`, transfer progress calculation, receiver file/text reassembly, live diagnostics metrics collection (ICE, gathering, signaling, channel, candidate counts, selected pair), and 40-entry debug log ring buffer.
+- **Purpose:** Complete WebRTC peer connection and DataChannel manager. Orchestrates signaling exchange, candidate queuing, 64KB binary chunk slicing with buffer backpressure via `waitForDrain`, transfer progress calculation, receiver file/text reassembly, persistent connection retention (no premature 10s ICE timeout kills), automated one-shot `pc.restartIce()`, resilient PeerJS broker IDs (`qs-v2-`) with 1.5s silent retry on `peer-unavailable`, transport isolation (`activeTransportRef`), live diagnostics metrics collection (ICE, gathering, signaling, channel, candidate counts, selected pair), and 40-entry debug log ring buffer.
 - **Exports:** `useWebRTC(mode): { role, roomId, roomCode, isConnected, progress, pendingHeader, startSender, startReceiver, sendFiles, sendText, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup, debugLog, diagnostics }`, `waitForDrain`, `DrainableChannel`, `FIREWALL_MSG_WITH_DIAGNOSTICS`, `WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`.
 
 #### `src/hooks/useLocalDiscovery.ts`

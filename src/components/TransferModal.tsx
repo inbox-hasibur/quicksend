@@ -35,9 +35,9 @@ export function TransferModal({
 
   // Derive unique key for current status + payload + error so dismissal is 100% deterministic
   const currentTransferKey =
-    progress.status === "idle" || progress.status === "connecting"
+    progress.status === "idle"
       ? null
-      : `${progress.status}_${progress.fileName || progress.totalBytes}_${progress.errorMessage || ""}`;
+      : `${progress.status}_${progress.fileName || progress.totalBytes || "active"}_${progress.errorMessage || ""}`;
 
   const isDismissed = Boolean(currentTransferKey && dismissedKey === currentTransferKey);
 
@@ -48,13 +48,10 @@ export function TransferModal({
     onClose();
   };
 
-  // Keyboard Escape listener to dismiss modal when transfer is completed, rejected, or in error
+  // Keyboard Escape listener to dismiss modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        e.key === "Escape" &&
-        (progress.status === "error" || progress.status === "completed" || progress.status === "rejected")
-      ) {
+      if (e.key === "Escape") {
         handleDismiss();
       }
     };
@@ -77,6 +74,8 @@ export function TransferModal({
 
   const getTitle = () => {
     switch (progress.status) {
+      case "connecting":
+        return "Connecting...";
       case "waiting-acceptance":
         return "Incoming Transfer";
       case "transferring":
@@ -122,66 +121,88 @@ export function TransferModal({
               {getTitle()}
             </h3>
           </div>
-          {(progress.status === "completed" ||
-            progress.status === "rejected" ||
-            progress.status === "error") && (
-              <button
-                type="button"
-                data-testid="transfer-modal-x-close"
-                onClick={handleDismiss}
-                className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
-                aria-label="Close transfer dialog"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
+          <button
+            type="button"
+            data-testid="transfer-modal-x-close"
+            onClick={handleDismiss}
+            className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+            aria-label="Close transfer dialog"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Content Details */}
         <div className="space-y-4">
           {/* File or Text info card */}
-          <div className="flex items-start gap-3 p-4 rounded-2xl border border-[var(--border-hairline)] dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-850/60">
-            {progress.itemType === "file" ? (
-              <FileTypeBadge fileName={progress.fileName} className="mt-0.5" />
-            ) : (
-              <FileText className="h-6 w-6 text-[var(--accent)] shrink-0 mt-0.5" />
-            )}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <p className="font-bold text-sm truncate text-neutral-900 dark:text-neutral-100">
-                  {progress.itemType === "file"
-                    ? progress.fileName || "File Payload"
-                    : "Text / Link Snippet"}
-                </p>
-                {progress.isVerified && (
-                  <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold">
-                    <ShieldCheck className="h-3 w-3" />
-                    Verified ✓
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <p className="text-xs text-neutral-500 font-mono tabular-nums">
-                  {progress.itemType === "file"
-                    ? formatBytes(progress.fileSize || progress.totalBytes)
-                    : `${progress.totalBytes} characters`}
-                </p>
-
-                {progress.totalFiles && progress.totalFiles > 1 && (
-                  <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-mono text-[10px] font-bold">
-                    File {progress.fileIndex || 1} of {progress.totalFiles}
-                  </span>
-                )}
-              </div>
-
-              {progress.itemType === "text" && progress.textPreview && (
-                <p className="text-xs text-neutral-400 mt-1 italic line-clamp-2">
-                  &ldquo;{progress.textPreview}&rdquo;
-                </p>
+          {(progress.fileName || progress.totalBytes > 0 || progress.itemType === "file" || progress.textContent) ? (
+            <div className="flex items-start gap-3 p-4 rounded-2xl border border-[var(--border-hairline)] dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-850/60">
+              {progress.itemType === "file" ? (
+                <FileTypeBadge fileName={progress.fileName} className="mt-0.5" />
+              ) : (
+                <FileText className="h-6 w-6 text-[var(--accent)] shrink-0 mt-0.5" />
               )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="font-bold text-sm truncate text-neutral-900 dark:text-neutral-100">
+                    {progress.itemType === "file"
+                      ? progress.fileName || "File Payload"
+                      : "Text / Link Snippet"}
+                  </p>
+                  {progress.isVerified && (
+                    <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold">
+                      <ShieldCheck className="h-3 w-3" />
+                      Verified ✓
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <p className="text-xs text-neutral-500 font-mono tabular-nums">
+                    {progress.itemType === "file"
+                      ? formatBytes(progress.fileSize || progress.totalBytes)
+                      : `${progress.totalBytes} characters`}
+                  </p>
+
+                  {progress.totalFiles && progress.totalFiles > 1 && (
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 font-mono text-[10px] font-bold">
+                      File {progress.fileIndex || 1} of {progress.totalFiles}
+                    </span>
+                  )}
+                </div>
+
+                {progress.itemType === "text" && progress.textPreview && (
+                  <p className="text-xs text-neutral-400 mt-1 italic line-clamp-2">
+                    &ldquo;{progress.textPreview}&rdquo;
+                  </p>
+                )}
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="p-4 rounded-2xl border border-[var(--border-hairline)] dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-850/60 text-center space-y-1">
+              <p className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
+                Connecting to Peer
+              </p>
+              <p className="text-xs text-neutral-500">
+                Establishing direct peer connection...
+              </p>
+            </div>
+          )}
+
+          {/* 0. Connecting view */}
+          {progress.status === "connecting" && (
+            <div className="space-y-3 pt-1">
+              <button
+                type="button"
+                data-testid="cancel-transfer-btn"
+                onClick={handleDismiss}
+                className="w-full py-2.5 px-4 rounded-xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 transition-colors flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+                <span>Cancel Transfer</span>
+              </button>
+            </div>
+          )}
 
           {/* 1. Waiting for acceptance view */}
           {progress.status === "waiting-acceptance" && (
@@ -195,7 +216,7 @@ export function TransferModal({
                 <button
                   type="button"
                   onClick={onAccept}
-                  className="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <ArrowDownToLine className="h-4 w-4" />
                   <span>
@@ -206,10 +227,11 @@ export function TransferModal({
                 </button>
                 <button
                   type="button"
+                  data-testid="cancel-transfer-btn"
                   onClick={onReject}
-                  className="py-2.5 px-4 rounded-xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 transition-colors"
+                  className="py-2.5 px-4 rounded-xl border border-neutral-300 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 font-semibold text-xs text-neutral-700 dark:text-neutral-300 transition-colors cursor-pointer"
                 >
-                  Decline
+                  Cancel Transfer
                 </button>
               </div>
             </div>
@@ -264,6 +286,16 @@ export function TransferModal({
                     </span>
                   </div>
                 )}
+
+                <button
+                  type="button"
+                  data-testid="cancel-transfer-btn"
+                  onClick={handleDismiss}
+                  className="w-full py-2.5 px-4 rounded-xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-600 dark:text-red-400 font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                  <span>Cancel Transfer</span>
+                </button>
               </div>
             );
           })()}

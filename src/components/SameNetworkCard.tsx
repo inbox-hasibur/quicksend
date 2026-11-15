@@ -32,6 +32,10 @@ function generateLanSessionCode(): string {
   return `lan${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
+function generatePairPin(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
 export function SameNetworkCard() {
   const [selectedPayload, setSelectedPayload] = useState<{ files: File[]; text: string }>({
     files: [],
@@ -39,7 +43,6 @@ export function SameNetworkCard() {
   });
   const [targetPeer, setTargetPeer] = useState<NearbyPeer | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [nearbyCode, setNearbyCode] = useState("");
   const {
     profile,
     peers,
@@ -49,12 +52,12 @@ export function SameNetworkCard() {
     updateName,
     cycleAvatar,
     status: discoveryStatus,
-  } = useLocalDiscovery(true, nearbyCode);
+  } = useLocalDiscovery(true);
 
   const [customNameInput, setCustomNameInput] = useState(profile.name);
   const [isManualExpanded, setIsManualExpanded] = useState(false);
   const [manualCode, setManualCode] = useState("");
-  const [localDevicePin] = useState(() => Math.floor(100000 + Math.random() * 900000).toString());
+  const [localDevicePin] = useState(generatePairPin);
   const [isShowQrModalOpen, setIsShowQrModalOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [copiedPin, setCopiedPin] = useState(false);
@@ -407,47 +410,6 @@ export function SameNetworkCard() {
         </div>
       </div>
 
-      {/* 4-digit Pairing Code for Cross-IP / CGNAT discovery */}
-      <details className="border border-[var(--border-hairline)] rounded-2xl bg-[var(--surface-subtle)] p-3 text-xs text-[var(--text-muted)] group">
-        <summary className="font-semibold text-[var(--text)] cursor-pointer select-none">
-          Can&apos;t see the other device?
-        </summary>
-        <div className="pt-3 mt-2 border-t border-[var(--border-hairline)] space-y-2">
-          <p className="text-[11px] text-[var(--text-muted)]">
-            Enter the same code on both devices
-          </p>
-          <div className="flex items-center gap-2">
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={4}
-              placeholder="4-digit code"
-              value={nearbyCode}
-              onChange={(e) => setNearbyCode(e.target.value.replace(/\D/g, "").slice(0, 4))}
-              className="w-32 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-sm font-mono font-bold text-center text-[var(--text)] focus:outline-none"
-              aria-label="Nearby 4-digit pairing code"
-            />
-            <button
-              type="button"
-              onClick={() => setNearbyCode(Math.floor(1000 + Math.random() * 9000).toString())}
-              className="px-3 py-1.5 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] hover:text-[var(--text)] text-xs font-semibold transition-colors cursor-pointer"
-            >
-              Generate
-            </button>
-            {nearbyCode && (
-              <button
-                type="button"
-                onClick={() => setNearbyCode("")}
-                className="text-xs text-[var(--text-muted)] hover:text-red-500 transition-colors cursor-pointer px-1"
-              >
-                Clear
-              </button>
-            )}
-          </div>
-        </div>
-      </details>
-
       {/* Direct PIN / QR Fallback Accordion */}
       <div className="border border-[var(--border-hairline)] rounded-2xl overflow-hidden bg-[var(--surface-subtle)]">
         <button
@@ -455,7 +417,7 @@ export function SameNetworkCard() {
           onClick={() => setIsManualExpanded((prev) => !prev)}
           className="w-full flex items-center justify-between p-4 text-xs font-semibold text-[var(--text)] hover:bg-neutral-200/50 dark:hover:bg-neutral-800/50 transition-colors cursor-pointer"
         >
-          <span>Can&apos;t find device on radar? Use 6-Digit PIN or QR Code</span>
+          <span>Connect by PIN or QR</span>
           {isManualExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
 

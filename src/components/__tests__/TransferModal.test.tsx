@@ -24,7 +24,7 @@ describe("TransferModal Component", () => {
     container.remove();
   });
 
-  it("should not render when progress status is idle or connecting", async () => {
+  it("should not render when progress status is idle", async () => {
     const idleProgress: TransferProgressState = {
       status: "idle",
       itemType: "file",
@@ -46,6 +46,80 @@ describe("TransferModal Component", () => {
     });
 
     expect(container.innerHTML).toBe("");
+  });
+
+  it("should render connecting state with Cancel Transfer button that calls onClose", async () => {
+    const connectingProgress: TransferProgressState = {
+      status: "connecting",
+      itemType: "file",
+      bytesTransferred: 0,
+      totalBytes: 0,
+      progressPercentage: 0,
+      speedBps: 0,
+    };
+
+    const onClose = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <TransferModal
+          progress={connectingProgress}
+          onAccept={vi.fn()}
+          onReject={vi.fn()}
+          onClose={onClose}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain("Connecting...");
+    const cancelBtn = container.querySelector('[data-testid="cancel-transfer-btn"]') as HTMLButtonElement;
+    expect(cancelBtn).not.toBeNull();
+    expect(cancelBtn.textContent).toContain("Cancel Transfer");
+
+    await act(async () => {
+      cancelBtn.click();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("should render transferring state with Cancel Transfer button that calls onClose", async () => {
+    const transferringProgress: TransferProgressState = {
+      status: "transferring",
+      itemType: "file",
+      fileName: "presentation.pdf",
+      fileSize: 10485760,
+      bytesTransferred: 5242880,
+      totalBytes: 10485760,
+      progressPercentage: 50,
+      speedBps: 1048576,
+    };
+
+    const onClose = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <TransferModal
+          progress={transferringProgress}
+          onAccept={vi.fn()}
+          onReject={vi.fn()}
+          onClose={onClose}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain("presentation.pdf");
+    const cancelBtn = container.querySelector('[data-testid="cancel-transfer-btn"]') as HTMLButtonElement;
+    expect(cancelBtn).not.toBeNull();
+    expect(cancelBtn.textContent).toContain("Cancel Transfer");
+
+    await act(async () => {
+      cancelBtn.click();
+    });
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it("should render error dialog and dismiss immediately when Close button is clicked", async () => {

@@ -111,7 +111,9 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 ## 3. Zero-Login UX Flow
 
 ### Home Screen Hub (Compact Option Tiles & Focused Next-Step Workspace)
-Instead of overwhelming users with multi-column pricing-style cards, the interface features a clean, mobile-first design with compact option tiles (`rounded-3xl` with soft squircle icons, subtle shadows, and arrow indicators). Tapping any tile cleanly transitions into that mode's dedicated workspace with a top "← All Channels" back navigation pill:
+Instead of overwhelming users with multi-column pricing-style cards, the interface features a clean, mobile-first design with compact option tiles (`rounded-3xl` with soft squircle icons, subtle shadows, and arrow indicators). Tapping any tile cleanly transitions into that mode's dedicated workspace with a top "← All Channels" back navigation pill, and tapping the AppHeader brand logo resets navigation back to Home from any channel.
+
+- **Universal Cancellation & No Forced Timeouts:** Transfer modal and connection routines allow users to cancel immediately via an explicit "Cancel Transfer" button, header close `X`, or `Escape` key at any stage (connecting, waiting, or transferring) without false error prompts. WebRTC connections stay open persistently until user cancellation or permanent ICE failure after automated ICE restart.
 
 ```
 [ QuickSend Home Hub ]

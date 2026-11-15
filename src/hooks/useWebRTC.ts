@@ -42,6 +42,7 @@ interface PeerJsConnection {
 }
 
 interface PeerJsInstance {
+  destroyed?: boolean;
   on: (event: string, callback: (...args: unknown[]) => void) => void;
   connect: (id: string, options?: unknown) => PeerJsConnection;
   destroy: () => void;
@@ -269,6 +270,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const activeDownloadUrlsRef = useRef<string[]>([]);
   const isCleaningUpRef = useRef<boolean>(false);
   const sessionGenRef = useRef<number>(0);
+  const hasRestartedIceRef = useRef<boolean>(false);
 
   const clearIceTimeout = useCallback(() => {
     if (iceTimerRef.current) {
@@ -279,24 +281,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   const startIceTimeout = useCallback(() => {
     clearIceTimeout();
-    // 4e: If no connection after 10 seconds, show firewall message with diagnostics report prompt
-    iceTimerRef.current = setTimeout(() => {
-      if (isConnectedRef.current || isCleaningUpRef.current) return;
-      setProgress((prev) => {
-        if (prev.status === "completed" || prev.status === "idle" || prev.progressPercentage >= 100) return prev;
-        return {
-          ...prev,
-          status: "error",
-          errorMessage: FIREWALL_MSG_WITH_DIAGNOSTICS,
-        };
-      });
-      setDiagnostics((d) => ({
-        ...d,
-        lastError: FIREWALL_MSG_WITH_DIAGNOSTICS,
-      }));
-      addLog("Connection timeout after 10 seconds");
-    }, 10000);
-  }, [clearIceTimeout, addLog]);
+    // Connections and waiting states remain open until user cancels or WebRTC permanently fails
+  }, [clearIceTimeout]);
 
   // Active channel accessor for backpressure monitoring
   const getActiveChannel = useCallback((): DrainableChannel | null => {
@@ -363,6 +349,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const cleanup = useCallback(() => {
     sessionGenRef.current++;
     isCleaningUpRef.current = true;
+    hasRestartedIceRef.current = false;
     clearIceTimeout();
     activeTransportRef.current = null;
     isConnectedRef.current = false;
@@ -781,6 +768,25 @@ export function useWebRTC(mode: TransferMode = "internet") {
         }
 
         if (state === "failed") {
+          if (!hasRestartedIceRef.current && typeof pc.restartIce === "function") {
+            hasRestartedIceRef.current = true;
+            addLog("ICE state failed, attempting restartIce()...");
+            try {
+              pc.restartIce();
+              if (currentRole === "sender") {
+                pc.createOffer({ iceRestart: true })
+                  .then((offer) => pc.setLocalDescription(offer).then(() => offer))
+                  .then((offer) => signalingRef.current.sendSignal("offer", offer))
+                  .catch((err) => {
+                    addLog(`ICE restart offer failed: ${err}`);
+                  });
+              }
+              return;
+            } catch (err) {
+              addLog(`pc.restartIce() call failed: ${err}`);
+            }
+          }
+
           setDiagnostics((d) => ({ ...d, lastError: FIREWALL_MSG_WITH_DIAGNOSTICS }));
           clearIceTimeout();
           isConnectedRef.current = false;
@@ -823,13 +829,32 @@ export function useWebRTC(mode: TransferMode = "internet") {
           pc.connectionState === "closed"
         ) {
           // If PeerJS is active, ignore raw WebRTC disconnect
-          if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
+          if (activeTransportRef.current === "peerjs") {
             return;
           }
 
-          isConnectedRef.current = false;
-          setIsConnected(false);
           if (pc.connectionState === "failed") {
+            if (!hasRestartedIceRef.current && typeof pc.restartIce === "function") {
+              hasRestartedIceRef.current = true;
+              addLog("Connection state failed, attempting restartIce()...");
+              try {
+                pc.restartIce();
+                if (currentRole === "sender") {
+                  pc.createOffer({ iceRestart: true })
+                    .then((offer) => pc.setLocalDescription(offer).then(() => offer))
+                    .then((offer) => signalingRef.current.sendSignal("offer", offer))
+                    .catch((err) => {
+                      addLog(`ICE restart offer failed: ${err}`);
+                    });
+                }
+                return;
+              } catch (err) {
+                addLog(`pc.restartIce() call failed: ${err}`);
+              }
+            }
+
+            isConnectedRef.current = false;
+            setIsConnected(false);
             clearIceTimeout();
             setProgress((prev) => {
               if (prev.status === "completed" || prev.status === "idle" || prev.progressPercentage >= 100) return prev;
@@ -840,6 +865,9 @@ export function useWebRTC(mode: TransferMode = "internet") {
               };
             });
             setDiagnostics((d) => ({ ...d, lastError: FIREWALL_MSG_WITH_DIAGNOSTICS }));
+          } else {
+            isConnectedRef.current = false;
+            setIsConnected(false);
           }
         }
       };
@@ -861,6 +889,10 @@ export function useWebRTC(mode: TransferMode = "internet") {
   // Process incoming signaling messages
   const handleSignalMessage = useCallback(
     async (message: SignalMessage, currentRole: PeerRole) => {
+      // Background raw-WebRTC signaling must never override an active PeerJS transport
+      if (activeTransportRef.current === "peerjs") {
+        return;
+      }
       const pc = pcRef.current;
 
       switch (message.type) {
@@ -1014,7 +1046,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         loadPeerConstructor()
           .then((PeerClass) => {
             if (sessionGenRef.current !== currentSession || !PeerClass || isConnectedRef.current) return;
-            const peerId = `qs-${generatedCode.toLowerCase()}`;
+            const peerId = `qs-v2-${generatedCode.toLowerCase()}`;
             const peer = new PeerClass(peerId, {
               config: getRtcConfig(mode),
               debug: 1,
@@ -1149,62 +1181,86 @@ export function useWebRTC(mode: TransferMode = "internet") {
             });
             peerInstanceRef.current = peer;
 
-            peer.on("open", () => {
-              const targetId = `qs-${cleanCode.toLowerCase()}`;
-              const conn = peer.connect(targetId, { reliable: true, serialization: "raw" });
-              dataConnRef.current = conn;
+            const targetId = `qs-v2-${cleanCode.toLowerCase()}`;
+            let retryTimer: NodeJS.Timeout | null = null;
 
-              const handleOpen = () => {
-                if (sessionGenRef.current !== currentSession) return;
-                clearIceTimeout();
-                activeTransportRef.current = "peerjs";
-                if (conn.dataChannel) {
-                  dcRef.current = conn.dataChannel;
-                }
-                isConnectedRef.current = true;
-                setIsConnected(true);
+            const connectToSender = () => {
+              if (sessionGenRef.current !== currentSession || isConnectedRef.current || !peer || peer.destroyed) return;
+              try {
+                const conn = peer.connect(targetId, { reliable: true, serialization: "raw" });
+                dataConnRef.current = conn;
 
-                // Tear down competing raw RTCPeerConnection cleanly to avoid false timeout
-                if (pcRef.current) {
-                  const rawPc = pcRef.current;
-                  pcRef.current = null;
-                  rawPc.oniceconnectionstatechange = null;
-                  rawPc.onconnectionstatechange = null;
-                  rawPc.onicecandidate = null;
-                  rawPc.ondatachannel = null;
-                  try {
-                    rawPc.close();
-                  } catch {
-                    // Ignore
+                const handleOpen = () => {
+                  if (sessionGenRef.current !== currentSession) return;
+                  if (retryTimer) {
+                    clearTimeout(retryTimer);
+                    retryTimer = null;
                   }
-                }
-              };
+                  clearIceTimeout();
+                  activeTransportRef.current = "peerjs";
+                  if (conn.dataChannel) {
+                    dcRef.current = conn.dataChannel;
+                  }
+                  isConnectedRef.current = true;
+                  setIsConnected(true);
 
-              if (conn.open) {
-                handleOpen();
-              } else {
-                conn.on("open", handleOpen);
+                  // Tear down competing raw RTCPeerConnection cleanly to avoid false timeout
+                  if (pcRef.current) {
+                    const rawPc = pcRef.current;
+                    pcRef.current = null;
+                    rawPc.oniceconnectionstatechange = null;
+                    rawPc.onconnectionstatechange = null;
+                    rawPc.onicecandidate = null;
+                    rawPc.ondatachannel = null;
+                    try {
+                      rawPc.close();
+                    } catch {
+                      // Ignore
+                    }
+                  }
+                };
+
+                if (conn.open) {
+                  handleOpen();
+                } else {
+                  conn.on("open", handleOpen);
+                }
+
+                conn.on("data", (data: unknown) => {
+                  handleIncomingData(data);
+                });
+
+                conn.on("close", () => {
+                  if (activeTransportRef.current === "peerjs") {
+                    isConnectedRef.current = false;
+                    setIsConnected(false);
+                  }
+                });
+
+                conn.on("error", (err: unknown) => {
+                  console.debug("PeerJS receiver conn error:", err);
+                });
+              } catch (err) {
+                console.debug("PeerJS receiver connect exception:", err);
               }
+            };
 
-              conn.on("data", (data: unknown) => {
-                handleIncomingData(data);
-              });
-
-              conn.on("close", () => {
-                if (activeTransportRef.current === "peerjs") {
-                  isConnectedRef.current = false;
-                  setIsConnected(false);
-                }
-              });
-
-              conn.on("error", (err: unknown) => {
-                console.debug("PeerJS receiver conn error:", err);
-              });
+            peer.on("open", () => {
+              connectToSender();
             });
 
             peer.on("error", (err: unknown) => {
               const e = err as { type?: string };
               console.debug("PeerJS receiver notice (fallback active):", e?.type);
+              // If receiver connected slightly before sender opened, retry silently every 1.5s
+              if (e?.type === "peer-unavailable" && sessionGenRef.current === currentSession && !isConnectedRef.current) {
+                if (retryTimer) clearTimeout(retryTimer);
+                retryTimer = setTimeout(() => {
+                  if (sessionGenRef.current === currentSession && !isConnectedRef.current) {
+                    connectToSender();
+                  }
+                }, 1500);
+              }
             });
           })
           .catch(() => {});

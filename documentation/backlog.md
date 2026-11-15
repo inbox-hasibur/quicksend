@@ -482,6 +482,28 @@
   - Redesigned README with centered hero logo, Shields.io badges (Live App, Next.js 16, TypeScript 5, Tailwind CSS, WebRTC DTLS/SRTP, Platform, 221 Tests, MIT License), clear value proposition, and CTA launch link.
   - Structured concise "About QuickSend", core highlights, 6-channel matrix, tech stack, local setup guide, and security/privacy architecture.
 
+### Sprint 23: Core Navigation Reset, Connection Timeout Elimination, Transfer Cancellation, and Internet/LAN Transport Reliability
+- [x] Navbar Logo/Title Home Reset (`src/components/AppHeader.tsx`, `src/components/ModeSelector.tsx`):
+  - Made QuickSend logo and title in `AppHeader.tsx` a clickable button/link (`cursor-pointer`) that resets app state to Home Hub ("All Channels") from any active channel.
+  - Dispatched `quicksend:go-home` custom window event and called `router.replace("/")` to clear `?room=` parameter without hard refresh.
+  - Subscribed `ModeSelector.tsx` to `quicksend:go-home` event to reset `selectedModeOverride` to `"home"`.
+- [x] Connection Timeout Elimination & ICE Restart (`src/hooks/useWebRTC.ts`):
+  - Removed aggressive 10s `ICE_CONNECTION_TIMEOUT_MS` fatal error kill; connections and waiting states remain open until user cancels or WebRTC permanently fails.
+  - Implemented single-shot ICE restart via `hasRestartedIceRef` upon ICE or connection failure (`pc.restartIce()` and new offer creation) before flagging permanent failure.
+- [x] Universal Transfer Cancellation (`src/components/TransferModal.tsx`):
+  - Rendered explicit **"Cancel Transfer"** button across `"connecting"`, `"waiting-acceptance"`, and `"transferring"` states.
+  - Enabled header `X` close button and Escape key dismiss during active transfer states.
+  - Modal mounts on `"connecting"` state to ensure immediate cancelability from the first second of peer connection negotiation.
+- [x] Dual-Transport PeerJS & Same-Network Reliability (`src/hooks/useWebRTC.ts`, `src/components/SameNetworkCard.tsx`):
+  - Updated PeerJS broker IDs to `qs-v2-${code.toLowerCase()}` to prevent collisions on public `0.peerjs.com` cloud server.
+  - Implemented silent 1.5s retry loop on `peer-unavailable` error in receiver when sender hasn't fully registered.
+  - Strictly isolated `activeTransportRef` so raw-WebRTC signaling and background timers never override active or connecting PeerJS sessions.
+  - Simplified `SameNetworkCard.tsx` by removing confusing duplicate 4-digit code section and preserving ONE clean collapsible fallback titled `"Connect by PIN or QR"`.
+- [x] Testing & Verification (`src/components/__tests__/TransferModal.test.tsx`, `src/hooks/__tests__/useWebRTC.test.ts`):
+  - Added unit tests in `TransferModal.test.tsx` verifying Cancel Transfer during `"connecting"` and `"transferring"`.
+  - Added test in `useWebRTC.test.ts` verifying starting a sender does not trigger a fatal error after 10 or 30 seconds.
+  - Verified full test suite (34 suites, 224 tests passing), zero ESLint warnings, and zero Next.js build errors.
+
 
 
 
