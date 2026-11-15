@@ -13,6 +13,7 @@ import {
   Cpu,
   ChevronDown,
   ChevronUp,
+  Wifi,
 } from "lucide-react";
 import { Dropzone } from "@/components/Dropzone";
 import { EstimateBadge } from "@/components/EstimateBadge";
@@ -21,7 +22,11 @@ import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
 import { ANDROID_INTENTS } from "@/lib/wifiQr";
 import { getPayloadBytes } from "@/lib/transferEstimate";
 
-export function NearbyShareCard() {
+interface NearbyShareCardProps {
+  onOpenMode?: (modeId: string) => void;
+}
+
+export function NearbyShareCard({ onOpenMode }: NearbyShareCardProps = {}) {
   const [selectedPayload, setSelectedPayload] = useState<{ files: File[]; text: string }>({
     files: [],
     text: "",
@@ -99,7 +104,7 @@ export function NearbyShareCard() {
         <div className="flex items-center gap-2 bg-[var(--surface-subtle)] px-3 py-1.5 rounded-2xl border border-[var(--border-hairline)] text-xs">
           <Share2 className="w-3.5 h-3.5 text-[var(--accent)]" />
           <span className="font-medium text-[var(--text)]">
-            {capabilities.hasWebShare ? "Native OS Share Ready" : "Web Share Supported"}
+            {capabilities.hasWebShare ? "Native OS Share Ready" : "Web Share Unsupported"}
           </span>
         </div>
       </div>
@@ -120,7 +125,7 @@ export function NearbyShareCard() {
         </div>
       )}
 
-      {/* PRIMARY FLOW: 1-TAP DEVICE SHARE */}
+      {/* 1. SELECT FILES & NATIVE SHARE */}
       <div className="space-y-4">
         <div className="space-y-2">
           <span className="text-xs font-bold text-[var(--text)] block">
@@ -133,27 +138,36 @@ export function NearbyShareCard() {
           />
         </div>
 
-        <button
-          type="button"
-          onClick={handleTriggerShare}
-          disabled={isSharing}
-          className="w-full py-3.5 px-6 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-        >
-          {isSharing ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>Opening Native Share Sheet...</span>
-            </>
-          ) : (
-            <>
-              <Share2 className="h-4 w-4" />
-              <span>Send via Quick Share / AirDrop / Bluetooth</span>
-            </>
-          )}
-        </button>
+        {!capabilities.hasWebShare ? (
+          <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-2.5 text-xs text-amber-700 dark:text-amber-400">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+            <p>
+              Native Web Share is not supported in this browser. To send files to nearby devices without restrictions, switch to <strong>Wi-Fi Hotspot</strong> or <strong>Same Wi-Fi</strong> mode.
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleTriggerShare}
+            disabled={isSharing}
+            className="w-full py-3.5 px-6 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+          >
+            {isSharing ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Opening Native Share Sheet...</span>
+              </>
+            ) : (
+              <>
+                <Share2 className="h-4 w-4" />
+                <span>Send via Quick Share / AirDrop / Bluetooth</span>
+              </>
+            )}
+          </button>
+        )}
       </div>
 
-      {/* RECEIVING GUIDANCE (PLAIN-ENGLISH & HONEST) */}
+      {/* 2. RECEIVING GUIDANCE */}
       <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shrink-0 shadow-2xs">
@@ -168,20 +182,46 @@ export function NearbyShareCard() {
             </p>
           </div>
         </div>
+      </div>
 
+      {/* 3. NEUTRAL INFO BOX & RADAR ALTERNATIVES */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3">
+        <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+          Browsers cannot scan or pair with other phones over Bluetooth. Quick Share and AirDrop do the nearby discovery for you. To send without internet, use Wi-Fi Hotspot mode.
+        </p>
         <div className="pt-1 flex flex-wrap items-center gap-2">
-          <a
-            href={ANDROID_INTENTS.BLUETOOTH_SETTINGS}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] hover:bg-[var(--surface-subtle)] text-[var(--text)] text-xs font-semibold shadow-2xs transition-colors"
+          <button
+            type="button"
+            onClick={() => onOpenMode?.("hotspot")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] hover:bg-[var(--surface-subtle)] text-[var(--text)] text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
           >
-            <Bluetooth className="w-3.5 h-3.5 text-[var(--accent)]" />
-            <span>Open Android Bluetooth Settings</span>
-            <ExternalLink className="w-3 h-3 text-[var(--text-muted)]" />
-          </a>
+            <Smartphone className="w-3.5 h-3.5 text-[var(--accent)]" />
+            <span>Open Wi-Fi Hotspot mode</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenMode?.("same-network")}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] hover:bg-[var(--surface-subtle)] text-[var(--text)] text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+          >
+            <Wifi className="w-3.5 h-3.5 text-[var(--accent)]" />
+            <span>Open Same Wi-Fi mode</span>
+          </button>
         </div>
       </div>
 
-      {/* SECONDARY COLLAPSIBLE: CONNECT BLE HARDWARE */}
+      {/* 4. BLUETOOTH SETTINGS BUTTON */}
+      <div>
+        <a
+          href={ANDROID_INTENTS.BLUETOOTH_SETTINGS}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] hover:bg-[var(--surface-subtle)] text-[var(--text)] text-xs font-semibold shadow-2xs transition-colors"
+        >
+          <Bluetooth className="w-3.5 h-3.5 text-[var(--accent)]" />
+          <span>Open Bluetooth settings</span>
+          <ExternalLink className="w-3 h-3 text-[var(--text-muted)]" />
+        </a>
+      </div>
+
+      {/* 5. COLLAPSIBLE BLE HARDWARE SECTION */}
       <div className="border border-[var(--border-hairline)] rounded-2xl overflow-hidden bg-[var(--surface)]">
         <button
           type="button"
@@ -190,7 +230,7 @@ export function NearbyShareCard() {
         >
           <div className="flex items-center gap-2">
             <Cpu className="w-4 h-4 text-indigo-500" />
-            <span>Connect BLE Device (Sensors / Hardware)</span>
+            <span>BLE hardware (sensors, microcontrollers)</span>
           </div>
           {showBleSection ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
@@ -199,6 +239,9 @@ export function NearbyShareCard() {
           <div className="p-4 sm:p-5 pt-0 border-t border-[var(--border-hairline)] space-y-4">
             <p className="text-xs text-[var(--text-muted)] leading-relaxed">
               Connect to compatible BLE microcontrollers, Arduino/ESP32 sensor nodes, or custom hardware peripherals using the W3C Web Bluetooth GATT Client.
+            </p>
+            <p className="text-xs text-[var(--text-muted)] leading-relaxed font-medium">
+              Phones will not appear here. Only devices that advertise over BLE are listed.
             </p>
 
             {!capabilities.hasBluetooth ? (
@@ -220,7 +263,7 @@ export function NearbyShareCard() {
                     Scan for Nearby BLE Peripherals
                   </h4>
                   <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                    Opens the browser device picker to pair with nearby GATT peripherals.
+                    Opens the browser device picker to select nearby GATT peripherals.
                   </p>
                 </div>
                 <button
@@ -237,7 +280,7 @@ export function NearbyShareCard() {
                   ) : (
                     <>
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>Pair BLE Hardware Peripheral</span>
+                      <span>Choose BLE device</span>
                     </>
                   )}
                 </button>

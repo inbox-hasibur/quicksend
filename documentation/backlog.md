@@ -431,4 +431,21 @@
   - Added unit test suite in `src/hooks/__tests__/useWebRTC.test.ts` testing `waitForDrain` behaviors.
 - [x] **Sprint 20 Verification:** 204/204 unit tests passing across 34 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
 
+### Sprint 21: Honest Bluetooth Mode Reorganization & Radar Navigation
+- [x] Honest Mode Reorganization (`src/components/NearbyShareCard.tsx`):
+  - Prioritized native OS share sheet (Quick Share, AirDrop, Windows Bluetooth) as primary 1-tap flow with Dropzone and dynamic transfer time estimation.
+  - Positioned honest plain-English receiving instructions explaining OS-level reception requirements.
+  - Added neutral info box clarifying browser Bluetooth sandbox realities ("Browsers cannot scan or pair with other phones over Bluetooth. Quick Share and AirDrop do the nearby discovery for you. To send without internet, use Wi-Fi Hotspot mode.") with 1-tap navigation buttons to "Open Wi-Fi Hotspot mode" and "Open Same Wi-Fi mode".
+  - Maintained dedicated Android Bluetooth settings shortcut button.
+  - Moved Web Bluetooth GATT Client into advanced collapsed section titled "BLE hardware (sensors, microcontrollers)" with explicit notice that phones will not appear and renamed CTA to "Choose BLE device".
+  - Cleanly hides share button area and shows informative unsupported notice when `navigator.share` is unavailable.
+- [x] Inter-Mode Navigation Wiring (`src/components/ModeSelector.tsx`):
+  - Passed `onOpenMode={(modeId) => handleSelectMode(modeId as TransferMode)}` prop from `ModeSelector` into `NearbyShareCard` allowing seamless in-app transitions to `"hotspot"` and `"same-network"` channels.
+- [x] Unit Testing & Verification (`src/components/__tests__/NearbyShareCard.test.tsx`):
+  - Tested honest share guidance, neutral info box visibility, and unsupported Web Share message when absent.
+  - Verified BLE hardware section is collapsed by default and reveals GATT details on click.
+  - Tested navigation callbacks firing `onOpenMode("hotspot")` and `onOpenMode("same-network")`.
+- [x] **Sprint 21 Verification:** 206/206 unit tests passing across 34 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+
+
 

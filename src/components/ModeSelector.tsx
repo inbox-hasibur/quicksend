@@ -228,7 +228,9 @@ export function ModeSelector() {
 
               {selectedMode === "hotspot" && <HotspotAssistantCard />}
 
-              {selectedMode === "bluetooth" && <NearbyShareCard />}
+              {selectedMode === "bluetooth" && (
+                <NearbyShareCard onOpenMode={(modeId) => handleSelectMode(modeId as TransferMode)} />
+              )}
             </div>
           </div>
         )

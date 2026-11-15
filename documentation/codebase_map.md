@@ -220,8 +220,8 @@ flowchart TD
 - **Exports:** `HotspotAssistantCard(): JSX.Element`
 
 #### `src/components/NearbyShareCard.tsx`
-- **Purpose:** Mode 4 Controller (Bluetooth & Quick Share). Honest 1-tap proximity sharing leveraging native OS share sheets (`navigator.share`) across Android Quick Share, Apple AirDrop, and Windows Bluetooth File Transfer with transfer history logging. Includes plain-English receiving instructions and a secondary collapsible Web Bluetooth GATT Client for microcontrollers and sensors.
-- **Exports:** `NearbyShareCard(): JSX.Element`
+- **Purpose:** Mode 4 Controller (Bluetooth & Quick Share). Honest 1-tap proximity sharing leveraging native OS share sheets (`navigator.share`) across Android Quick Share, Apple AirDrop, and Windows Bluetooth File Transfer with transfer history logging. Includes plain-English receiving instructions, a neutral info box routing to Wi-Fi Hotspot or Same Wi-Fi modes via `onOpenMode`, an Android Bluetooth settings shortcut, and an advanced collapsed Web Bluetooth GATT Client for microcontrollers and sensors.
+- **Exports:** `NearbyShareCard({ onOpenMode }?: NearbyShareCardProps): JSX.Element`
 
 #### `src/components/OpticalHandshakeModal.tsx`
 - **Purpose:** Visual modal for 100% zero-internet optical WebRTC signaling. Displays compressed Offer/Answer QR codes and launches the camera scanner to exchange SDP descriptions directly across device screens.

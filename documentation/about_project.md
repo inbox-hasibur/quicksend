@@ -85,11 +85,13 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 ### Mode 4: Share via Bluetooth (Honest Native OS Proximity Share)
 - **Primary Use Case:** Proximity sharing directly leveraging your operating system's built-in proximity hardware.
 - **Architectural Reality (Honest Web Sandbox Standards):**
-  - Browsers cannot act as GATT Servers or intercept raw Bluetooth radio packets due to W3C security sandboxes.
+  - Browsers cannot act as GATT Peripherals or scan/pair with other phones over Bluetooth due to W3C security sandboxes.
 - **Streamlined User Experience:**
-  - **1-Tap Device Share (Primary):** Select files or text with Dropzone and tap **"Send via Quick Share / AirDrop / Bluetooth"** (`navigator.share`). Hands payload off directly to Android Quick Share, Apple AirDrop, or Windows Bluetooth File Transfer, logging sent items to session history.
-  - **Plain-English Receiving Guidance:** Clear, honest guidance explaining that incoming Bluetooth transfers are received via the device's native OS Quick Share / AirDrop / Bluetooth settings, accompanied by a 1-tap shortcut to Android Bluetooth Settings (`ANDROID_INTENTS.BLUETOOTH_SETTINGS`).
-  - **Secondary Collapsible for Hardware:** Cleanly tucked secondary section `"Connect BLE Device (Sensors / Hardware)"` for hardware developers connecting to BLE microcontrollers (ESP32, Arduino) via Web-BLE GATT Client.
+  - **1-Tap Device Share (Primary):** Select files or text with Dropzone and tap **"Send via Quick Share / AirDrop / Bluetooth"** (`navigator.share`). Hands payload off directly to Android Quick Share, Apple AirDrop, or Windows Bluetooth File Transfer, logging sent items to session history. If Web Share is unsupported, cleanly displays an informative notice routing users to Wi-Fi Hotspot or Same Wi-Fi modes.
+  - **Plain-English Receiving Guidance:** Clear, honest guidance explaining that incoming Bluetooth transfers are received via the device's native OS Quick Share / AirDrop / Bluetooth settings.
+  - **Neutral Info Box & Radar Routing:** Informs users that browsers cannot scan or pair with phones over Bluetooth, offering 1-tap buttons to **Open Wi-Fi Hotspot mode** and **Open Same Wi-Fi mode**.
+  - **OS Bluetooth Settings Shortcut:** 1-tap shortcut to open device Bluetooth Settings (`ANDROID_INTENTS.BLUETOOTH_SETTINGS`).
+  - **Advanced Collapsible for BLE Hardware:** Collapsed section `"BLE hardware (sensors, microcontrollers)"` for hardware developers connecting to BLE microcontrollers (ESP32, Arduino) via Web-BLE GATT Client with explicit notice that phones will not appear.
 
 ---
 
@@ -268,9 +270,14 @@ quicksend/
     │   └── page.tsx
     ├── components/
     │   ├── __tests__/
+    │   │   ├── CableTransferCard.test.tsx
+    │   │   ├── ConnectionDiagnostics.test.tsx
     │   │   ├── FileTypeBadge.test.tsx
+    │   │   ├── HotspotAssistantCard.test.tsx
+    │   │   ├── NearbyShareCard.test.tsx
     │   │   ├── SegmentedControl.test.tsx
     │   │   ├── SpeedIndicator.test.tsx
+    │   │   ├── TransferModal.test.tsx
     │   │   └── UltrasonicCard.test.tsx
     │   ├── AppHeader.tsx
     │   ├── CableTransferCard.tsx
