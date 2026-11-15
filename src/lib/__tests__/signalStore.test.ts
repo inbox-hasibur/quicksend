@@ -138,6 +138,37 @@ describe("SignalStore - MemorySignalStore", () => {
     await miniStore.createRoom("ROOM4");
     expect(await miniStore.getActiveRoomCount()).toBeLessThanOrEqual(3);
   });
+
+  it("should set, get, and delete generic string keys", async () => {
+    await store.setKey("pin:1234", "dev_abc", 60);
+    const value = await store.getKey("pin:1234");
+    expect(value).toBe("dev_abc");
+
+    const nonExistent = await store.getKey("pin:9999");
+    expect(nonExistent).toBeNull();
+
+    const deleted = await store.deleteKey("pin:1234");
+    expect(deleted).toBe(true);
+
+    const afterDelete = await store.getKey("pin:1234");
+    expect(afterDelete).toBeNull();
+  });
+
+  it("should expire generic keys when their TTL is exceeded", async () => {
+    await store.setKey("pin:5678", "dev_xyz", 1); // 1-second TTL
+    expect(await store.getKey("pin:5678")).toBe("dev_xyz");
+
+    // Advance simulated time past 1 second
+    const originalNow = Date.now;
+    Date.now = () => originalNow() + 1500;
+
+    try {
+      const expired = await store.getKey("pin:5678");
+      expect(expired).toBeNull();
+    } finally {
+      Date.now = originalNow;
+    }
+  });
 });
 
 describe("SignalStore - RedisSignalStore (REST Mode with mocked fetch)", () => {

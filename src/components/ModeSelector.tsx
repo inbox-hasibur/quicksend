@@ -6,11 +6,11 @@ import {
   Globe,
   Wifi,
   Smartphone,
-  Bluetooth,
   Camera,
   Cable,
   ArrowLeft,
   ArrowRight,
+  Users,
 } from "lucide-react";
 import type { TransferMode, ModeStatus } from "@/types/mode";
 import { useBrowserCapabilities } from "@/hooks/useNetworkStatus";
@@ -68,11 +68,11 @@ export function ModeSelector() {
         };
       case "bluetooth":
         return {
-          displayName: "Bluetooth",
-          icon: <Bluetooth className="h-5 w-5" />,
-          tag: "Wireless",
+          displayName: "Nearby Pair",
+          icon: <Users className="h-5 w-5" />,
+          tag: "Nearby",
           speedBars: 3,
-          summary: "Quick Share, AirDrop, and Bluetooth transfer for nearby devices.",
+          summary: "Tap a nearby device or enter a PIN. Send after they accept.",
         };
       case "camera":
         return {
@@ -229,7 +229,7 @@ export function ModeSelector() {
               {selectedMode === "hotspot" && <HotspotAssistantCard />}
 
               {selectedMode === "bluetooth" && (
-                <NearbyShareCard onOpenMode={(modeId) => handleSelectMode(modeId as TransferMode)} />
+                <NearbyShareCard />
               )}
             </div>
           </div>

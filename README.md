@@ -26,12 +26,12 @@ QuickSend features a versatile multi-modal transfer architecture designed for ev
 | **1. Share via Internet** | Public Internet | 6-digit room code / Dynamic QR code | Lab PC to remote phone or across different networks. WebRTC peer-to-peer encrypted data channel. |
 | **2. Same Network Wi-Fi** | Local Area Network | Subnet discovery / Local signaling | Fast high-throughput transfer of large files between devices on the same Wi-Fi/LAN router. |
 | **3. Wi-Fi + Hotspot** | Offline / No Internet | Hotspot Wi-Fi QR credential (`WIFI:S:...`) | Zero-internet environments (field research, isolated labs, air-gapped workstations). |
-| **4. Bluetooth Interface** | Device Proximity | Web Bluetooth API (`navigator.bluetooth`) | Ultra-close range transfers without needing Wi-Fi or router infrastructure. |
+| **4. Nearby Pair** | Nearby Proximity | 4-digit PIN lookup / Radar tap & accept | Tap a nearby device or enter a 4-digit PIN with acceptance prompt; system share fallback. |
 
 ### 📱 Offline PWA & Graceful Degradation
 - **Progressive Web App (PWA):** Installable on Android, iOS, Windows, macOS, and Linux.
 - **Offline Caching:** The application shell, QR generators, and offline utilities work without an active internet connection.
-- **Adaptive UI:** Built-in connection state monitors detect when devices drop offline, gracefully greying out internet-dependent modes while prioritizing local Wi-Fi and Bluetooth modes.
+- **Adaptive UI:** Built-in connection state monitors detect when devices drop offline, gracefully greying out internet-dependent modes while prioritizing local Wi-Fi, hotspot, and offline system share.
 
 ---
 
@@ -42,7 +42,7 @@ QuickSend features a versatile multi-modal transfer architecture designed for ev
 - **UI & Styling:** [Tailwind CSS](https://tailwindcss.com/)
 - **Icons:** [lucide-react](https://lucide.dev/)
 - **QR Code Tools:** [qrcode.react](https://github.com/zpao/qrcode.react) (generator) & [html5-qrcode](https://github.com/mebjas/html5-qrcode) (scanner)
-- **P2P Protocols:** WebRTC (RTCDataChannel), Web Bluetooth API
+- **P2P Protocols:** WebRTC (RTCDataChannel), Web Share API
 - **Code Quality:** [ESLint](https://eslint.org/)
 
 ---

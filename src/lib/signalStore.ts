@@ -17,6 +17,9 @@ export interface SignalStoreAdapter {
   getStorageMode(): StorageMode;
   getActiveRoomCount(): Promise<number>;
   clear?(): Promise<void>;
+  getKey(key: string): Promise<string | null>;
+  setKey(key: string, value: string, ttlSeconds?: number): Promise<void>;
+  deleteKey(key: string): Promise<boolean>;
 }
 
 const DEFAULT_TTL_MS = 15 * 60 * 1000; // 15 minutes
@@ -29,6 +32,7 @@ const DEFAULT_MAX_ROOMS = 5000;
 export class MemorySignalStore implements SignalStoreAdapter {
   private rooms: Map<string, SignalingRoomState> = new Map();
   private codeToRoomId: Map<string, string> = new Map();
+  private genericKeys: Map<string, { value: string; expiresAt: number }> = new Map();
   private lastCleanup: number = Date.now();
   private ttlMs: number;
   private maxRooms: number;
@@ -48,6 +52,12 @@ export class MemorySignalStore implements SignalStoreAdapter {
       if (now - room.createdAt > this.ttlMs) {
         this.codeToRoomId.delete(room.code);
         this.rooms.delete(roomId);
+      }
+    }
+
+    for (const [key, entry] of this.genericKeys.entries()) {
+      if (now > entry.expiresAt) {
+        this.genericKeys.delete(key);
       }
     }
 
@@ -169,6 +179,34 @@ export class MemorySignalStore implements SignalStoreAdapter {
   async clear(): Promise<void> {
     this.rooms.clear();
     this.codeToRoomId.clear();
+    this.genericKeys.clear();
+  }
+
+  async getKey(key: string): Promise<string | null> {
+    const entry = this.genericKeys.get(key);
+    if (!entry) return null;
+    if (Date.now() > entry.expiresAt) {
+      this.genericKeys.delete(key);
+      return null;
+    }
+    return entry.value;
+  }
+
+  async setKey(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    const existing = this.genericKeys.get(key);
+    let expiresAt: number;
+    if (ttlSeconds !== undefined) {
+      expiresAt = Date.now() + ttlSeconds * 1000;
+    } else if (existing && existing.expiresAt > Date.now()) {
+      expiresAt = existing.expiresAt;
+    } else {
+      expiresAt = Date.now() + 60 * 1000;
+    }
+    this.genericKeys.set(key, { value, expiresAt });
+  }
+
+  async deleteKey(key: string): Promise<boolean> {
+    return this.genericKeys.delete(key);
   }
 }
 
@@ -365,6 +403,23 @@ export class RedisSignalStore implements SignalStoreAdapter {
       // Ignore clear errors in testing
     }
   }
+
+  async getKey(key: string): Promise<string | null> {
+    return this.command<string | null>(["GET", `quicksend:${key}`]);
+  }
+
+  async setKey(key: string, value: string, ttlSeconds?: number): Promise<void> {
+    if (ttlSeconds && ttlSeconds > 0) {
+      await this.command(["SET", `quicksend:${key}`, value, "EX", ttlSeconds]);
+    } else {
+      await this.command(["SET", `quicksend:${key}`, value]);
+    }
+  }
+
+  async deleteKey(key: string): Promise<boolean> {
+    const res = await this.command<number>(["DEL", `quicksend:${key}`]);
+    return Boolean(res && res > 0);
+  }
 }
 
 declare global {
@@ -401,8 +456,13 @@ export const signalStore: SignalStoreAdapter = {
   createRoom: (customCode) => getSignalStore().createRoom(customCode),
   getRoom: (identifier, by) => getSignalStore().getRoom(identifier, by),
   updateRoom: (roomId, updater) => getSignalStore().updateRoom(roomId, updater),
-  deleteRoom: (roomId) => getSignalStore().deleteRoom(roomId),
+  deleteRoom(roomId) {
+    return getSignalStore().deleteRoom(roomId);
+  },
   getStorageMode: () => getSignalStore().getStorageMode(),
   getActiveRoomCount: () => getSignalStore().getActiveRoomCount(),
   clear: () => getSignalStore().clear?.() ?? Promise.resolve(),
+  getKey: (key) => getSignalStore().getKey(key),
+  setKey: (key, value, ttlSeconds) => getSignalStore().setKey(key, value, ttlSeconds),
+  deleteKey: (key) => getSignalStore().deleteKey(key),
 };

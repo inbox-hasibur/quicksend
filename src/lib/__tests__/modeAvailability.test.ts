@@ -94,20 +94,10 @@ describe("modeAvailability logic", () => {
       expect(status.disabledReason).toContain("Browser lacks Web Bluetooth and Web Share API");
     });
 
-    it("should provide specific badges for WebShare vs BLE support", () => {
-      const shareOnly = getModeStatus("bluetooth", {
-        isOnline: true,
-        hasWebShare: true,
-        hasBluetooth: false,
-      });
-      expect(shareOnly.badge).toBe("Quick Share / AirDrop");
-
-      const bleOnly = getModeStatus("bluetooth", {
-        isOnline: true,
-        hasWebShare: false,
-        hasBluetooth: true,
-      });
-      expect(bleOnly.badge).toBe("Web Bluetooth BLE");
+    it("should provide Nearby Pair name and Pair online, share offline status badge", () => {
+      const status = getModeStatus("bluetooth", onlineFullCapabilities);
+      expect(status.name).toBe("Nearby Pair");
+      expect(status.badge).toBe("Pair online, share offline");
     });
 
     it("should provide optical stream badge for camera mode", () => {

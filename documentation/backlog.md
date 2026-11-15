@@ -447,5 +447,38 @@
   - Tested navigation callbacks firing `onOpenMode("hotspot")` and `onOpenMode("same-network")`.
 - [x] **Sprint 21 Verification:** 206/206 unit tests passing across 34 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
 
+### Sprint 22: Nearby Pair Redesign & Cross-Group PIN Allocation
+- [x] Signal Store Generic Key APIs (`src/lib/signalStore.ts`, `src/lib/__tests__/signalStore.test.ts`):
+  - Extended `SignalStoreAdapter` with generic key operations: `getKey(key)`, `setKey(key, value, ttlSeconds?)`, and `deleteKey(key)`.
+  - Implemented generic key mapping in `MemorySignalStore` with TTL expiration and stale pruning.
+  - Implemented Redis REST commands in `RedisSignalStore` (`GET`, `SET [EX]`, `DEL`) for distributed key coordination.
+  - Added unit test suite covering set, get, delete, and TTL expiration.
+- [x] Ephemeral 4-Digit PIN Allocation & Pair Lookup (`src/app/api/discover/route.ts`, `src/app/api/discover/__tests__/route.test.ts`):
+  - Allocated unique 4-digit PINs (`0000`–`9999`) with 15s presence TTL refreshed on heartbeat; cleaned up PIN keys upon `leave`.
+  - Added `action: "pairLookup"` with PIN regex validation (`/^\d{4}$/`), rate-limiting (max 10 calls/min per IP, HTTP 429 `{ error: "Too many attempts" }`), and returning `{ found: true, peerId, name, avatar, os }` without exposing IP or group info.
+  - Enabled cross-network beaming (`action: "beam"`) routed directly by target device ID.
+  - Added comprehensive test coverage verifying unique PIN distribution across 200 devices, heartbeat retention, TTL expiry, rate limiting, and cross-group beam coordination.
+- [x] Discovery Hook Enhancements (`src/hooks/useLocalDiscovery.ts`, `src/hooks/__tests__/useLocalDiscovery.test.tsx`):
+  - Exposed `pin: string | null` state updated from announcement responses.
+  - Implemented `lookupPin(pin: string): Promise<NearbyPeer | null>` with 429 error handling.
+  - Made `beamToPeer` accept either string device IDs or peer objects.
+- [x] Nearby Pair UI Flow & Components (`src/components/NearbyShareCard.tsx`, `NearbyPeerCard.tsx`, `NearbyPairRequestModal.tsx`):
+  - Created `NearbyPeerCard.tsx` with squircle avatar emoji, avatar color, peer name, OS badge, and "Send request" label.
+  - Created `NearbyPairRequestModal.tsx` with peer name, avatar, Accept/Decline action buttons, and 45-second auto-decline countdown progress bar.
+  - Implemented tri-state pairing flow (`"idle"` | `"requesting"` | `"connected"`) in `NearbyShareCard.tsx` using `useLocalDiscovery(true)` and `useWebRTC("internet")`.
+  - Idle state renders "This device" card with prominent PIN and copy button, nearby peer grid, and 4-digit PIN input with Connect button.
+  - Requesting state initiates sender WebRTC session and beams room code with 45s timeout.
+  - Incoming request alerts user with auto-declining modal.
+  - Connected state provides file/text dropzone and send controls for sender, waiting state for receiver, and live `ConnectionDiagnostics`.
+- [x] Mode Rebranding & Offline Graceful Degradation (`src/components/ModeSelector.tsx`, `src/lib/modeAvailability.ts`):
+  - Renamed mode to "Nearby Pair", updated summary to `"Tap a nearby device or enter a PIN. Send after they accept."`, and changed icon to `Users` from `lucide-react`.
+  - Removed Web Bluetooth GATT client UI and obsolete `onOpenMode` prop.
+  - Moved system share sheet, receiving instructions, and Bluetooth settings shortcut into collapsed `<details>` titled `"More ways: System share (Quick Share, AirDrop, Bluetooth)"`.
+  - Handled offline state via `useNetworkStatus()`: hides pairing sections, displays `"Pairing needs internet. System share below works without internet."`, and opens the "More ways" section by default.
+  - Updated `modeAvailability.ts` status text to `"Pair online, share offline"`.
+- [x] Unit Testing & Verification (`src/components/__tests__/NearbyShareCard.test.tsx`, `src/lib/__tests__/modeAvailability.test.ts`):
+  - Tested "Nearby Pair" heading and status badge, idle PIN display, peer card clicks triggering beam, PIN input validation, successful beam and not found errors, incoming request modal accept/decline, connected sender dropzone, and offline details behavior.
+
+
 
 

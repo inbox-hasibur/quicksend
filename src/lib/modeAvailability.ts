@@ -71,20 +71,16 @@ export function getModeStatus(mode: TransferMode, capabilities: BrowserCapabilit
     }
     case "bluetooth": {
       const isAvailable = capabilities.hasWebShare || capabilities.hasBluetooth;
-      let badge = "Nearby BLE / Quick Share";
+      let badge = "Pair online, share offline";
       if (!isAvailable) {
         badge = "Unsupported Browser";
-      } else if (capabilities.hasBluetooth && !capabilities.hasWebShare) {
-        badge = "Web Bluetooth BLE";
-      } else if (!capabilities.hasBluetooth && capabilities.hasWebShare) {
-        badge = "Quick Share / AirDrop";
       }
 
       return {
         mode: "bluetooth",
-        name: "Bluetooth",
-        tagline: "Bluetooth & Quick Share",
-        description: "Quick Share, AirDrop, and Bluetooth transfer for nearby devices.",
+        name: "Nearby Pair",
+        tagline: "Nearby Pair & Quick Share",
+        description: "Tap a nearby device or enter a PIN. Send after they accept.",
         isAvailable,
         disabledReason: isAvailable
           ? undefined

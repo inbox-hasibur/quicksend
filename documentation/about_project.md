@@ -30,8 +30,8 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
        v                               v                             v                            v                 v
 +------------------+          +------------------+          +------------------+        +--------------------+  +---------------+
 |      Mode 1      |          |      Mode 2      |          |      Mode 5      |        |       Mode 3       |  |    Mode 4     |
-|     Internet     |          |    Same Wi-Fi    |          |    Via Camera    |        |  Wi-Fi + Hotspot   |  |   Bluetooth   |
-|   (WebRTC P2P)   |          |  (Live Radar)    |          | (Optical Stream) |        | (Offline Transfer) |  | (Nearby/BLE)  |
+|     Internet     |          |    Same Wi-Fi    |          |    Via Camera    |        |  Wi-Fi + Hotspot   |  |  Nearby Pair  |
+|   (WebRTC P2P)   |          |  (Live Radar)    |          | (Optical Stream) |        | (Offline Transfer) |  | (4-Digit PIN) |
 +------------------+          +------------------+          +------------------+        +--------------------+  +---------------+
 ```
 
@@ -82,16 +82,15 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 
 ---
 
-### Mode 4: Share via Bluetooth (Honest Native OS Proximity Share)
-- **Primary Use Case:** Proximity sharing directly leveraging your operating system's built-in proximity hardware.
-- **Architectural Reality (Honest Web Sandbox Standards):**
-  - Browsers cannot act as GATT Peripherals or scan/pair with other phones over Bluetooth due to W3C security sandboxes.
-- **Streamlined User Experience:**
-  - **1-Tap Device Share (Primary):** Select files or text with Dropzone and tap **"Send via Quick Share / AirDrop / Bluetooth"** (`navigator.share`). Hands payload off directly to Android Quick Share, Apple AirDrop, or Windows Bluetooth File Transfer, logging sent items to session history. If Web Share is unsupported, cleanly displays an informative notice routing users to Wi-Fi Hotspot or Same Wi-Fi modes.
-  - **Plain-English Receiving Guidance:** Clear, honest guidance explaining that incoming Bluetooth transfers are received via the device's native OS Quick Share / AirDrop / Bluetooth settings.
-  - **Neutral Info Box & Radar Routing:** Informs users that browsers cannot scan or pair with phones over Bluetooth, offering 1-tap buttons to **Open Wi-Fi Hotspot mode** and **Open Same Wi-Fi mode**.
-  - **OS Bluetooth Settings Shortcut:** 1-tap shortcut to open device Bluetooth Settings (`ANDROID_INTENTS.BLUETOOTH_SETTINGS`).
-  - **Advanced Collapsible for BLE Hardware:** Collapsed section `"BLE hardware (sensors, microcontrollers)"` for hardware developers connecting to BLE microcontrollers (ESP32, Arduino) via Web-BLE GATT Client with explicit notice that phones will not appear.
+### Mode 4: Nearby Pair (PIN Allocation, Cross-Network Beaming & System Share Fallback)
+- **Primary Use Case:** Proximity device pairing via unique 4-digit PINs, nearby discovered peer cards, explicit acceptance prompts, and native OS share fallbacks.
+- **Architecture & Workflow:**
+  - **Unique 4-Digit PIN:** Every device on the radar receives a unique 4-digit PIN (`0000`–`9999`) refreshed via heartbeat. Users can share their PIN or tap a discovered device card.
+  - **Cross-Network Beaming:** Devices can enter another device's 4-digit PIN, triggering a rate-limited lookup (`/api/discover` `action: "pairLookup"`) and cross-network WebRTC signaling beam (`action: "beam"`).
+  - **Explicit Pairing Acceptance:** The receiving device is presented with a 45-second auto-declining pair request modal (`NearbyPairRequestModal`) displaying the sender's name and avatar emoji.
+  - **Connected Transfer:** Once accepted, sender transmits files or text with real-time transfer progress (`TransferModal`) and backpressure-managed streaming.
+  - **Collapsed Native System Share ("More ways"):** Native `<details>` containing OS Web Share (`navigator.share` for Quick Share, AirDrop, Bluetooth), plain-English receiving guidance, and Bluetooth settings link.
+  - **Offline Resilience:** When offline, pairing UI gracefully hides while displaying `"Pairing needs internet. System share below works without internet."` with the "More ways" section expanded.
 
 ---
 
@@ -119,7 +118,7 @@ Instead of overwhelming users with multi-column pricing-style cards, the interfa
    ├── [ Mode 1: Internet ] ────> Opens Dedicated Workspace ────> [ Send | Receive ]
    ├── [ Mode 2: Same Wi-Fi ] ───> Opens Dedicated Workspace ────> [ Radar Discovery & Beaming ]
    ├── [ Mode 3: Hotspot ] ──────> Opens Dedicated Workspace ────> [ Host AP | Join AP ]
-   ├── [ Mode 4: Bluetooth ] ────> Opens Dedicated Workspace ────> [ Native Share | BLE ]
+   ├── [ Mode 4: Nearby Pair ] ──> Opens Dedicated Workspace ────> [ Tap Peer | 4-Digit PIN | System Share ]
    ├── [ Mode 5: Via Camera ] ───> Opens Dedicated Workspace ────> [ Animated QR Stream ]
    ├── [ Mode 6: Via Cable ] ────> Opens Dedicated Workspace ────> [ Direct Cable | WebUSB ]
    └── [ Ultrasonic Audio ] ────> Standalone Bottom Workspace ───> [ Speaker | Microphone ]
@@ -288,6 +287,8 @@ quicksend/
     │   ├── HotspotAssistantCard.tsx
     │   ├── InternetSharingCard.tsx
     │   ├── ModeSelector.tsx
+    │   ├── NearbyPairRequestModal.tsx
+    │   ├── NearbyPeerCard.tsx
     │   ├── NearbyShareCard.tsx
     │   ├── NetworkStatusBadge.tsx
     │   ├── OpticalHandshakeModal.tsx

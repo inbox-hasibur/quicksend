@@ -51,6 +51,7 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
   const [peers, setPeers] = useState<NearbyPeer[]>([]);
   const [networkId, setNetworkId] = useState<string | null>(null);
   const [incomingBeam, setIncomingBeam] = useState<IncomingBeamEvent | null>(null);
+  const [pin, setPin] = useState<string | null>(null);
   const [status, setStatus] = useState<DiscoveryStatus>({
     lastPollOk: false,
     lastPollAt: null,
@@ -117,6 +118,9 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
           } else {
             setIncomingBeam(null);
           }
+          if (data.pin !== undefined) {
+            setPin(data.pin);
+          }
           // If server reassigned avatar to avoid conflict on this subnet, update local profile
           if (
             data.assignedAvatar &&
@@ -155,9 +159,10 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
     }
   }, [profile, validCode]);
 
-  // Direct beam signaling from sender to receiver on same network
+  // Direct beam signaling from sender to receiver on same network or across networks
   const beamToPeer = useCallback(
-    async (targetDeviceId: string, roomCode: string) => {
+    async (target: string | { id: string }, roomCode: string) => {
+      const targetDeviceId = typeof target === "string" ? target : target.id;
       try {
         const beamPayload: Record<string, unknown> = {
           action: "beam",
@@ -189,6 +194,37 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
     },
     [profile, validCode]
   );
+
+  const lookupPin = useCallback(async (searchPin: string): Promise<NearbyPeer | null> => {
+    const cleanPin = searchPin.trim();
+    const res = await fetch("/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "pairLookup",
+        pin: cleanPin,
+      }),
+    });
+    if (res.status === 429) {
+      throw new Error("Too many attempts");
+    }
+    if (!res.ok) {
+      return null;
+    }
+    const data = await res.json();
+    if (data.found && data.peerId) {
+      return {
+        id: data.peerId,
+        name: data.name || "Nearby Peer",
+        avatarEmoji: data.avatar || "🦊",
+        os: data.os || "Device",
+        peerId: data.peerId,
+        formFactor: "mobile",
+        lastSeen: Date.now(),
+      };
+    }
+    return null;
+  }, []);
 
   const clearIncomingBeam = useCallback(async () => {
     setIncomingBeam(null);
@@ -276,5 +312,7 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
     cycleAvatar,
     refreshPeers: announcePresence,
     status,
+    pin,
+    lookupPin,
   };
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { AVATAR_PRESETS } from "@/lib/deviceIdentity";
-import { isRedisConfigured } from "@/lib/signalStore";
+import { isRedisConfigured, signalStore } from "@/lib/signalStore";
 
 export interface DiscoveredPeer {
   id: string;
@@ -13,6 +13,7 @@ export interface DiscoveredPeer {
   formFactor: "desktop" | "laptop" | "mobile" | "tablet";
   peerId: string;
   lastSeen: number;
+  pin?: string;
 }
 
 export interface IncomingBeamNotice {
@@ -414,6 +415,64 @@ export async function POST(request: Request) {
     const defaultNetworkId = isCodeValid ? `code:${rawCode}` : computeNetworkId(ip);
     const targetNetworkId = customNetworkId || defaultNetworkId;
 
+    if (action === "pairLookup") {
+      const rateLimitKey = `ratelimit:pairlookup:${ip}`;
+      const currentAttemptsStr = await signalStore.getKey(rateLimitKey);
+      const currentAttempts = currentAttemptsStr ? parseInt(currentAttemptsStr, 10) : 0;
+      if (currentAttempts >= 10) {
+        return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
+      }
+      if (currentAttempts === 0) {
+        await signalStore.setKey(rateLimitKey, "1", 60);
+      } else {
+        await signalStore.setKey(rateLimitKey, String(currentAttempts + 1));
+      }
+
+      const lookupPin = typeof body.pin === "string" ? body.pin.trim() : "";
+      if (!/^\d{4}$/.test(lookupPin)) {
+        return NextResponse.json({ found: false });
+      }
+
+      const targetDeviceId = await signalStore.getKey(`pin:${lookupPin}`);
+      if (!targetDeviceId) {
+        return NextResponse.json({ found: false });
+      }
+
+      let targetPeer: DiscoveredPeer | null = null;
+      const rawTarget = await signalStore.getKey(`device:${targetDeviceId}`);
+      if (rawTarget) {
+        try {
+          const parsed: DiscoveredPeer = JSON.parse(rawTarget);
+          if (Date.now() - parsed.lastSeen <= 15000) {
+            targetPeer = parsed;
+          }
+        } catch {
+          // Ignore parse error
+        }
+      }
+      if (!targetPeer) {
+        for (const pMap of networkPeers.values()) {
+          const p = pMap.get(targetDeviceId);
+          if (p && Date.now() - p.lastSeen <= 15000) {
+            targetPeer = p;
+            break;
+          }
+        }
+      }
+
+      if (!targetPeer) {
+        return NextResponse.json({ found: false });
+      }
+
+      return NextResponse.json({
+        found: true,
+        peerId: targetPeer.id,
+        name: targetPeer.name,
+        avatar: targetPeer.avatarEmoji || "🦊",
+        os: targetPeer.os || "Device",
+      });
+    }
+
     if (action === "announce") {
       if (!deviceId) {
         return NextResponse.json({ success: false, error: "deviceId required" }, { status: 400 });
@@ -440,6 +499,28 @@ export async function POST(request: Request) {
         }
       }
 
+      // 4-digit unique pairing PIN allocation and refresh
+      const PRESENCE_TTL_SECONDS = 15;
+      let assignedPin = await signalStore.getKey(`devpin:${deviceId}`);
+      if (assignedPin && /^\d{4}$/.test(assignedPin)) {
+        await signalStore.setKey(`pin:${assignedPin}`, deviceId, PRESENCE_TTL_SECONDS);
+        await signalStore.setKey(`devpin:${deviceId}`, assignedPin, PRESENCE_TTL_SECONDS);
+      } else {
+        assignedPin = null;
+        for (let attempt = 0; attempt < 50; attempt++) {
+          const candidate = Math.floor(Math.random() * 10000).toString().padStart(4, "0");
+          const heldBy = await signalStore.getKey(`pin:${candidate}`);
+          if (!heldBy || heldBy === deviceId) {
+            assignedPin = candidate;
+            break;
+          }
+        }
+        if (assignedPin) {
+          await signalStore.setKey(`pin:${assignedPin}`, deviceId, PRESENCE_TTL_SECONDS);
+          await signalStore.setKey(`devpin:${deviceId}`, assignedPin, PRESENCE_TTL_SECONDS);
+        }
+      }
+
       const peerRecord: DiscoveredPeer = {
         id: deviceId,
         name: name || "Anonymous Peer",
@@ -451,9 +532,11 @@ export async function POST(request: Request) {
         formFactor: formFactor || "laptop",
         peerId: peerId || deviceId,
         lastSeen: Date.now(),
+        pin: assignedPin || undefined,
       };
 
       await savePeer(targetNetworkId, peerRecord);
+      await signalStore.setKey(`device:${deviceId}`, JSON.stringify(peerRecord), PRESENCE_TTL_SECONDS);
 
       // Check if another peer on this subnet initiated a direct beam to this device
       const incomingBeam = await getAndClearBeam(deviceId);
@@ -473,6 +556,7 @@ export async function POST(request: Request) {
         incomingBeam: incomingBeam || null,
         groupLabel,
         ipFamily,
+        pin: assignedPin || null,
       });
     }
 
@@ -503,6 +587,12 @@ export async function POST(request: Request) {
       if (deviceId) {
         await removePeer(targetNetworkId, deviceId);
         await clearBeam(deviceId);
+        const leavingPin = await signalStore.getKey(`devpin:${deviceId}`);
+        if (leavingPin) {
+          await signalStore.deleteKey(`pin:${leavingPin}`);
+        }
+        await signalStore.deleteKey(`devpin:${deviceId}`);
+        await signalStore.deleteKey(`device:${deviceId}`);
       }
       return NextResponse.json({ success: true });
     }

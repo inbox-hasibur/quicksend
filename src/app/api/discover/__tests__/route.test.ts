@@ -375,4 +375,267 @@ describe("Discovery API Route (/api/discover)", () => {
       expect(postJson.networkId).toBe("local-lan");
     });
   });
+
+  describe("4-Digit PIN Allocation, Pair Lookup, and Cross-Group Beaming", () => {
+    it("allocates a unique 4-digit PIN per device across 200 registrations", async () => {
+      const pins = new Set<string>();
+      for (let i = 0; i < 200; i++) {
+        const req = new Request("http://localhost/api/discover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-forwarded-for": "192.168.1.1" },
+          body: JSON.stringify({
+            action: "announce",
+            deviceId: `dev_pin_alloc_${i}`,
+            name: `Device ${i}`,
+          }),
+        });
+        const res = await POST(req);
+        const data = await res.json();
+        expect(data.success).toBe(true);
+        expect(typeof data.pin).toBe("string");
+        expect(data.pin).toMatch(/^\d{4}$/);
+        pins.add(data.pin);
+      }
+      expect(pins.size).toBe(200);
+    });
+
+    it("retains the same PIN on heartbeat", async () => {
+      const devId = "dev_hb_pin_test";
+      const req1 = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "192.168.1.2" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: devId,
+          name: "Heartbeat Device",
+        }),
+      });
+      const res1 = await POST(req1);
+      const data1 = await res1.json();
+      const originalPin = data1.pin;
+      expect(originalPin).toBeTruthy();
+
+      // Heartbeat announce
+      const req2 = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "192.168.1.2" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: devId,
+          name: "Heartbeat Device",
+        }),
+      });
+      const res2 = await POST(req2);
+      const data2 = await res2.json();
+      expect(data2.pin).toBe(originalPin);
+    });
+
+    it("expires PIN with presence after TTL", async () => {
+      const devId = "dev_ttl_pin_test";
+      const req = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "192.168.1.3" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: devId,
+          name: "Expiring Device",
+        }),
+      });
+      const res = await POST(req);
+      const data = await res.json();
+      const pin = data.pin;
+      expect(pin).toBeTruthy();
+
+      // Check lookup is found now
+      const lookupReq1 = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "192.168.1.4" },
+        body: JSON.stringify({
+          action: "pairLookup",
+          pin,
+        }),
+      });
+      const lookupRes1 = await POST(lookupReq1);
+      const lookupData1 = await lookupRes1.json();
+      expect(lookupData1.found).toBe(true);
+
+      // Advance time past presence TTL (15s)
+      const origNow = Date.now;
+      Date.now = () => origNow() + 16000;
+      try {
+        const lookupReq2 = new Request("http://localhost/api/discover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-forwarded-for": "192.168.1.4" },
+          body: JSON.stringify({
+            action: "pairLookup",
+            pin,
+          }),
+        });
+        const lookupRes2 = await POST(lookupReq2);
+        const lookupData2 = await lookupRes2.json();
+        expect(lookupData2.found).toBe(false);
+      } finally {
+        Date.now = origNow;
+      }
+    });
+
+    it("handles pairLookup found, not found, and invalid format without exposing IP", async () => {
+      // Register target device
+      const targetReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.5" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: "dev_lookup_target",
+          name: "Alice Phone",
+          os: "iOS",
+        }),
+      });
+      const targetRes = await POST(targetReq);
+      const targetData = await targetRes.json();
+      const pin = targetData.pin;
+
+      // Valid found
+      const foundReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.50" },
+        body: JSON.stringify({
+          action: "pairLookup",
+          pin,
+        }),
+      });
+      const foundRes = await POST(foundReq);
+      expect(foundRes.status).toBe(200);
+      const foundData = await foundRes.json();
+      expect(foundData.found).toBe(true);
+      expect(foundData.peerId).toBe("dev_lookup_target");
+      expect(foundData.name).toBe("Alice Phone");
+      expect(foundData.os).toBe("iOS");
+      expect(foundData.avatar).toBeDefined();
+      // Verify no IP or network group is leaked
+      expect(foundData.ip).toBeUndefined();
+      expect(foundData.networkId).toBeUndefined();
+      expect(foundData.groupLabel).toBeUndefined();
+
+      // Not found
+      const notFoundReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.50" },
+        body: JSON.stringify({
+          action: "pairLookup",
+          pin: "0000",
+        }),
+      });
+      const notFoundRes = await POST(notFoundReq);
+      const notFoundData = await notFoundRes.json();
+      expect(notFoundData.found).toBe(false);
+
+      // Invalid format
+      for (const invalidPin of ["12", "123", "12345", "abcd", ""]) {
+        const invReq = new Request("http://localhost/api/discover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.50" },
+          body: JSON.stringify({
+            action: "pairLookup",
+            pin: invalidPin,
+          }),
+        });
+        const invRes = await POST(invReq);
+        const invData = await invRes.json();
+        expect(invData.found).toBe(false);
+      }
+    });
+
+    it("enforces rate limit of 10 pairLookup calls per minute with HTTP 429", async () => {
+      const testIp = "203.0.113.77";
+      // 10 calls succeed
+      for (let i = 0; i < 10; i++) {
+        const req = new Request("http://localhost/api/discover", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-forwarded-for": testIp },
+          body: JSON.stringify({
+            action: "pairLookup",
+            pin: "1234",
+          }),
+        });
+        const res = await POST(req);
+        expect(res.status).toBe(200);
+      }
+
+      // 11th call gets 429
+      const blockedReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": testIp },
+        body: JSON.stringify({
+          action: "pairLookup",
+          pin: "1234",
+        }),
+      });
+      const blockedRes = await POST(blockedReq);
+      expect(blockedRes.status).toBe(429);
+      const blockedData = await blockedRes.json();
+      expect(blockedData.error).toBe("Too many attempts");
+    });
+
+    it("allows beaming to a device in another group when target was found by pin", async () => {
+      // Device A on Network 1
+      const devAReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.1" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: "dev_cross_a",
+          name: "Device A Network 1",
+        }),
+      });
+      const devARes = await POST(devAReq);
+      const devAData = await devARes.json();
+      const pinA = devAData.pin;
+      expect(pinA).toBeTruthy();
+
+      // Device B on Network 2 looks up Device A via PIN
+      const lookupReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.2" },
+        body: JSON.stringify({
+          action: "pairLookup",
+          pin: pinA,
+        }),
+      });
+      const lookupRes = await POST(lookupReq);
+      const lookupData = await lookupRes.json();
+      expect(lookupData.found).toBe(true);
+      expect(lookupData.peerId).toBe("dev_cross_a");
+
+      // Device B beams to Device A across groups
+      const beamReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.2" },
+        body: JSON.stringify({
+          action: "beam",
+          targetDeviceId: lookupData.peerId,
+          fromPeer: { id: "dev_cross_b", name: "Device B Network 2" },
+          roomCode: "CROSS-ROOM-777",
+        }),
+      });
+      const beamRes = await POST(beamReq);
+      expect(beamRes.status).toBe(200);
+
+      // Device A announces again and receives the incoming beam
+      const devAReq2 = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.1" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: "dev_cross_a",
+          name: "Device A Network 1",
+        }),
+      });
+      const devARes2 = await POST(devAReq2);
+      const devAData2 = await devARes2.json();
+      expect(devAData2.incomingBeam).toBeDefined();
+      expect(devAData2.incomingBeam.roomCode).toBe("CROSS-ROOM-777");
+      expect(devAData2.incomingBeam.fromPeer.id).toBe("dev_cross_b");
+    });
+  });
 });

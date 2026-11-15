@@ -146,4 +146,96 @@ describe("useLocalDiscovery and Snapshot Stability", () => {
 
     expect(hookData.profile.avatarEmoji).not.toBe(initialEmoji);
   });
+
+  it("exposes pin from announce response and supports lookupPin and beamToPeer", async () => {
+    let hookData!: ReturnType<typeof useLocalDiscovery>;
+
+    globalThis.fetch = vi.fn().mockImplementation(async (_url: string, opts?: RequestInit) => {
+      const body = opts?.body ? JSON.parse(opts.body as string) : {};
+      if (body.action === "announce") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            success: true,
+            networkId: "lan_test",
+            peers: [],
+            pin: "7890",
+          }),
+        };
+      }
+      if (body.action === "pairLookup") {
+        if (body.pin === "1234") {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              found: true,
+              peerId: "target_peer_id",
+              name: "Bob Phone",
+              avatar: "🦁",
+              os: "Android",
+            }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ found: false }),
+        };
+      }
+      if (body.action === "beam") {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ success: true }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ success: true }),
+      };
+    });
+
+    await act(async () => {
+      root.render(<DiscoveryConsumer onHook={(h) => (hookData = h)} />);
+    });
+
+    await act(async () => {
+      await hookData.refreshPeers();
+    });
+
+    expect(hookData.pin).toBe("7890");
+
+    let peer: Awaited<ReturnType<typeof hookData.lookupPin>> = null;
+    await act(async () => {
+      peer = await hookData.lookupPin("1234");
+    });
+    expect(peer).toEqual(
+      expect.objectContaining({
+        id: "target_peer_id",
+        name: "Bob Phone",
+        avatarEmoji: "🦁",
+        os: "Android",
+      })
+    );
+
+    let notFound: Awaited<ReturnType<typeof hookData.lookupPin>> = null;
+    await act(async () => {
+      notFound = await hookData.lookupPin("9999");
+    });
+    expect(notFound).toBeNull();
+
+    // Verify beamToPeer accepting peer object
+    await act(async () => {
+      await hookData.beamToPeer(peer!, "ROOM-TEST");
+    });
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/discover",
+      expect.objectContaining({
+        body: expect.stringContaining('"targetDeviceId":"target_peer_id"'),
+      })
+    );
+  });
 });
