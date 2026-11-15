@@ -478,6 +478,9 @@
   - Updated `modeAvailability.ts` status text to `"Pair online, share offline"`.
 - [x] Unit Testing & Verification (`src/components/__tests__/NearbyShareCard.test.tsx`, `src/lib/__tests__/modeAvailability.test.ts`):
   - Tested "Nearby Pair" heading and status badge, idle PIN display, peer card clicks triggering beam, PIN input validation, successful beam and not found errors, incoming request modal accept/decline, connected sender dropzone, and offline details behavior.
+- [x] Modern README Showcase Overhaul (`README.md`):
+  - Redesigned README with centered hero logo, Shields.io badges (Live App, Next.js 16, TypeScript 5, Tailwind CSS, WebRTC DTLS/SRTP, Platform, 221 Tests, MIT License), clear value proposition, and CTA launch link.
+  - Structured concise "About QuickSend", core highlights, 6-channel matrix, tech stack, local setup guide, and security/privacy architecture.
 
 
 
