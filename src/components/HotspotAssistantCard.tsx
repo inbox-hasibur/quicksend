@@ -27,6 +27,7 @@ import { EstimateBadge } from "@/components/EstimateBadge";
 import { TransferModal } from "@/components/TransferModal";
 import { QRScannerModal } from "@/components/QRScannerModal";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useLocalDiscovery, type NearbyPeer } from "@/hooks/useLocalDiscovery";
 import { buildWifiQrString, ANDROID_INTENTS } from "@/lib/wifiQr";
@@ -70,6 +71,7 @@ export function HotspotAssistantCard() {
     beamToPeer,
     clearIncomingBeam,
     cycleAvatar,
+    status: discoveryStatus,
   } = useLocalDiscovery(true);
 
   // WebRTC DataChannel Engine
@@ -84,6 +86,8 @@ export function HotspotAssistantCard() {
     acceptIncomingTransfer,
     rejectIncomingTransfer,
     cleanup,
+    diagnostics,
+    debugLog,
   } = useWebRTC("hotspot");
 
   const processedBeamCodeRef = useRef<string | null>(null);
@@ -653,6 +657,15 @@ export function HotspotAssistantCard() {
         onReject={rejectIncomingTransfer}
         onClose={handleModalClose}
       />
+
+      {/* Live Connection Diagnostics */}
+      <div className="pt-2">
+        <ConnectionDiagnostics
+          diagnostics={diagnostics}
+          debugLog={debugLog}
+          discoveryStatus={discoveryStatus}
+        />
+      </div>
     </div>
   );
 }

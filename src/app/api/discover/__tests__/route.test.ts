@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { GET, POST, computeNetworkId, normalizeIpv6Prefix, isLocalOrPrivateIp } from "../route";
+import {
+  GET,
+  POST,
+  computeNetworkId,
+  normalizeIpv6Prefix,
+  isLocalOrPrivateIp,
+  getNetworkGroupInfo,
+} from "../route";
 
 describe("Discovery API Route (/api/discover)", () => {
   it("should return local-lan networkId for private LAN and loopback IPs", async () => {
@@ -189,5 +196,78 @@ describe("Discovery API Route (/api/discover)", () => {
     // Client B must be assigned a different avatar, not 🦊!
     expect(jsonB.assignedAvatar.avatarEmoji).not.toBe("🦊");
     expect(jsonB.peers.some((p: { avatarEmoji: string }) => p.avatarEmoji === "🦊")).toBe(true);
+  });
+
+  describe("groupLabel masking and ipFamily detection", () => {
+    it("should mask IPv4 by keeping first two octets and replacing rest with x", () => {
+      const info1 = getNetworkGroupInfo("203.0.113.4");
+      expect(info1.groupLabel).toBe("203.0.x.x");
+      expect(info1.ipFamily).toBe("v4");
+
+      const info2 = getNetworkGroupInfo("198.51.100.25");
+      expect(info2.groupLabel).toBe("198.51.x.x");
+      expect(info2.ipFamily).toBe("v4");
+
+      const info3 = getNetworkGroupInfo("::ffff:203.0.113.4");
+      expect(info3.groupLabel).toBe("203.0.x.x");
+      expect(info3.ipFamily).toBe("v4");
+    });
+
+    it("should mask IPv6 by keeping first two hextets and appending ...", () => {
+      const info1 = getNetworkGroupInfo("2001:db8:85a3:0042:1000:8a2e:0370:7334");
+      expect(info1.groupLabel).toBe("2001:db8...");
+      expect(info1.ipFamily).toBe("v6");
+
+      const info2 = getNetworkGroupInfo("2400:cb00:2048:1::c629:d7a2");
+      expect(info2.groupLabel).toBe("2400:cb00...");
+      expect(info2.ipFamily).toBe("v6");
+    });
+
+    it("should return local-lan and family local for loopback and private subnets", () => {
+      expect(getNetworkGroupInfo("127.0.0.1")).toEqual({
+        groupLabel: "local-lan",
+        ipFamily: "local",
+      });
+      expect(getNetworkGroupInfo("::1")).toEqual({
+        groupLabel: "local-lan",
+        ipFamily: "local",
+      });
+      expect(getNetworkGroupInfo("192.168.1.5")).toEqual({
+        groupLabel: "local-lan",
+        ipFamily: "local",
+      });
+      expect(getNetworkGroupInfo("10.0.1.20")).toEqual({
+        groupLabel: "local-lan",
+        ipFamily: "local",
+      });
+      expect(getNetworkGroupInfo("172.16.0.1")).toEqual({
+        groupLabel: "local-lan",
+        ipFamily: "local",
+      });
+    });
+
+    it("should include groupLabel and ipFamily in GET and POST responses", async () => {
+      const getReq = new Request("http://localhost/api/discover", {
+        headers: { "x-forwarded-for": "203.0.113.4" },
+      });
+      const getRes = await GET(getReq);
+      const getJson = await getRes.json();
+      expect(getJson.groupLabel).toBe("203.0.x.x");
+      expect(getJson.ipFamily).toBe("v4");
+
+      const postReq = new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": "203.0.113.4" },
+        body: JSON.stringify({
+          action: "announce",
+          deviceId: "dev_mask_test",
+          name: "Mask Tester",
+        }),
+      });
+      const postRes = await POST(postReq);
+      const postJson = await postRes.json();
+      expect(postJson.groupLabel).toBe("203.0.x.x");
+      expect(postJson.ipFamily).toBe("v4");
+    });
   });
 });

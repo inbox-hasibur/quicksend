@@ -386,3 +386,25 @@
   - Removed all occurrences of the former landscape grid across all source code, tests, and documentation.
 - [x] **Sprint 18 Verification:** 188/188 unit tests passing across 32 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
 
+### Sprint 19: WebRTC Connection Diagnostics & Subnet Group Masking
+- [x] WebRTC Diagnostics & Debug Log Ring Buffer (`src/hooks/useWebRTC.ts`):
+  - Implemented 40-entry debug log ring buffer recording `{ t, msg }` (milliseconds elapsed since session start).
+  - Maintained diagnostics object: `{ iceState, gatheringState, signalingState, channelState, candidateCounts: { host, srflx, relay }, selectedPair, lastError }`.
+  - Wired into `oniceconnectionstatechange`, `onicegatheringstatechange`, `onsignalingstatechange`, `onicecandidate` (reading type after "typ " in candidate string), data channel `onopen`, `onclose`, and `onerror`.
+  - Querying `pc.getStats()` once upon `connected` or `completed` ICE state to inspect selected candidate pair local and remote `candidateType`.
+  - Instrumented logging for offer created, answer received, remote description set, and number of queued candidates flushed.
+- [x] Discovery Subnet Group Masking & Poll Status (`src/app/api/discover/route.ts`, `src/hooks/useLocalDiscovery.ts` & tests):
+  - Created `getNetworkGroupInfo(rawIp)` producing `groupLabel` (IPv4 first two octets + `x.x`, IPv6 first two hextets + `...`, loopback/RFC 1918 `local-lan`) and `ipFamily` ("v4" | "v6" | "local").
+  - Returned `groupLabel` and `ipFamily` across `GET` (list) and `POST` (announce/register) route responses.
+  - Exposed `status` in `useLocalDiscovery` (`lastPollOk`, `lastPollAt`, `lastError`, `peerCount`, `groupLabel`, `ipFamily`) updated on every poll heartbeat.
+  - Added unit test suite for IPv4/IPv6/local-lan masking and route response schema in `src/app/api/discover/__tests__/route.test.ts`.
+- [x] Connection Diagnostics Panel (`src/components/ConnectionDiagnostics.tsx` & tests):
+  - Native `<details>` titled "Connection details", closed by default with small muted monospace text.
+  - Fetches `GET /api/health` once on expand, warning if memory storage is used across multi-instance server deployments.
+  - Displays Network group, Radar status, ICE/gathering/signaling/channel states, candidate counts, selected pair types, last error, and formatted debug log.
+  - One-click "Copy report" button copying plain-text report to clipboard with temporary 2-second "Copied" feedback.
+  - Comprehensive unit tests in `src/components/__tests__/ConnectionDiagnostics.test.tsx` verifying default closed state, health fetch and field rendering on open, and clipboard export containing "ICE state".
+- [x] Transferred Diagnostics into Same-Network & Hotspot Cards (`src/components/SameNetworkCard.tsx`, `src/components/HotspotAssistantCard.tsx`):
+  - Placed `<ConnectionDiagnostics />` at the bottom of both Same Wi-Fi and Hotspot cards wired to their existing `useWebRTC` and `useLocalDiscovery` hook states.
+- [x] **Sprint 19 Verification:** 195/195 unit tests passing across 33 test suites, `npm run lint` passing with 0 errors/0 warnings, `npm run build` Turbopack compilation passing with 0 errors.
+

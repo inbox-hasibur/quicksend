@@ -22,6 +22,7 @@ import { Dropzone } from "@/components/Dropzone";
 import { EstimateBadge } from "@/components/EstimateBadge";
 import { TransferModal } from "@/components/TransferModal";
 import { QRScannerModal } from "@/components/QRScannerModal";
+import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useLocalDiscovery, type NearbyPeer } from "@/hooks/useLocalDiscovery";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
@@ -46,6 +47,7 @@ export function SameNetworkCard() {
     clearIncomingBeam,
     updateName,
     cycleAvatar,
+    status: discoveryStatus,
   } = useLocalDiscovery(true);
 
   const [customNameInput, setCustomNameInput] = useState(profile.name);
@@ -68,6 +70,8 @@ export function SameNetworkCard() {
     acceptIncomingTransfer,
     rejectIncomingTransfer,
     cleanup,
+    diagnostics,
+    debugLog,
   } = useWebRTC("same-network");
 
   const processedBeamCodeRef = useRef<string | null>(null);
@@ -555,6 +559,15 @@ export function SameNetworkCard() {
         onReject={rejectIncomingTransfer}
         onClose={handleModalClose}
       />
+
+      {/* Live Connection Diagnostics */}
+      <div className="pt-2">
+        <ConnectionDiagnostics
+          diagnostics={diagnostics}
+          debugLog={debugLog}
+          discoveryStatus={discoveryStatus}
+        />
+      </div>
     </div>
   );
 }

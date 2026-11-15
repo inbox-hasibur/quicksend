@@ -47,6 +47,32 @@ interface PeerJsInstance {
   destroy: () => void;
 }
 
+export interface CandidateCounts {
+  host: number;
+  srflx: number;
+  relay: number;
+}
+
+export interface SelectedCandidatePair {
+  local: string;
+  remote: string;
+}
+
+export interface WebRTCDiagnostics {
+  iceState: string;
+  gatheringState: string;
+  signalingState: string;
+  channelState: string;
+  candidateCounts: CandidateCounts;
+  selectedPair: SelectedCandidatePair | null;
+  lastError: string | null;
+}
+
+export interface DebugLogEntry {
+  t: number;
+  msg: string;
+}
+
 type ActiveTransport = "peerjs" | "webrtc" | null;
 
 async function loadPeerConstructor() {
@@ -78,6 +104,79 @@ export function useWebRTC(mode: TransferMode = "internet") {
     progressPercentage: 0,
     speedBps: 0,
   });
+
+  const [debugLog, setDebugLog] = useState<DebugLogEntry[]>([]);
+  const [diagnostics, setDiagnostics] = useState<WebRTCDiagnostics>({
+    iceState: "new",
+    gatheringState: "new",
+    signalingState: "stable",
+    channelState: "closed",
+    candidateCounts: { host: 0, srflx: 0, relay: 0 },
+    selectedPair: null,
+    lastError: null,
+  });
+
+  const connectStartTimeRef = useRef<number>(0);
+  const hasCheckedStatsRef = useRef<boolean>(false);
+
+  // Add debug log entry to ring buffer (max 40)
+  const addLog = useCallback((msg: string) => {
+    const t = connectStartTimeRef.current > 0 ? Math.max(0, Date.now() - connectStartTimeRef.current) : 0;
+    setDebugLog((prev) => {
+      const next = [...prev, { t, msg }];
+      return next.length > 40 ? next.slice(-40) : next;
+    });
+  }, []);
+
+  // Inspect selected candidate pair via getStats once connected
+  const checkSelectedPair = useCallback(async (pc: RTCPeerConnection) => {
+    if (hasCheckedStatsRef.current) return;
+    hasCheckedStatsRef.current = true;
+    try {
+      if (typeof pc.getStats !== "function") return;
+      const stats = await pc.getStats();
+      let localCandidateId: string | undefined;
+      let remoteCandidateId: string | undefined;
+
+      stats.forEach((report: Record<string, unknown>) => {
+        if (report.type === "transport" && report.selectedCandidatePairId) {
+          const pair = stats.get(report.selectedCandidatePairId as string) as
+            | Record<string, unknown>
+            | undefined;
+          if (pair) {
+            localCandidateId = pair.localCandidateId as string | undefined;
+            remoteCandidateId = pair.remoteCandidateId as string | undefined;
+          }
+        }
+      });
+      if (!localCandidateId || !remoteCandidateId) {
+        stats.forEach((report: Record<string, unknown>) => {
+          if (
+            report.type === "candidate-pair" &&
+            (report.selected || (report.nominated && report.state === "succeeded"))
+          ) {
+            localCandidateId = report.localCandidateId as string | undefined;
+            remoteCandidateId = report.remoteCandidateId as string | undefined;
+          }
+        });
+      }
+      if (localCandidateId && remoteCandidateId) {
+        const localCand = stats.get(localCandidateId) as Record<string, unknown> | undefined;
+        const remoteCand = stats.get(remoteCandidateId) as Record<string, unknown> | undefined;
+        if (localCand && remoteCand) {
+          const local = (localCand.candidateType || localCand.type || "unknown") as string;
+          const remote = (remoteCand.candidateType || remoteCand.type || "unknown") as string;
+          setDiagnostics((d) => ({
+            ...d,
+            selectedPair: { local, remote },
+          }));
+          addLog(`Selected pair: local ${local}, remote ${remote}`);
+        }
+      }
+    } catch {
+      // Ignore stats error
+    }
+  }, [addLog]);
 
   const activeTransportRef = useRef<ActiveTransport>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -224,6 +323,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
       pcRef.current = null;
       pc.onicecandidate = null;
       pc.oniceconnectionstatechange = null;
+      pc.onicegatheringstatechange = null;
+      pc.onsignalingstatechange = null;
       pc.onconnectionstatechange = null;
       pc.ondatachannel = null;
       try {
@@ -479,6 +580,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
       dc.binaryType = "arraybuffer";
 
       dc.onopen = () => {
+        addLog("DataChannel open");
+        setDiagnostics((d) => ({ ...d, channelState: "open" }));
         clearIceTimeout();
         activeTransportRef.current = "webrtc";
         isConnectedRef.current = true;
@@ -486,6 +589,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
       };
 
       dc.onclose = () => {
+        addLog("DataChannel close");
+        setDiagnostics((d) => ({ ...d, channelState: "closed" }));
         if (isCleaningUpRef.current) return;
         if (activeTransportRef.current === "webrtc") {
           isConnectedRef.current = false;
@@ -494,6 +599,12 @@ export function useWebRTC(mode: TransferMode = "internet") {
       };
 
       dc.onerror = () => {
+        addLog("DataChannel error");
+        setDiagnostics((d) => ({
+          ...d,
+          channelState: "closing",
+          lastError: "DataChannel error occurred during transfer.",
+        }));
         if (isCleaningUpRef.current || !dcRef.current) return;
         // Never override active PeerJS transfer or already finished/verified transfers
         if (activeTransportRef.current === "peerjs") return;
@@ -511,7 +622,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         handleIncomingData(event.data);
       };
     },
-    [clearIceTimeout, handleIncomingData]
+    [clearIceTimeout, handleIncomingData, addLog]
   );
 
   // Setup Peer Connection
@@ -531,6 +642,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       pc.onicecandidate = (event) => {
         if (event.candidate) {
+          const candStr = event.candidate.candidate || "";
+          const match = candStr.match(/typ\s+(\w+)/);
+          const candType = match ? match[1] : (event.candidate.type || "unknown");
+          addLog(`Local candidate: ${candType}`);
+          if (candType === "host" || candType === "srflx" || candType === "relay") {
+            setDiagnostics((d) => ({
+              ...d,
+              candidateCounts: {
+                ...d.candidateCounts,
+                [candType]: d.candidateCounts[candType] + 1,
+              },
+            }));
+          }
           signalingRef.current
             .sendSignal("candidate", event.candidate.toJSON())
             .catch(() => { });
@@ -539,12 +663,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       pc.oniceconnectionstatechange = () => {
         if (isCleaningUpRef.current || !pcRef.current) return;
+        const state = pc.iceConnectionState;
+        addLog(`ICE state: ${state}`);
+        setDiagnostics((d) => ({ ...d, iceState: state }));
+        if (state === "connected" || state === "completed") {
+          checkSelectedPair(pc);
+        }
         // If PeerJS is active or connected, ignore raw WebRTC ICE failures
         if (activeTransportRef.current === "peerjs" || isConnectedRef.current) {
           return;
         }
 
-        if (pc.iceConnectionState === "failed") {
+        if (state === "failed") {
+          setDiagnostics((d) => ({ ...d, lastError: FIREWALL_FALLBACK_MESSAGE }));
           clearIceTimeout();
           isConnectedRef.current = false;
           setIsConnected(false);
@@ -557,6 +688,20 @@ export function useWebRTC(mode: TransferMode = "internet") {
             };
           });
         }
+      };
+
+      pc.onicegatheringstatechange = () => {
+        if (isCleaningUpRef.current || !pcRef.current) return;
+        const state = pc.iceGatheringState;
+        addLog(`Gathering state: ${state}`);
+        setDiagnostics((d) => ({ ...d, gatheringState: state }));
+      };
+
+      pc.onsignalingstatechange = () => {
+        if (isCleaningUpRef.current || !pcRef.current) return;
+        const state = pc.signalingState;
+        addLog(`Signaling state: ${state}`);
+        setDiagnostics((d) => ({ ...d, signalingState: state }));
       };
 
       pc.onconnectionstatechange = () => {
@@ -603,7 +748,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       return pc;
     },
-    [mode, setupDataChannel, clearIceTimeout]
+    [mode, setupDataChannel, clearIceTimeout, addLog, checkSelectedPair]
   );
 
   // Process incoming signaling messages
@@ -620,6 +765,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
+            addLog("Offer created");
+            setDiagnostics((d) => ({ ...d, signalingState: pc.signalingState }));
             await signalingRef.current.sendSignal("offer", offer);
           }
           break;
@@ -631,11 +778,15 @@ export function useWebRTC(mode: TransferMode = "internet") {
             await pcInstance.setRemoteDescription(
               new RTCSessionDescription(message.payload as RTCSessionDescriptionInit)
             );
+            addLog("Remote description set");
+            setDiagnostics((d) => ({ ...d, signalingState: pcInstance.signalingState }));
 
+            const flushedCount = candidateQueueRef.current.length;
             while (candidateQueueRef.current.length > 0) {
               const cand = candidateQueueRef.current.shift();
               if (cand) await pcInstance.addIceCandidate(new RTCIceCandidate(cand));
             }
+            addLog(`Flushed ${flushedCount} queued candidates`);
 
             const answer = await pcInstance.createAnswer();
             await pcInstance.setLocalDescription(answer);
@@ -646,13 +797,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
         case "answer": {
           if (currentRole === "sender" && pc) {
+            addLog("Answer received");
             await pc.setRemoteDescription(
               new RTCSessionDescription(message.payload as RTCSessionDescriptionInit)
             );
+            addLog("Remote description set");
+            setDiagnostics((d) => ({ ...d, signalingState: pc.signalingState }));
+
+            const flushedCount = candidateQueueRef.current.length;
             while (candidateQueueRef.current.length > 0) {
               const cand = candidateQueueRef.current.shift();
               if (cand) await pc.addIceCandidate(new RTCIceCandidate(cand));
             }
+            addLog(`Flushed ${flushedCount} queued candidates`);
           }
           break;
         }
@@ -693,7 +850,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         }
       }
     },
-    [createPeerConnection, setupDataChannel]
+    [createPeerConnection, setupDataChannel, addLog]
   );
 
   // Sender starts a session with dual PeerJS cloud broker + signaling fallback
@@ -710,6 +867,20 @@ export function useWebRTC(mode: TransferMode = "internet") {
         progressPercentage: 0,
         speedBps: 0,
       });
+
+      connectStartTimeRef.current = Date.now();
+      hasCheckedStatsRef.current = false;
+      setDebugLog([]);
+      setDiagnostics({
+        iceState: "new",
+        gatheringState: "new",
+        signalingState: "stable",
+        channelState: "closed",
+        candidateCounts: { host: 0, srflx: 0, relay: 0 },
+        selectedPair: null,
+        lastError: null,
+      });
+      addLog("Sender started");
 
       startIceTimeout();
       createPeerConnection("sender");
@@ -808,7 +979,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       return { roomId: newRoomId, code: generatedCode };
     },
-    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, mode]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, mode, addLog]
   );
 
   // Receiver joins a session with dual PeerJS cloud broker + signaling fallback
@@ -825,6 +996,20 @@ export function useWebRTC(mode: TransferMode = "internet") {
         progressPercentage: 0,
         speedBps: 0,
       });
+
+      connectStartTimeRef.current = Date.now();
+      hasCheckedStatsRef.current = false;
+      setDebugLog([]);
+      setDiagnostics({
+        iceState: "new",
+        gatheringState: "new",
+        signalingState: "stable",
+        channelState: "closed",
+        candidateCounts: { host: 0, srflx: 0, relay: 0 },
+        selectedPair: null,
+        lastError: null,
+      });
+      addLog("Receiver started");
 
       startIceTimeout();
       createPeerConnection("receiver");
@@ -921,7 +1106,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         })
         .catch(() => {});
     },
-    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, mode]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, mode, addLog]
   );
 
   // Sequential Multi-File Batch Queue Sender
@@ -1166,5 +1351,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     acceptIncomingTransfer,
     rejectIncomingTransfer,
     cleanup,
+    debugLog,
+    diagnostics,
   };
 }

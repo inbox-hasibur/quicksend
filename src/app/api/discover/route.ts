@@ -167,6 +167,38 @@ export function computeNetworkId(rawIp: string): string {
   return `lan_${Math.abs(hash).toString(36)}`;
 }
 
+export function getNetworkGroupInfo(rawIp: string): {
+  groupLabel: string;
+  ipFamily: "v4" | "v6" | "local";
+} {
+  let ip = (rawIp || "127.0.0.1").trim();
+  if (ip.startsWith("::ffff:")) {
+    ip = ip.substring(7);
+  }
+
+  // Loopback and private subnets
+  if (isLocalOrPrivateIp(ip)) {
+    return { groupLabel: "local-lan", ipFamily: "local" };
+  }
+
+  // IPv6: first two hextets then "..."
+  if (ip.includes(":")) {
+    const parts = ip.split(":").filter(Boolean);
+    const prefix = parts.slice(0, 2).join(":");
+    return { groupLabel: `${prefix}...`, ipFamily: "v6" };
+  }
+
+  // IPv4: first two octets and replace the rest with x
+  if (ip.includes(".")) {
+    const parts = ip.split(".");
+    if (parts.length >= 2) {
+      return { groupLabel: `${parts[0]}.${parts[1]}.x.x`, ipFamily: "v4" };
+    }
+  }
+
+  return { groupLabel: "local-lan", ipFamily: "local" };
+}
+
 function pruneStalePeers(peers: Map<string, DiscoveredPeer>, ttlMs = 15000): DiscoveredPeer[] {
   const now = Date.now();
   const active: DiscoveredPeer[] = [];
@@ -334,11 +366,14 @@ export async function GET(request: Request) {
     const ip = getClientIp(request);
     const networkId = computeNetworkId(ip);
     const peers = await getNetworkPeers(networkId);
+    const { groupLabel, ipFamily } = getNetworkGroupInfo(ip);
 
     return NextResponse.json({
       success: true,
       networkId,
       peers,
+      groupLabel,
+      ipFamily,
     });
   } catch (err) {
     return NextResponse.json(
@@ -412,6 +447,7 @@ export async function POST(request: Request) {
 
       // Check if another peer on this subnet initiated a direct beam to this device
       const incomingBeam = await getAndClearBeam(deviceId);
+      const { groupLabel, ipFamily } = getNetworkGroupInfo(ip);
 
       return NextResponse.json({
         success: true,
@@ -423,6 +459,8 @@ export async function POST(request: Request) {
           avatarColor: assignedColor,
         },
         incomingBeam: incomingBeam || null,
+        groupLabel,
+        ipFamily,
       });
     }
 

@@ -271,6 +271,10 @@ flowchart TD
 - **Purpose:** Reusable transfer speed indicator with an explicit "Speed" text label, Lucide Gauge icon, and 5 solid high-contrast stepped pill segments (Emerald for 5/5, Indigo for 4/5, Blue for 3/5, Amber for 2/5). Clearly visible across both dark and light modes.
 - **Exports:** `SpeedIndicator({ speedBars, total, className, showIcon, showLabel }: SpeedIndicatorProps): JSX.Element`, `getSpeedColorClass(speedBars: number): string`
 
+#### `src/components/ConnectionDiagnostics.tsx`
+- **Purpose:** Collapsible native `<details>` diagnostics panel for Same Wi-Fi and Hotspot transfers. Displays live server storage mode (with memory multi-instance warning via `/api/health`), masked network group label (`groupLabel`), IP family, discovery radar poll status, ICE connection/gathering/signaling states, DataChannel state, candidate type counts (host, srflx, relay), selected candidate pair, last error, and 40-entry debug log ring buffer with one-click plain text clipboard report export.
+- **Exports:** `ConnectionDiagnostics({ diagnostics, debugLog, discoveryStatus }: ConnectionDiagnosticsProps): JSX.Element`, `ConnectionDiagnosticsProps`.
+
 #### `src/components/NetworkStatusBadge.tsx`
 - **Purpose:** Live connection status pill reflecting online/offline state.
 
@@ -282,8 +286,12 @@ flowchart TD
 ### 3.3 Custom Hooks (`src/hooks/`)
 
 #### `src/hooks/useWebRTC.ts`
-- **Purpose:** Complete WebRTC peer connection and DataChannel manager. Orchestrates signaling exchange, candidate queuing, 64KB binary chunk slicing with buffer backpressure, transfer progress calculation, and receiver file/text reassembly.
-- **Exports:** `useWebRTC(): { role, roomId, roomCode, isConnected, progress, pendingHeader, startSender, startReceiver, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup }`
+- **Purpose:** Complete WebRTC peer connection and DataChannel manager. Orchestrates signaling exchange, candidate queuing, 64KB binary chunk slicing with buffer backpressure, transfer progress calculation, receiver file/text reassembly, live diagnostics metrics collection (ICE, gathering, signaling, channel, candidate counts, selected pair), and 40-entry debug log ring buffer.
+- **Exports:** `useWebRTC(mode): { role, roomId, roomCode, isConnected, progress, pendingHeader, startSender, startReceiver, sendFiles, sendText, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup, debugLog, diagnostics }`, `WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`.
+
+#### `src/hooks/useLocalDiscovery.ts`
+- **Purpose:** Local network peer discovery via `/api/discover`. Manages peer heartbeat polling, dynamic avatar conflict resolution, incoming beam handling, and exposes detailed poll status (`DiscoveryStatus` with `groupLabel` and `ipFamily`).
+- **Exports:** `useLocalDiscovery(isAutoDiscovering): { profile, peers, networkId, incomingBeam, beamToPeer, clearIncomingBeam, isScanning, updateName, cycleAvatar, refreshPeers, status }`, `DiscoveryStatus`, `NearbyPeer`, `IncomingBeamEvent`.
 
 #### `src/hooks/useNetworkStatus.ts`
 - **Purpose:** Hydration-safe network and browser capability detection hooks built with `useSyncExternalStore`.
@@ -391,5 +399,5 @@ flowchart TD
 ---
 
 ## 4. Sprint Status: All Sprints Completed & Production Verified
-All eighteen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, and human-readable word recovery codes) are fully implemented, verified with 188 passing unit tests across 32 test suites, zero lint warnings, and production build ready.
+All nineteen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, human-readable word recovery codes, and live connection diagnostics with masked network group labels) are fully implemented, verified with 195 passing unit tests across 33 test suites, zero lint warnings, and production build ready.
 ```

@@ -30,6 +30,15 @@ export interface IncomingBeamEvent {
   timestamp: number;
 }
 
+export interface DiscoveryStatus {
+  lastPollOk: boolean;
+  lastPollAt: number | null;
+  lastError: string | null;
+  peerCount: number;
+  groupLabel: string | null;
+  ipFamily: string | null;
+}
+
 export function useLocalDiscovery(isAutoDiscovering = true) {
   const profile: DeviceProfile = useSyncExternalStore(
     subscribeToDeviceProfile,
@@ -39,6 +48,14 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
   const [peers, setPeers] = useState<NearbyPeer[]>([]);
   const [networkId, setNetworkId] = useState<string | null>(null);
   const [incomingBeam, setIncomingBeam] = useState<IncomingBeamEvent | null>(null);
+  const [status, setStatus] = useState<DiscoveryStatus>({
+    lastPollOk: false,
+    lastPollAt: null,
+    lastError: null,
+    peerCount: 0,
+    groupLabel: null,
+    ipFamily: null,
+  });
   const isScanning = isAutoDiscovering;
   const announceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -71,7 +88,16 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
         const data = await res.json();
         if (data.success) {
           setNetworkId(data.networkId);
-          setPeers(data.peers || []);
+          const activePeers = data.peers || [];
+          setPeers(activePeers);
+          setStatus({
+            lastPollOk: true,
+            lastPollAt: Date.now(),
+            lastError: null,
+            peerCount: activePeers.length,
+            groupLabel: data.groupLabel || null,
+            ipFamily: data.ipFamily || null,
+          });
           if (data.incomingBeam) {
             setIncomingBeam(data.incomingBeam);
           } else {
@@ -89,10 +115,29 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
               color: data.assignedAvatar.avatarColor,
             });
           }
+        } else {
+          setStatus((prev) => ({
+            ...prev,
+            lastPollOk: false,
+            lastPollAt: Date.now(),
+            lastError: data.error || "Announcement failed",
+          }));
         }
+      } else {
+        setStatus((prev) => ({
+          ...prev,
+          lastPollOk: false,
+          lastPollAt: Date.now(),
+          lastError: `HTTP ${res.status}`,
+        }));
       }
-    } catch {
-      // Ignore network hiccups during background discovery
+    } catch (err) {
+      setStatus((prev) => ({
+        ...prev,
+        lastPollOk: false,
+        lastPollAt: Date.now(),
+        lastError: err instanceof Error ? err.message : "Network error",
+      }));
     }
   }, [profile]);
 
@@ -206,5 +251,6 @@ export function useLocalDiscovery(isAutoDiscovering = true) {
     updateName,
     cycleAvatar,
     refreshPeers: announcePresence,
+    status,
   };
 }
