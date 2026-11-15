@@ -82,15 +82,13 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 
 ---
 
-### Mode 4: Nearby Pair (PIN Allocation, Cross-Network Beaming & System Share Fallback)
-- **Primary Use Case:** Proximity device pairing via unique 4-digit PINs, nearby discovered peer cards, explicit acceptance prompts, and native OS share fallbacks.
+### Mode 4: Share via Bluetooth (System Bluetooth, Quick Share & BLE Hardware)
+- **Primary Use Case:** Direct file sending via native operating system radio sheet (Bluetooth, Quick Share, AirDrop) and W3C Web Bluetooth GATT hardware interfacing.
 - **Architecture & Workflow:**
-  - **Unique 4-Digit PIN:** Every device on the radar receives a unique 4-digit PIN (`0000`–`9999`) refreshed via heartbeat. Users can share their PIN or tap a discovered device card.
-  - **Cross-Network Beaming:** Devices can enter another device's 4-digit PIN, triggering a rate-limited lookup (`/api/discover` `action: "pairLookup"`) and cross-network WebRTC signaling beam (`action: "beam"`).
-  - **Explicit Pairing Acceptance:** The receiving device is presented with a 45-second auto-declining pair request modal (`NearbyPairRequestModal`) displaying the sender's name and avatar emoji.
-  - **Connected Transfer:** Once accepted, sender transmits files or text with real-time transfer progress (`TransferModal`) and backpressure-managed streaming.
-  - **Collapsed Native System Share ("More ways"):** Native `<details>` containing OS Web Share (`navigator.share` for Quick Share, AirDrop, Bluetooth), plain-English receiving guidance, and Bluetooth settings link.
-  - **Offline Resilience:** When offline, pairing UI gracefully hides while displaying `"Pairing needs internet. System share below works without internet."` with the "More ways" section expanded.
+  - **Step 1:** Select files or text via `Dropzone` with real-time transfer duration estimate (`EstimateBadge`).
+  - **Step 2:** One-tap native handoff via W3C Web Share API (`navigator.share({ files, text })`), logging sent transfers to `useTransferHistory`.
+  - **Honest Receiving Guidance:** Transparent explanation that browsers cannot intercept raw incoming Bluetooth radio packets due to sandbox security boundaries; provides 1-tap Android Bluetooth settings shortcut (`ANDROID_INTENTS.BLUETOOTH_SETTINGS`) and guides users to Wi-Fi Hotspot for browser-to-browser offline transfers.
+  - **BLE Hardware Interfacing:** Collapsible section for discovering and connecting to Bluetooth Low Energy (BLE) peripherals and sensors via `navigator.bluetooth`.
 
 ---
 
@@ -290,8 +288,6 @@ quicksend/
     │   ├── HotspotAssistantCard.tsx
     │   ├── InternetSharingCard.tsx
     │   ├── ModeSelector.tsx
-    │   ├── NearbyPairRequestModal.tsx
-    │   ├── NearbyPeerCard.tsx
     │   ├── NearbyShareCard.tsx
     │   ├── NetworkStatusBadge.tsx
     │   ├── OpticalHandshakeModal.tsx

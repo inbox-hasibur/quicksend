@@ -522,6 +522,22 @@
   - Updated `useQuadScanner.test.ts` candidate rotation tests for `"1x1"` priority.
   - Full suite verification: 35 test files, 226 tests passing, zero lint warnings, clean build.
 
+### Sprint 25: Bluetooth Channel Restoration & Clutter Removal
+- [x] Rebranding & Home Hub Tile Restoration (`src/components/ModeSelector.tsx`, `src/lib/modeAvailability.ts`):
+  - Restored 4th channel name to **`Bluetooth`** with the `Bluetooth` icon and subtitle `"Send via system Bluetooth, Quick Share, or AirDrop"`.
+  - Maintained `"bluetooth"` in the 5-channel Home Hub (`["internet", "same-network", "hotspot", "bluetooth", "camera"]` + `"cable"`).
+  - Updated `modeAvailability.ts` with `"Direct Radio / Share"` badge and honest capability description.
+- [x] Honest & Clean Bluetooth Workspace (`src/components/NearbyShareCard.tsx`):
+  - Removed 4-digit PIN allocation, peer radar grid, and 45-second pairing request modal clutter.
+  - Deleted unused components `NearbyPeerCard.tsx` and `NearbyPairRequestModal.tsx`.
+  - Structured 2-step workspace: Step 1 file/text attachment via `Dropzone` with `EstimateBadge`, Step 2 primary "Send via Bluetooth / Quick Share / AirDrop" button via `shareViaNative` logging to `useTransferHistory`.
+  - Added honest guidance card explaining browser sandbox limits on raw incoming Bluetooth radio, with 1-tap Android Bluetooth settings shortcut and Wi-Fi Hotspot recommendation for browser-to-browser transfers.
+  - Tucked optional Web Bluetooth BLE hardware sensor connection in a clean bottom collapsible `<details>`.
+- [x] Unit Testing & Verification (`src/components/__tests__/NearbyShareCard.test.tsx`, `src/lib/__tests__/modeAvailability.test.ts`):
+  - Updated `NearbyShareCard.test.tsx` to verify Bluetooth title, subtitle, honest receiving guidance card, native share trigger with history logging, and BLE hardware scanning.
+  - Updated `modeAvailability.test.ts` for Bluetooth channel metadata.
+  - Full suite verification: 35 test files, 226 tests passing, zero lint warnings, clean build.
+
 
 
 

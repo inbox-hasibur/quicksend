@@ -10,7 +10,7 @@ import {
   Cable,
   ArrowLeft,
   ArrowRight,
-  Users,
+  Bluetooth,
 } from "lucide-react";
 import type { TransferMode, ModeStatus } from "@/types/mode";
 import { useBrowserCapabilities } from "@/hooks/useNetworkStatus";
@@ -79,11 +79,11 @@ export function ModeSelector() {
         };
       case "bluetooth":
         return {
-          displayName: "Nearby Pair",
-          icon: <Users className="h-5 w-5" />,
-          tag: "Nearby",
-          speedBars: 3,
-          summary: "Tap a nearby device or enter a PIN. Send after they accept.",
+          displayName: "Bluetooth",
+          icon: <Bluetooth className="h-5 w-5" />,
+          tag: "Direct Radio",
+          speedBars: 2,
+          summary: "Send via system Bluetooth, Quick Share, or AirDrop",
         };
       case "camera":
         return {

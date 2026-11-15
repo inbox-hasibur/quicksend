@@ -53,9 +53,7 @@ flowchart TD
         SameNetCard["SameNetworkCard.tsx (Mode 2 Controller: Local Radar & Device Beaming)"]
         CameraCard["CameraStreamCard.tsx (Mode 5 Controller: Air-Gapped Optical QR Stream)"]
         HotspotCard["HotspotAssistantCard.tsx (Mode 3 Controller: Hotspot QR & Wizard)"]
-        NearbyCard["NearbyShareCard.tsx (Mode 4 Controller: Nearby Pair & Quick Share)"]
-        NearbyPeerComp["NearbyPeerCard.tsx (Discovered Peer Squircle Card)"]
-        NearbyPairMod["NearbyPairRequestModal.tsx (45s Auto-Declining Connection Dialog)"]
+        NearbyCard["NearbyShareCard.tsx (Mode 4 Controller: Bluetooth & Native Quick Share)"]
         OpticalModal["OpticalHandshakeModal.tsx (Camera-to-Camera Optical QR Handshake)"]
         DropzoneComp["Dropzone.tsx (Drag & Drop Files / Text Paste Tabs)"]
         QRDisp["QRCodeDisplay.tsx (SVG QR Generator & 6-Digit PIN Display)"]
@@ -222,16 +220,8 @@ flowchart TD
 - **Exports:** `HotspotAssistantCard(): JSX.Element`
 
 #### `src/components/NearbyShareCard.tsx`
-- **Purpose:** Mode 4 Controller (Nearby Pair). Simple proximity pairing flow with local 4-digit PIN allocation, nearby discovered peer cards, explicit acceptance dialog (`NearbyPairRequestModal`), 45-second timeout, connected WebRTC transfer (`useWebRTC("internet")`), connection diagnostics, offline graceful degradation, and collapsed "More ways: System share (Quick Share, AirDrop, Bluetooth)" fallback.
+- **Purpose:** Mode 4 Controller (Bluetooth & Native Quick Share). Clean, honest Bluetooth workspace with 2-step transfer flow (drag-and-drop/text input with `EstimateBadge`, primary system share handoff via `navigator.share` delegating to native Bluetooth, Quick Share, or AirDrop with transfer history logging), transparent guidance explaining browser Bluetooth radio limitations with Android settings shortcut, and collapsible Web Bluetooth BLE sensor hardware scanner (`navigator.bluetooth`).
 - **Exports:** `NearbyShareCard(): JSX.Element`
-
-#### `src/components/NearbyPeerCard.tsx`
-- **Purpose:** Accessible rounded button card representing a discovered nearby peer, displaying squircle avatar emoji, avatar color, peer name, OS badge, and "Send request" label.
-- **Exports:** `NearbyPeerCard({ peer, onPress, disabled }: NearbyPeerCardProps): JSX.Element`
-
-#### `src/components/NearbyPairRequestModal.tsx`
-- **Purpose:** Centered accessible modal dialog alerting the receiver of an incoming pair request, showing peer name, avatar, Accept/Decline action buttons, and 45-second auto-decline progress countdown.
-- **Exports:** `NearbyPairRequestModal({ peerName, peerAvatar, onAccept, onDecline }: NearbyPairRequestModalProps): JSX.Element`
 
 #### `src/components/OpticalHandshakeModal.tsx`
 - **Purpose:** Visual modal for 100% zero-internet optical WebRTC signaling. Displays compressed Offer/Answer QR codes and launches the camera scanner to exchange SDP descriptions directly across device screens.
