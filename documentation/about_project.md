@@ -274,6 +274,13 @@ quicksend/
     │   │   ├── SpeedIndicator.test.tsx
     │   │   ├── TransferModal.test.tsx
     │   │   └── UltrasonicCard.test.tsx
+    │   ├── camera/
+    │   │   ├── __tests__/
+    │   │   │   └── CameraParts.test.tsx
+    │   │   ├── CameraReceiver.tsx
+    │   │   ├── CameraSender.tsx
+    │   │   ├── ReceiverCompleteView.tsx
+    │   │   └── ReceiverProgressView.tsx
     │   ├── AppHeader.tsx
     │   ├── CableTransferCard.tsx
     │   ├── CameraStreamCard.tsx

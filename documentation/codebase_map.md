@@ -293,8 +293,24 @@ flowchart TD
 - **Exports:** `NearbyShareCard(): JSX.Element`
 
 #### `src/components/CameraStreamCard.tsx`
-- **Purpose:** Mode 5 Controller (Via Camera Scan). Zero-network air-gapped file/text streaming via animated sequenced QR frames. Defaults sender to Single layout and Medium density (with 2x2 and 2x3 options) with real-time transfer estimates (`EstimateBadge`), and receiver auto-detection starting with 1x1 single QR. Reassembles multi-frame payloads with Base45 decoding and XOR parity recovery, triggers automated safe download, and renders a prominent "Save / Download File" card action.
+- **Purpose:** Mode 5 Controller (Via Camera Scan). Lightweight parent coordinator housing the mode heading, role SegmentedControl ("Stream / Send" vs "Scan / Receive"), and conditionally mounting `CameraSender` or `CameraReceiver`.
 - **Exports:** `CameraStreamCard(): JSX.Element`, `CameraLayout`.
+
+#### `src/components/camera/CameraSender.tsx`
+- **Purpose:** Sender-side controller for air-gapped optical streaming. Handles payload dropping/encoding into sequenced Base45 frames and XOR parity frames, dynamic frame ticking ticker with speed presets (Slow, Normal, Fast), layout switcher (`Single`, `2x2`, `2x3`), density presets (`Small`, `Medium`, `Large`), animated SVG QR rendering, frame progress estimation via `EstimateBadge`, and typed recovery code replaying.
+- **Exports:** `CameraSender(props: CameraSenderProps): JSX.Element`, `CameraLayout`, `parseLayoutDims`, `getFramesPerTick`.
+
+#### `src/components/camera/CameraReceiver.tsx`
+- **Purpose:** Receiver-side controller for camera stream scanning. Orchestrates `useQuadScanner` (multi-quadrant auto-detection) and `useHtml5Scanner` (classic single-stream camera scanner), throttled frame ingestion into `OpticalDataCollector`, real-time decoding diagnostics line, and session hash tracking.
+- **Exports:** `CameraReceiver(props: CameraReceiverProps): JSX.Element`.
+
+#### `src/components/camera/ReceiverCompleteView.tsx`
+- **Purpose:** Presentational view displayed when optical transfer reassembly completes with 100% data integrity. Features file metadata display, text snippet viewer, copy text button, and prominent "Save / Download File" action.
+- **Exports:** `ReceiverCompleteView(props: ReceiverCompleteViewProps): JSX.Element`.
+
+#### `src/components/camera/ReceiverProgressView.tsx`
+- **Purpose:** Presentational live collection progress bar and collapsible missing frames recovery code generator with 1-click clipboard copy.
+- **Exports:** `ReceiverProgressView(props: ReceiverProgressViewProps): JSX.Element`.
 
 #### `src/components/CableTransferCard.tsx`
 - **Purpose:** Mode 6 Controller (Via Cable). Direct gigabit line-speed transfer over USB-C to USB-C or Ethernet cable links. Features 1-tap Android USB tethering shortcut (`ANDROID_INTENTS.TETHER_SETTINGS`), direct link-local WebRTC P2P PIN/QR pairing, and host candidate priority.
