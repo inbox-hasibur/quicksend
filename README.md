@@ -8,13 +8,8 @@
     <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript" alt="TypeScript" /></a>
     <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-4.0-38B2AC?style=flat-square&logo=tailwind-css" alt="Tailwind CSS" /></a>
     <a href="https://webrtc.org"><img src="https://img.shields.io/badge/WebRTC-DTLS%2FSRTP%20Encrypted-F36523?style=flat-square&logo=webrtc" alt="WebRTC Encrypted" /></a>
-    <img src="https://img.shields.io/badge/Tests-238%20Passed-brightgreen?style=flat-square" alt="238 Tests Passed" />
     <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License MIT" />
     <img src="https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-4B5563?style=flat-square" alt="Cross-Platform" />
-  </p>
-
-  <p>
-    <b>English</b> • <a href="#-about-quicksend">বাংলা</a> • <a href="#-key-features">中文</a> • <a href="#-6-versatile-transfer-channels">Español</a> • <a href="#-tech-stack">Français</a> • <a href="#-local-development-setup">Português</a> • <a href="#-testing--verification">日本語</a> • <a href="#-license--credits">Deutsch</a>
   </p>
 
   <h3>The Zero-Login, Ephemeral Peer-to-Peer Transfer Engine for Web &amp; Mobile.</h3>
@@ -22,7 +17,7 @@
   <p>
     Transfer files of any size, directories, code snippets, or clipboard text between devices in seconds.<br />
     Direct browser-to-browser P2P with WebRTC, local subnet radar, offline hotspot, native Bluetooth/Quick Share, and air-gapped optical QR streams in one app.<br />
-    <strong>No accounts. No native apps. Zero cloud storage or tracking.</strong>
+    <strong>Zero server uploads — files stay on your device until direct P2P transfer.</strong>
   </p>
 
   <p>
@@ -34,7 +29,7 @@
   <br />
 
   <a href="https://quicksend.vercel.app">
-    <img src="public/preview.jpg" alt="QuickSend Web App Interface Preview" width="900" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.35);" />
+    <img src="public/preview.png" alt="QuickSend Web App Interface Preview" width="900" style="border-radius: 12px; box-shadow: 0 12px 40px rgba(0,0,0,0.35);" />
   </a>
 </div>
 
@@ -54,7 +49,7 @@ In university computer labs, research facilities, offices, and shared workstatio
 
 ## 📡 6 Versatile Transfer Channels
 
-QuickSend automatically detects your connectivity and adapts to your environment, providing 6 specialized transfer channels plus an experimental audio stream:
+QuickSend automatically detects your connectivity and adapts to your environment, providing 6 specialized transfer channels:
 
 | Channel | Connectivity | Handshake Method | Ideal Use Case |
 | :--- | :--- | :--- | :--- |
@@ -65,19 +60,17 @@ QuickSend automatically detects your connectivity and adapts to your environment
 | **📷 Via Camera Scan** | 100% Air-Gapped | Animated Optical QR Stream | Completely isolated environments with zero radio emissions. Stream data via Base45 animated QRs with XOR parity recovery. |
 | **🔌 Via Cable** | Direct Cable Link | USB-C / Ethernet / Tethering | Maximum line-speed transfers (1–10 Gbps) over wired connections with host candidate priority, plus WebUSB and Web Serial hardware support. |
 
-> 🔊 **Acoustic Audio Transfer (Experimental Bonus):** QuickSend also features an experimental ultrasonic sound modem using Frequency Shift Keying (FSK) across 18,000–19,800 Hz with real-time FFT audio spectrum visualization.
-
 ---
 
 ## ✨ Key Features
 
+- 🔒 **Zero Server Uploads:** Files never pass through or touch an intermediary cloud server. Data stays strictly on your local device until direct P2P transfer begins.
 - 🔓 **Zero Accounts & Zero Logins:** No email, phone number, or password required. Start transferring immediately upon opening the page.
-- 🛡️ **100% Ephemeral & End-to-End Encrypted:** Direct peer-to-peer transmission secured with `WebRTC DTLS/SRTP`. Files never pass through or touch an intermediary database.
+- 🛡️ **100% Ephemeral & End-to-End Encrypted:** Direct peer-to-peer transmission secured with `WebRTC DTLS/SRTP`.
 - 📦 **Multi-File Batch Queue & Disk Streaming:** Beam entire folders or batches of files sequentially over an open channel. Large payloads (> 100MB) stream directly to disk using the File System Access API without browser tab crashes.
 - ⏱️ **Smart Transfer Time Estimation:** Dynamic, channel-aware estimate badges calculate expected transfer durations before sending based on payload size and channel throughput.
 - 🩺 **Real-Time Connection Diagnostics:** Expandable diagnostic drawer displaying ICE connection states, candidate pair types (host, srflx, relay), signaling status, and one-click copyable debug reports.
 - 📱 **Offline PWA & Service Worker:** Installable Progressive Web App (PWA) with client-side asset caching that runs reliably even without an active internet connection.
-- 🔍 **SHA-256 Bit-Perfect Verification:** Verifies file integrity on completion with a visual confirmation badge.
 
 ---
 
@@ -119,7 +112,6 @@ QuickSend prioritizes direct device-to-device communication without storing any 
 | **Optical Engine** | `html5-qrcode`, `jsQR`, `qrcode.react` | High-contrast animated QR code generator, multi-layout scanner, and Deflate + Base45 codec. |
 | **Forward Error Correction** | XOR Parity Stride Engine | Recovers dropped frames in optical streams with word recovery codes. |
 | **Hardware APIs** | File System Access, Web Share, Web Bluetooth | Native disk writing, OS share sheet handoff, and BLE peripheral interfacing. |
-| **Testing & Quality** | [Vitest 5.1](https://vitest.dev/) + Happy DOM | High-speed unit & integration test runner with 238 passing tests across 38 suites. |
 
 ---
 
@@ -149,23 +141,6 @@ QuickSend prioritizes direct device-to-device communication without storing any 
 
 4. **Open in your browser:**
    Navigate to [http://localhost:3000](http://localhost:3000).
-
----
-
-## 🧪 Testing & Verification
-
-QuickSend maintains strict automated test coverage across networking, encryption, optical codecs, and UI components:
-
-```bash
-# Run the complete test suite (238 tests across 38 suites)
-npm test
-
-# Run ESLint validation
-npm run lint
-
-# Build optimized production bundle
-npm run build
-```
 
 ---
 
