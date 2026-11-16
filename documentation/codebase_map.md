@@ -1,10 +1,10 @@
 # QuickSend: Codebase Map & Dependency Graph
 
-> **Last Updated:** Sprint 4 Complete (Mode 4 Bluetooth, Polish, History & Vercel Deployment)  
+> **Last Updated:** Sprint 25 Complete (Bluetooth Channel Restoration & Modernization)  
 > **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 
-This document provides a high-density, comprehensive map of the repository's modules, files, dependencies, exports, and browser API integrations. Any AI coding assistant or engineer can read this single document to understand the codebase without scanning raw files.
+This document provides a high-density, comprehensive map of the repository's modules, files, dependencies, exports, architecture, and browser API integrations. Any AI coding assistant or engineer can read this single document to understand the entire codebase without scanning raw files.
 
 ---
 
@@ -17,78 +17,87 @@ flowchart TD
         BLE["Web Bluetooth GATT Client (navigator.bluetooth)"]
         Share["Web Share API (navigator.share with files)"]
         NetStat["Network Information (navigator.onLine, online/offline events)"]
-        Cam["MediaDevices / Camera (HTML5 QR Scanner)"]
+        Cam["MediaDevices / Camera (getUserMedia, BarcodeDetector)"]
+        Audio["Web Audio API (AudioContext, AnalyserNode, OscillatorNode)"]
+        FS["File System Access API (showSaveFilePicker, writable streams)"]
         SW["Service Worker (public/sw.js, CacheStorage)"]
     end
 
     subgraph External_Libraries["Installed Core Packages"]
-        NextJS["Next.js 16 (App Router, Turbopack, Route Handlers)"]
-        React19["React 19 (useSyncExternalStore, Client Components)"]
-        Lucide["lucide-react (Icons: Globe, Wifi, Smartphone, Bluetooth, Zap, etc.)"]
+        NextJS["Next.js 16 (App Router, Turbopack, Route Handlers, React 19)"]
+        Lucide["lucide-react (Icons: Globe, Wifi, Smartphone, Bluetooth, Camera, Cable, Zap, etc.)"]
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
-        Tailwind["Tailwind CSS v4 (@tailwindcss/turbopack)"]
-        Vitest["Vitest v5 + happy-dom (115 Passing Tests across 19 Suites)"]
-        PeerJS["peerjs (Global WebRTC Peer Connection & Real-Time Broker)"]
+        Tailwind["Tailwind CSS 3.4 (Glassmorphic dark/light design system)"]
+        Vitest["Vitest 5.1 + happy-dom (224 Passing Tests across 35 Suites)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
-        Layout["layout.tsx (Root Shell, Font Injection)"]
-        Page["page.tsx (5-Mode Home Hub & URL Param Receiver)"]
+        Layout["layout.tsx (Root Shell, HTML lang, Font Injection)"]
+        Page["page.tsx (6-Channel Home Hub, Suspense & URL Param Receiver)"]
         Manifest["manifest.ts (PWA Web App Manifest)"]
         ErrBoundary["error.tsx (Client Error Boundary & Crash Guard)"]
-        HealthAPI["api/health/route.ts (Health Check & Runtime Telemetry)"]
+        GlobalCSS["globals.css (Tailwind CSS Tokens & Soft Glass Theme Variables)"]
+        HealthAPI["api/health/route.ts (Health Check & Upstash/Memory Telemetry)"]
         SignalAPI["api/signal/route.ts (Room Signaling & Ephemeral Relay)"]
-        DiscoverAPI["api/discover/route.ts (Same Wi-Fi Local Discovery & Presence)"]
-        SignalAPITests["api/signal/__tests__/route.test.ts (API Route Tests)"]
-        DiscoverAPITests["api/discover/__tests__/route.test.ts (Discovery Route Tests)"]
+        DiscoverAPI["api/discover/route.ts (Subnet Discovery, CGNAT Pairing PIN, Beaming)"]
     end
 
     subgraph Src_Components["src/components/ (UI & Presentation Components)"]
-        AppHdr["AppHeader.tsx (Logo, Session History Pill, Status Badge)"]
-        ModeSel["ModeSelector.tsx (5-Mode Grid & Active Panels)"]
+        AppHdr["AppHeader.tsx (Logo, QuickSend Reset Link, History Counter, Status)"]
+        ModeSel["ModeSelector.tsx (6-Channel Grid, Active Workspace, return pill)"]
         NetBadge["NetworkStatusBadge.tsx (Online/Offline Real-Time Pill)"]
+        ThemeTgl["ThemeToggle.tsx (Tactile Light/Dark Mode Switcher)"]
+        HistoryMod["TransferHistoryModal.tsx (Session Transfer Drawer)"]
         SWReg["ServiceWorkerRegister.tsx (PWA /sw.js Registration)"]
         InternetCard["InternetSharingCard.tsx (Mode 1 Controller: Dual-Transport PIN/QR)"]
         SameNetCard["SameNetworkCard.tsx (Mode 2 Controller: Local Radar & Device Beaming)"]
-        CameraCard["CameraStreamCard.tsx (Mode 5 Controller: Air-Gapped Optical QR Stream)"]
         HotspotCard["HotspotAssistantCard.tsx (Mode 3 Controller: Hotspot QR & Wizard)"]
         NearbyCard["NearbyShareCard.tsx (Mode 4 Controller: Bluetooth & Native Quick Share)"]
-        OpticalModal["OpticalHandshakeModal.tsx (Camera-to-Camera Optical QR Handshake)"]
+        CameraCard["CameraStreamCard.tsx (Mode 5 Controller: Air-Gapped Optical QR Stream)"]
+        CableCard["CableTransferCard.tsx (Mode 6 Controller: Direct Cable & Tethering)"]
+        UltrasonicCard["UltrasonicCard.tsx (Bonus Acoustic FSK Sound Modem)"]
+        ConnDiag["ConnectionDiagnostics.tsx (Collapsible Connection Details Drawer)"]
         DropzoneComp["Dropzone.tsx (Drag & Drop Files / Text Paste Tabs)"]
+        EstimateBdg["EstimateBadge.tsx (Channel Transfer Time Estimation Badge)"]
+        FileTypeBdg["FileTypeBadge.tsx (Color-coded file type chips PDF, IMG, DOC, etc.)"]
+        OpticalModal["OpticalHandshakeModal.tsx (Zero-Internet Optical WebRTC Signaling)"]
         QRDisp["QRCodeDisplay.tsx (SVG QR Generator & 6-Digit PIN Display)"]
         QRModal["QRScannerModal.tsx (Camera Viewport Scanner Dialog)"]
-        TransferMod["TransferModal.tsx (Incoming Prompt, Speed, Progress Bar)"]
-        SpeedInd["SpeedIndicator.tsx (Solid High-Contrast Speed Indicator)"]
-        HistoryMod["TransferHistoryModal.tsx (Ephemeral Session Transfer Drawer)"]
-        FileTypeBdg["FileTypeBadge.tsx (Color-coded file type chips PDF, IMG, DOC, etc.)"]
-        EstimateBdg["EstimateBadge.tsx (Channel Transfer Time Estimation Badge)"]
         SegControl["SegmentedControl.tsx (Tactile Pill Track & Keyboard Navigation)"]
-        ThemeTgl["ThemeToggle.tsx (Tactile Dark/Light Mode Toggle)"]
+        SpeedInd["SpeedIndicator.tsx (Solid High-Contrast Speed Indicator)"]
+        TransferMod["TransferModal.tsx (Incoming Prompt, Speed, Progress Bar, Cancel)"]
     end
 
     subgraph Src_Hooks["src/hooks/ (Custom React Hooks)"]
-        UseNet["useNetworkStatus.ts (useNetworkStatus, useBrowserCapabilities)"]
         UseRTC["useWebRTC.ts (useWebRTC: Peer Connection & Stream Controller)"]
-        UseLocalDisc["useLocalDiscovery.ts (Radar Presence & Peering)"]
+        UseLocalDisc["useLocalDiscovery.ts (Radar Subnet Discovery & 4-Digit Pairing)"]
         UseNearby["useNearbyShare.ts (useNearbyShare: Web Share & Web-BLE Client)"]
-        UseHist["useTransferHistory.ts (useTransferHistory: Ephemeral Session Storage)"]
+        UseNet["useNetworkStatus.ts (useNetworkStatus, useBrowserCapabilities)"]
+        UseQuadScan["useQuadScanner.ts (1x1, 2x2, 2x3 Grid Decoding with Auto-Candidate)"]
+        UseHtml5Scan["useHtml5Scanner.ts (Isolated html5-qrcode Lifecycle Controller)"]
         UseThm["useTheme.ts (useTheme: Light / Dark Mode Controller)"]
+        UseHist["useTransferHistory.ts (useTransferHistory: Ephemeral Session Storage)"]
     end
 
     subgraph Src_Lib["src/lib/ (Protocols, Pure Logic & Utilities)"]
-        ModeAvail["modeAvailability.ts (isModeAvailable, getModeStatus, getAllModesStatus)"]
+        Base45["base45.ts (RFC 9285 Alphanumeric QR Encoder/Decoder)"]
+        RecoveryWords["recoveryWords.ts (256-Word Phonetic English Recovery Dictionary)"]
+        QuadDecode["quadDecode.ts (Multi-Region Grid Cropping & Decoding)"]
+        OptRecovery["opticalRecovery.ts (Word Recovery Codes with Parity Checksum)"]
+        OptStream["opticalDataStream.ts (Base45 Optical Chunker & XOR Parity FEC)"]
+        OptSdp["opticalSdp.ts (WebRTC SDP Compression & Optical Splitter)"]
+        TransferEst["transferEstimate.ts (Channel Transfer Time & Duration Formatter)"]
+        WifiQr["wifiQr.ts (WIFI:S:... QR Formatter & Android Intent Shortcuts)"]
         CodeGen["codeGenerator.ts (generateRoomCode, formatRoomCode, normalizeRoomCode)"]
         Chunker["chunker.ts (sliceBlobIntoChunks, reassembly, formatBytes, formatSpeed)"]
         DevId["deviceIdentity.ts (Device Avatars & Non-Colliding Identity)"]
-        OptStream["opticalDataStream.ts (Visual Base64 Chunker & Optical Collector)"]
+        DiskStream["diskStream.ts (File System Access Large File Streamer)"]
+        IceConfig["iceConfig.ts (STUN Pool, TURN Injection, getRtcConfig)"]
+        ModeAvail["modeAvailability.ts (isModeAvailable, getModeStatus, getAllModesStatus)"]
         SigClient["signalingClient.ts (SignalingClient: Room & Signal Polling Engine)"]
         SignalStore["signalStore.ts (Dual-Mode: Upstash Redis REST + Memory TTL)"]
-        IceConfig["iceConfig.ts (Multi-Provider STUN Pool + TURN Config)"]
-        DiskStream["diskStream.ts (File System Access Disk Streaming Fallback)"]
-        WifiQr["wifiQr.ts (buildWifiQrString, parseWifiQrString, ANDROID_INTENTS)"]
-        OpticalSdp["opticalSdp.ts (encodeOpticalSdp, decodeOpticalSdp, compactSdp)"]
-        TransferEst["transferEstimate.ts (Channel Transfer Time & Duration Formatter)"]
+        Ultrasonic["ultrasonicStream.ts (Frequency Shift Keying FSK Codec)"]
     end
 
     subgraph Src_Types["src/types/ (TypeScript Domain Interfaces)"]
@@ -100,20 +109,25 @@ flowchart TD
     %% Active Wired Dependencies
     Layout --> SWReg
     Layout --> Page
+    Page --> AppHdr
     Page --> NetBadge
     Page --> ModeSel
-    NetBadge --> UseNet
+    Page --> UltrasonicCard
+
+    AppHdr --> UseNet
+    AppHdr --> ThemeTgl
+    AppHdr --> HistoryMod
+    ThemeTgl --> UseThm
+    HistoryMod --> UseHist
+
     ModeSel --> UseNet
     ModeSel --> ModeAvail
     ModeSel --> InternetCard
     ModeSel --> SameNetCard
-    ModeSel --> CameraCard
     ModeSel --> HotspotCard
     ModeSel --> NearbyCard
-
-    SameNetCard --> UseLocalDisc
-    SameNetCard --> DevId
-    CameraCard --> OptStream
+    ModeSel --> CameraCard
+    ModeSel --> CableCard
 
     InternetCard --> UseRTC
     InternetCard --> DropzoneComp
@@ -122,38 +136,75 @@ flowchart TD
     InternetCard --> TransferMod
     InternetCard --> CodeGen
     InternetCard --> SegControl
+    InternetCard --> EstimateBdg
+    InternetCard --> ConnDiag
 
     SameNetCard --> UseRTC
+    SameNetCard --> UseLocalDisc
+    SameNetCard --> DevId
     SameNetCard --> DropzoneComp
     SameNetCard --> OpticalModal
     SameNetCard --> TransferMod
-    SameNetCard --> OpticalSdp
+    SameNetCard --> EstimateBdg
+    SameNetCard --> ConnDiag
 
     HotspotCard --> UseRTC
+    HotspotCard --> UseLocalDisc
     HotspotCard --> DropzoneComp
     HotspotCard --> OpticalModal
     HotspotCard --> TransferMod
     HotspotCard --> WifiQr
-    HotspotCard --> OpticalSdp
     HotspotCard --> QRGen
+    HotspotCard --> EstimateBdg
+    HotspotCard --> ConnDiag
+
+    NearbyCard --> UseNearby
+    NearbyCard --> DropzoneComp
+    NearbyCard --> EstimateBdg
+    NearbyCard --> UseHist
+    NearbyCard --> BLE
+    NearbyCard --> Share
+
+    CameraCard --> UseQuadScan
+    CameraCard --> UseHtml5Scan
+    CameraCard --> Base45
+    CameraCard --> OptStream
+    CameraCard --> OptRecovery
+    CameraCard --> RecoveryWords
+    CameraCard --> EstimateBdg
+    CameraCard --> DropzoneComp
+
+    CableCard --> UseRTC
+    CableCard --> DropzoneComp
+    CableCard --> TransferMod
+    CableCard --> EstimateBdg
+
+    UltrasonicCard --> Ultrasonic
+    UltrasonicCard --> Audio
+    UltrasonicCard --> DropzoneComp
 
     OpticalModal --> QRGen
     OpticalModal --> QRModal
-    OpticalModal --> OpticalSdp
+    OpticalModal --> OptSdp
 
-    QRDisp --> QRGen
-    QRDisp --> CodeGen
-    QRModal --> QRScan
-    QRModal --> CodeGen
     DropzoneComp --> Chunker
     DropzoneComp --> SegControl
+    DropzoneComp --> FileTypeBdg
     TransferMod --> Chunker
+    TransferMod --> SpeedInd
+    TransferMod --> DiskStream
+
     UseRTC --> SigClient
     UseRTC --> Chunker
+    UseRTC --> IceConfig
     UseRTC --> RTC
     SigClient --> SignalAPI
+    SignalAPI --> SignalStore
     SignalAPI --> CodeGen
     SignalAPI --> SignalTypes
+    DiscoverAPI --> SignalStore
+    DiscoverAPI --> DevId
+    UseLocalDisc --> DiscoverAPI
 ```
 
 ---
@@ -162,13 +213,15 @@ flowchart TD
 
 | Directory | Role & Responsibilities | Key Dependencies |
 | :--- | :--- | :--- |
-| `src/app/` | Next.js App Router entry points, layout, metadata, and `/api/signal` room signaling handler. | `next`, `react`, `lucide-react` |
-| `src/app/api/signal/` | Ephemeral serverless WebRTC room signaling and ICE/SDP message queue. | `src/lib/codeGenerator`, `src/types/signaling` |
-| `src/components/` | Presentation & interactive units: 4-mode selector, Internet mode, Same-Network mode, Hotspot assistant, Optical Handshake modal, Dropzone, QR display/scanner, and transfer progress modal. | `lucide-react`, `qrcode.react`, `html5-qrcode`, `src/hooks/` |
-| `src/hooks/` | Stateful React lifecycle hooks managing network connectivity (`useNetworkStatus`) and WebRTC P2P streams (`useWebRTC`). | `react`, `src/lib/` |
-| `src/lib/` | Pure TypeScript domain functions: binary packet chunking, room code generators, Wi-Fi pairing QR strings, optical SDP compression, and mode availability evaluators. | `src/types/`, `vitest` |
-| `src/types/` | Domain TypeScript interfaces: transfer headers, progress state, signaling messages, and mode contracts. | TypeScript |
-| `public/` | Static SVG icons, PWA Service Worker (`sw.js`), and public web assets. | Browser CacheStorage |
+| `src/app/` | Next.js 16 App Router entry points, layout, metadata, error boundary, and route handlers (`/api/health`, `/api/signal`, `/api/discover`). | `next`, `react`, `lucide-react`, Tailwind CSS |
+| `src/app/api/signal/` | Ephemeral serverless WebRTC room signaling and ICE/SDP message queue. | `src/lib/signalStore`, `src/lib/codeGenerator`, `src/types/signaling` |
+| `src/app/api/discover/` | Local subnet peer discovery, IP detection, CGNAT 4-digit pairing PIN, and beaming endpoints. | `src/lib/signalStore`, `src/lib/deviceIdentity` |
+| `src/app/api/health/` | Public health check returning runtime environment, Redis/Memory storage telemetry, and uptime. | `src/lib/signalStore` |
+| `src/components/` | Presentation & interactive units: 6-channel mode selector, channel controller cards, diagnostic drawer, dropzone, QR displays, modals, badges, and progress indicators. | `lucide-react`, `qrcode.react`, `html5-qrcode`, `src/hooks/`, `src/lib/` |
+| `src/hooks/` | Stateful React lifecycle hooks managing WebRTC connections (`useWebRTC`), subnet discovery (`useLocalDiscovery`), camera scanners (`useQuadScanner`, `useHtml5Scanner`), theme, and history. | `react`, `src/lib/`, browser runtime APIs |
+| `src/lib/` | Pure TypeScript domain libraries: Base45 encoding, word recovery codes, multi-QR grid splitting, optical XOR parity stream, chunking, STUN/TURN ICE config, disk streaming, and transfer estimation. | `src/types/`, `vitest` |
+| `src/types/` | Domain TypeScript interfaces: transfer headers, progress state, signaling messages, device identities, and mode contracts. | TypeScript 5 |
+| `public/` | Static SVG icons, hero preview image (`preview.jpg`), PWA Service Worker (`sw.js`), and public web assets. | Browser CacheStorage |
 | `documentation/` | Living project governance, sprint roadmaps, architecture specifications, and codebase maps. | Markdown Docs |
 
 ---
@@ -178,8 +231,20 @@ flowchart TD
 ### 3.1 Application Routes & Route Handlers (`src/app/`)
 
 #### `src/app/page.tsx`
-- **Purpose:** Primary landing hub for "QuickSend". Wraps `<ModeSelector />` in `<Suspense>` so dynamic search params (`?room=123456`) hydrate cleanly while maintaining static prerendering.
-- **Exports:** `default Home(): JSX.Element`
+- **Purpose:** Primary landing hub for "QuickSend". Wraps `<ModeSelector />` in `<Suspense>` so dynamic search params (`?room=123456`) hydrate cleanly while maintaining static prerendering. Hosts `AppHeader`, `NetworkStatusBadge`, `ModeSelector`, and the experimental `UltrasonicCard` section.
+- **Exports:** `default function Home(): JSX.Element`
+
+#### `src/app/layout.tsx`
+- **Purpose:** Root application shell configuring HTML `lang="en"`, dynamic viewport, theme script injection, and metadata for PWA and SEO. Injects `<ServiceWorkerRegister />` to register `/sw.js`.
+- **Exports:** `metadata: Metadata`, `viewport: Viewport`, `default function RootLayout({ children }: { children: React.ReactNode }): JSX.Element`
+
+#### `src/app/error.tsx`
+- **Purpose:** Next.js client-side error boundary that gracefully traps unhandled rendering crashes, prevents black-screen errors, and renders a glassmorphic crash recovery card with a retry button.
+- **Exports:** `default function ErrorBoundary({ error, reset }: { error: Error & { digest?: string }, reset: () => void }): JSX.Element`
+
+#### `src/app/manifest.ts`
+- **Purpose:** Dynamic Web App Manifest generator defining PWA identity, standalone display mode, background color `#0B0F17`, theme color `#2563EB`, and SVG app icons.
+- **Exports:** `default function manifest(): MetadataRoute.Manifest`
 
 #### `src/app/globals.css`
 - **Purpose:** Global styling, theme tokens (light & dark mode soft glass variables: `--bg`, `--surface`, `--surface-glass`, `--border-soft`, `--text`, `--text-muted`, `--accent`, `--accent-soft`, `--radius-card`, `--shadow-soft`), and utility classes (`.glass-card`, `.pill`, `.pill-active`).
@@ -192,48 +257,75 @@ flowchart TD
 - **Purpose:** Next.js Route Handler (`GET`, `POST`) for ephemeral room coordination, SDP offer/answer exchange, and ICE candidate delivery. Backed by `signalStore` adapter with clean HTTP status codes (`400`, `404`, `409`, `200`).
 - **Exports:** `GET(request: Request)`, `POST(request: Request)`
 
+#### `src/app/api/discover/route.ts`
+- **Purpose:** Local network subnet discovery endpoint (`GET`, `POST`). Extracts client IP, groups devices by private subnet or optional 4-digit pairing code (`code:XXXX`) for cross-IP / CGNAT environments, maintains 45-second presence TTL, and coordinates instant 1-tap beaming requests.
+- **Exports:** `GET(request: Request)`, `POST(request: Request)`, `getClientIp(request: Request): string`, `isLocalOrPrivateIp(cleanIp: string): boolean`, `DiscoveredPeer`, `IncomingBeamNotice`.
+
 #### `src/app/api/signal/__tests__/route.test.ts`
 - **Purpose:** Integration test suite verifying room creation, room query by code, peer joining, signaling delivery, error codes, and cleanup.
+
+#### `src/app/api/discover/__tests__/route.test.ts`
+- **Purpose:** Integration test suite verifying local IP detection, subnet grouping, 4-digit PIN pairing, beam delivery, and expiration.
 
 ---
 
 ### 3.2 UI Components (`src/components/`)
 
+#### `src/components/AppHeader.tsx`
+- **Purpose:** Soft glass header (`.glass-card`) displaying formatted client-side date (`useSyncExternalStore`), clickable bold "QuickSend" title with Zap icon that dispatches `quicksend:go-home` and navigates to `/` (clearing `?room=`), session transfer history drawer toggle with counter badge, ThemeToggle, and live network status badge.
+- **Exports:** `AppHeader(): JSX.Element`
+
+#### `src/components/ModeSelector.tsx`
+- **Purpose:** Clean, linear 6-channel workspace coordinator. In the default Home state, renders the transfer option tiles in a tactile responsive grid directly styled after the reference card aesthetic (soft surface, squircle icon, clean typography). Selecting any mode smoothly transitions into a focused workspace card with an "All Channels" return pill.
+- **Exports:** `ModeSelector(): JSX.Element`
+
+#### `src/components/InternetSharingCard.tsx`
+- **Purpose:** Mode 1 Interactive Controller (Via Internet). Manages Format (`PIN / Mobile / Keyword` or `QR Code`) and Role (`Send` or `Receive`). Offers flexible sender strategies (Auto 6-digit PIN, memorized Mobile Number, or Custom Keyword), dynamic room code lookup, dropzone payload selection, peer connection status, transfer modal trigger, and collapsible ConnectionDiagnostics.
+- **Exports:** `InternetSharingCard({ initialRoomCode }: InternetSharingCardProps): JSX.Element`
+
 #### `src/components/SameNetworkCard.tsx`
-- **Purpose:** Mode 2 Controller (Same Network Wi-Fi). Prioritizes internal host ICE candidates across the local router subnet and supports Camera-to-Camera Optical QR fallback when the local network has no internet.
+- **Purpose:** Mode 2 Controller (Same Network Wi-Fi). Automatic local subnet radar with peer cards, visual avatar emojis, 1-tap beam requests, 4-digit pairing PIN backup for CGNAT/cross-IP environments, connected WebRTC transfer (`useWebRTC("same-network")`), and collapsible ConnectionDiagnostics.
 - **Exports:** `SameNetworkCard(): JSX.Element`
 
-#### `src/components/CameraStreamCard.tsx`
-- **Purpose:** Mode 5 Controller (Via Camera Scan). Zero-network air-gapped file/text streaming via animated sequenced QR frames. Defaults sender to Single layout and Medium density (with 2x2 and 2x3 options) with real-time transfer estimates (`EstimateBadge`), and receiver auto-detection starting with 1x1 single QR. Reassembles multi-frame payloads with XOR parity recovery, triggers automated safe download, and renders a prominent "Save / Download File" card action.
-- **Exports:** `CameraStreamCard(): JSX.Element`
-
-#### `src/components/CableTransferCard.tsx`
-- **Purpose:** Mode 6 Controller (Via Cable). Direct gigabit line-speed transfer over USB-C to USB-C or Ethernet cable links. Features 1-tap Android USB tethering shortcut (`ANDROID_INTENTS.TETHER_SETTINGS`), direct link-local WebRTC P2P PIN/QR pairing, and WebUSB/WebSerial direct port interface.
-- **Exports:** `CableTransferCard(): JSX.Element`
-
-#### `src/components/UltrasonicCard.tsx`
-- **Purpose:** Standalone acoustic sound data transfer section situated at the bottom of the home hub. Emits and receives Frequency Shift Keying (FSK) audio over speaker and microphone (near-ultrasonic 18–20 kHz and audible 1.5–3 kHz presets) with live canvas FFT frequency spectrum visualization.
-- **Exports:** `UltrasonicCard(): JSX.Element`
-
 #### `src/components/HotspotAssistantCard.tsx`
-- **Purpose:** Mode 3 Controller (Wi-Fi Hotspot Transfer Engine). Dual-phase transfer architecture combining compact 1-tap Android Hotspot/Wi-Fi settings shortcuts, optional collapsible Wi-Fi QR code generator, live Hotspot Radar with 1-tap subnet beaming via `useLocalDiscovery(true)` + `useWebRTC("hotspot")`, and a collapsible offline 6-digit PIN / QR pairing backup for zero-cellular environments.
+- **Purpose:** Mode 3 Controller (Wi-Fi Hotspot Transfer Engine). Dual-phase transfer architecture combining compact 1-tap Android Hotspot/Wi-Fi settings shortcuts (`ANDROID_INTENTS`), optional collapsible Wi-Fi QR code generator, live Hotspot Radar with 1-tap subnet beaming via `useLocalDiscovery(true)` + `useWebRTC("hotspot")`, collapsible offline 6-digit PIN / QR pairing backup, and collapsible ConnectionDiagnostics.
 - **Exports:** `HotspotAssistantCard(): JSX.Element`
 
 #### `src/components/NearbyShareCard.tsx`
 - **Purpose:** Mode 4 Controller (Bluetooth & Native Quick Share). Clean, honest Bluetooth workspace with 2-step transfer flow (drag-and-drop/text input with `EstimateBadge`, primary system share handoff via `navigator.share` delegating to native Bluetooth, Quick Share, or AirDrop with transfer history logging), transparent guidance explaining browser Bluetooth radio limitations with Android settings shortcut, and collapsible Web Bluetooth BLE sensor hardware scanner (`navigator.bluetooth`).
 - **Exports:** `NearbyShareCard(): JSX.Element`
 
+#### `src/components/CameraStreamCard.tsx`
+- **Purpose:** Mode 5 Controller (Via Camera Scan). Zero-network air-gapped file/text streaming via animated sequenced QR frames. Defaults sender to Single layout and Medium density (with 2x2 and 2x3 options) with real-time transfer estimates (`EstimateBadge`), and receiver auto-detection starting with 1x1 single QR. Reassembles multi-frame payloads with Base45 decoding and XOR parity recovery, triggers automated safe download, and renders a prominent "Save / Download File" card action.
+- **Exports:** `CameraStreamCard(): JSX.Element`
+
+#### `src/components/CableTransferCard.tsx`
+- **Purpose:** Mode 6 Controller (Via Cable). Direct gigabit line-speed transfer over USB-C to USB-C or Ethernet cable links. Features 1-tap Android USB tethering shortcut (`ANDROID_INTENTS.TETHER_SETTINGS`), direct link-local WebRTC P2P PIN/QR pairing, and host candidate priority.
+- **Exports:** `CableTransferCard(): JSX.Element`
+
+#### `src/components/UltrasonicCard.tsx`
+- **Purpose:** Standalone acoustic sound data transfer section situated at the bottom of the home hub. Emits and receives Frequency Shift Keying (FSK) audio over speaker and microphone (near-ultrasonic 18–20 kHz and audible 1.5–3 kHz presets) with live canvas FFT frequency spectrum visualization.
+- **Exports:** `UltrasonicCard(): JSX.Element`
+
+#### `src/components/ConnectionDiagnostics.tsx`
+- **Purpose:** Collapsible native `<details>` diagnostics panel for WebRTC connections. Displays live server storage mode (with memory multi-instance warning via `/api/health`), masked network group label (`groupLabel`), IP family, discovery radar poll status, ICE connection/gathering/signaling states, DataChannel state, candidate type counts (host, srflx, relay), selected candidate pair, last error, and 40-entry debug log ring buffer with one-click plain text clipboard report export.
+- **Exports:** `ConnectionDiagnostics({ diagnostics, debugLog, discoveryStatus }: ConnectionDiagnosticsProps): JSX.Element`, `ConnectionDiagnosticsProps`.
+
+#### `src/components/Dropzone.tsx`
+- **Purpose:** Dual-mode payload selector with "Files" tab (multi-file drag-and-drop, format/size formatting, individual item removal, FileTypeBadge chips) and "Text / Link" tab (instant clipboard snippet input).
+- **Exports:** `Dropzone({ onSelectionChange }: DropzoneProps): JSX.Element`
+
+#### `src/components/EstimateBadge.tsx`
+- **Purpose:** Dynamic badge displaying expected transfer duration calculated by `transferEstimate.ts` based on payload size and active channel throughput. Renders clean icon and time text (e.g. `~3s`, `< 1s`, `42 frames`).
+- **Exports:** `EstimateBadge({ channel, payload, frames, className }: EstimateBadgeProps): JSX.Element`, `EstimateBadgeProps`.
+
+#### `src/components/FileTypeBadge.tsx`
+- **Purpose:** Color-coded visual file-type badge component categorizing payloads into distinct semantic visual tags (`PDF` in red, `IMG` in purple, `DOC` in blue, `ZIP` in amber, `VID` in rose, `AUD` in cyan, `TXT` in emerald, and `FILE` fallback in neutral).
+- **Exports:** `FileTypeBadge({ name, mimeType, className }: FileTypeBadgeProps): JSX.Element`
+
 #### `src/components/OpticalHandshakeModal.tsx`
 - **Purpose:** Visual modal for 100% zero-internet optical WebRTC signaling. Displays compressed Offer/Answer QR codes and launches the camera scanner to exchange SDP descriptions directly across device screens.
 - **Exports:** `OpticalHandshakeModal({ isOpen, role, localPayloadQr, onOfferScanned, onAnswerScanned, onClose }: OpticalHandshakeModalProps): JSX.Element | null`
-
-#### `src/components/InternetSharingCard.tsx`
-- **Purpose:** Mode 1 Interactive Controller. Manages Format (`PIN / Mobile / Keyword` or `QR Code`) and Role (`Send` or `Receive`). Offers flexible sender strategies (Auto 6-digit PIN, memorized Mobile Number, or Custom Keyword), dynamic room code lookup, dropzone payload selection, peer connection status, and transfer modal trigger.
-- **Exports:** `InternetSharingCard({ initialRoomCode }: InternetSharingCardProps): JSX.Element`
-
-#### `src/components/Dropzone.tsx`
-- **Purpose:** Dual-mode payload selector with "Files" tab (multi-file drag-and-drop, format/size formatting, individual item removal) and "Text / Link" tab (instant clipboard snippet input).
-- **Exports:** `Dropzone({ onSelectionChange }: DropzoneProps): JSX.Element`
 
 #### `src/components/QRCodeDisplay.tsx`
 - **Purpose:** High-contrast QR code renderer powered by `qrcode.react` (`QRCodeSVG`). Displays the dynamic room URL, 6-digit PIN with center hyphen, and one-click copy buttons.
@@ -242,6 +334,22 @@ flowchart TD
 #### `src/components/QRScannerModal.tsx`
 - **Purpose:** In-browser camera QR code reader using `html5-qrcode`. Features permission handling, camera stream initialization, auto-parsing of room URLs (`?room=...`), and direct PIN extraction.
 - **Exports:** `QRScannerModal({ isOpen, onClose, onScanSuccess }: QRScannerModalProps): JSX.Element | null`
+
+#### `src/components/SegmentedControl.tsx`
+- **Purpose:** Reusable segmented option switch matching the tactile reference UI. Features a soft neutral pill track, pure white elevated active tab with subtle shadow, `role="tablist"` accessibility, and keyboard arrow key navigation.
+- **Exports:** `SegmentedControl({ options, value, onChange, ariaLabel }: SegmentedControlProps): JSX.Element`
+
+#### `src/components/SpeedIndicator.tsx`
+- **Purpose:** Reusable transfer speed indicator with an explicit "Speed" text label, Lucide Gauge icon, and 5 solid high-contrast stepped pill segments (Emerald for 5/5, Indigo for 4/5, Blue for 3/5, Amber for 2/5). Clearly visible across both dark and light modes.
+- **Exports:** `SpeedIndicator({ speedBars, total, className, showIcon, showLabel }: SpeedIndicatorProps): JSX.Element`, `getSpeedColorClass(speedBars: number): string`
+
+#### `src/components/ThemeToggle.tsx`
+- **Purpose:** Accessible tactile toggle button switching between light and dark modes with persistent `localStorage` synchronization and smooth CSS variable transitions.
+- **Exports:** `ThemeToggle(): JSX.Element`
+
+#### `src/components/TransferHistoryModal.tsx`
+- **Purpose:** Slide-over ephemeral drawer listing sent and received items from the current session (item name, type chip, byte size, timestamp, channel, and direct download/re-copy actions).
+- **Exports:** `TransferHistoryModal({ isOpen, onClose }: TransferHistoryModalProps): JSX.Element | null`
 
 #### `src/components/TransferModal.tsx`
 - **Purpose:** Multi-state transfer progress dialog with universal cancellation:
@@ -252,35 +360,13 @@ flowchart TD
   5. *Error / Declined:* Informative status feedback with immediate dismiss via close button or Escape key.
 - **Exports:** `TransferModal({ progress, onAccept, onReject, onClose }: TransferModalProps): JSX.Element | null`
 
-#### `src/components/FileTypeBadge.tsx`
-- **Purpose:** Color-coded visual file-type badge component categorizing payloads into distinct semantic visual tags (`PDF` in red, `IMG` in purple, `DOC` in blue, `ZIP` in amber, `VID` in rose, `AUD` in cyan, `TXT` in emerald, and `FILE` fallback in neutral).
-- **Exports:** `FileTypeBadge({ name, mimeType, className }: FileTypeBadgeProps): JSX.Element`
-
-#### `src/components/AppHeader.tsx`
-- **Purpose:** Soft glass header (`.glass-card`) displaying formatted client-side date (`useSyncExternalStore`), clickable bold "QuickSend" title with Zap icon that dispatches `quicksend:go-home` and navigates to `/` (clearing `?room=`), session transfer history drawer toggle with counter badge, and live network status badge.
-- **Exports:** `AppHeader(): JSX.Element`
-
-#### `src/components/ModeSelector.tsx`
-- **Purpose:** Clean, linear 4-channel workspace coordinator. In the default Home state, renders the 4 transfer option tiles in a tactile 2x2 grid directly styled after the reference card aesthetic (soft neutral `#F4F5F7` surface, uniform `rounded-2xl`, squircle icon, clean typography). Selecting any mode smoothly transitions into a focused workspace card with an "All Channels" return pill. No artificial sidebars or bottom navigation menus.
-- **Exports:** `ModeSelector(): JSX.Element`
-
-#### `src/components/SegmentedControl.tsx`
-- **Purpose:** Reusable segmented option switch matching the tactile reference UI. Features a soft neutral pill track, pure white elevated active tab with subtle shadow, `role="tablist"` accessibility, and keyboard arrow key navigation.
-- **Exports:** `SegmentedControl({ options, value, onChange, ariaLabel }: SegmentedControlProps): JSX.Element`
-
-#### `src/components/SpeedIndicator.tsx`
-- **Purpose:** Reusable transfer speed indicator with an explicit "Speed" text label, Lucide Gauge icon, and 5 solid high-contrast stepped pill segments (Emerald for 5/5, Indigo for 4/5, Blue for 3/5, Amber for 2/5). Clearly visible across both dark and light modes.
-- **Exports:** `SpeedIndicator({ speedBars, total, className, showIcon, showLabel }: SpeedIndicatorProps): JSX.Element`, `getSpeedColorClass(speedBars: number): string`
-
-#### `src/components/ConnectionDiagnostics.tsx`
-- **Purpose:** Collapsible native `<details>` diagnostics panel for Same Wi-Fi and Hotspot transfers. Displays live server storage mode (with memory multi-instance warning via `/api/health`), masked network group label (`groupLabel`), IP family, discovery radar poll status, ICE connection/gathering/signaling states, DataChannel state, candidate type counts (host, srflx, relay), selected candidate pair, last error, and 40-entry debug log ring buffer with one-click plain text clipboard report export.
-- **Exports:** `ConnectionDiagnostics({ diagnostics, debugLog, discoveryStatus }: ConnectionDiagnosticsProps): JSX.Element`, `ConnectionDiagnosticsProps`.
-
 #### `src/components/NetworkStatusBadge.tsx`
 - **Purpose:** Live connection status pill reflecting online/offline state.
+- **Exports:** `NetworkStatusBadge(): JSX.Element`
 
 #### `src/components/ServiceWorkerRegister.tsx`
-- **Purpose:** Registers `/sw.js` in production environments.
+- **Purpose:** Registers `/sw.js` in production environments and logs service worker registration status.
+- **Exports:** `ServiceWorkerRegister(): null`
 
 ---
 
@@ -294,6 +380,10 @@ flowchart TD
 - **Purpose:** Local network peer discovery via `/api/discover`. Manages peer heartbeat polling, dynamic avatar conflict resolution, incoming beam handling, optional 4-digit pairing code for cross-IP / CGNAT discovery, and exposes detailed poll status (`DiscoveryStatus` with `groupLabel` and `ipFamily`).
 - **Exports:** `useLocalDiscovery(isAutoDiscovering, code): { profile, peers, networkId, incomingBeam, beamToPeer, clearIncomingBeam, isScanning, updateName, cycleAvatar, refreshPeers, status }`, `DiscoveryStatus`, `NearbyPeer`, `IncomingBeamEvent`.
 
+#### `src/hooks/useNearbyShare.ts`
+- **Purpose:** Web Share API (`navigator.share`) delegating files and text to native OS Bluetooth, Quick Share, or AirDrop, combined with a Web Bluetooth GATT client (`navigator.bluetooth`) connecting to peripheral BLE hardware sensors.
+- **Exports:** `useNearbyShare(): { capabilities, isSharing, shareSuccess, isConnectingBle, bleDevice, bleServices, errorMsg, shareViaNative, requestBleDevice, disconnectBleDevice, clearError }`, `BleDeviceInfo`, `BleServiceInfo`, `NearbyCapabilities`.
+
 #### `src/hooks/useNetworkStatus.ts`
 - **Purpose:** Hydration-safe network and browser capability detection hooks built with `useSyncExternalStore`.
 - **Exports:** `useNetworkStatus(): boolean`, `useBrowserCapabilities(): BrowserCapabilities`
@@ -306,21 +396,29 @@ flowchart TD
 - **Purpose:** Multi-layout camera scanner hook supporting 1x1, 2x2, and 2x3 grid decoding. Captures video via `getUserMedia`, runs 10fps loop, and decodes frames using native `BarcodeDetector` or `jsQR` multi-region splitting (`decodeGrid`) with auto-layout candidate rotation starting with 1x1 single QR. Reuses a single offscreen `<canvas>` with 720p dimension capping to completely prevent memory spikes and browser tab crashes on mobile devices.
 - **Exports:** `useQuadScanner(): UseQuadScannerReturn`, `pickLayout`, `LAYOUT_CANDIDATES`, `UseQuadScannerReturn`.
 
+#### `src/hooks/useTheme.ts`
+- **Purpose:** Light / dark mode controller using `useSyncExternalStore` for SSR-safe hydration, syncing with `localStorage` and `prefers-color-scheme`.
+- **Exports:** `useTheme(): { theme, resolvedTheme, setTheme, toggleTheme }`, `applyThemeToDOM(theme: Theme): "light" | "dark"`, `getThemeSnapshot(): Theme`, `Theme`, `THEME_STORAGE_KEY`.
+
+#### `src/hooks/useTransferHistory.ts`
+- **Purpose:** Ephemeral transfer history state hook persisting sent and received files in `sessionStorage` (up to 50 items) with reactive cross-component broadcast.
+- **Exports:** `useTransferHistory(): { history, addSentItem, addReceivedItem, clearHistory }`, `addTransferHistoryItem`, `getTransferHistorySnapshot`, `TransferHistoryItem`, `SESSION_STORAGE_KEY`, `MAX_HISTORY_ITEMS`.
+
 ---
 
 ### 3.4 Protocol & Domain Libraries (`src/lib/`)
 
 #### `src/lib/base45.ts`
 - **Purpose:** RFC 9285 Base45 encoder and decoder for QR alphanumeric mode (~97% packing efficiency).
-- **Exports:** `encodeBase45`, `decodeBase45`, `BASE45_ALPHABET`.
+- **Exports:** `encodeBase45(bytes: Uint8Array): string`, `decodeBase45(str: string): Uint8Array`, `BASE45_ALPHABET: string`.
 
 #### `src/lib/recoveryWords.ts`
 - **Purpose:** 256-word phonetic English dictionary (3-6 chars, unique 3-letter prefixes) for human-readable recovery codes.
-- **Exports:** `RECOVERY_WORDS`, `wordToIndex`.
+- **Exports:** `RECOVERY_WORDS: readonly string[]`, `wordToIndex(rawWord: string): number`.
 
 #### `src/lib/quadDecode.ts`
 - **Purpose:** Multi-region image grid splitting (2x2, 2x3, 1x1) with 8% overlap padding on inner edges for multi-QR camera stream decoding. Decodes regions with `decodeGrid`, `decodeQuadrants`, and `jsqrDecodeOne`.
-- **Exports:** `cropImageData`, `getGridRects`, `decodeGrid`, `decodeQuadrants`, `jsqrDecodeOne`.
+- **Exports:** `cropImageData`, `getGridRects`, `decodeGrid`, `decodeQuadrants`, `jsqrDecodeOne`, `GridRect`.
 
 #### `src/lib/opticalRecovery.ts`
 - **Purpose:** Optical Transfer word recovery code encoder and decoder. Generates human-friendly word sequences mapping session byte, LEB128 varint missing frame ranges, and modulo checksum word (max 40 words). Tolerates hyphens, commas, mixed case, and 3-letter abbreviations.
@@ -330,6 +428,10 @@ flowchart TD
 - **Purpose:** Optical Data Stream protocol for zero-network air-gapped camera-to-screen transfer. Features Base45 alphanumeric QR frames (`QS2:...` and parity `QP2:...`), FNV-1a checksums, symmetrical compression, stride-grouped XOR parity frames (`buildParityFrames`), and automatic single-packet loss reconstruction in `OpticalDataCollector`.
 - **Exports:** `encodeFileToOpticalFrames`, `encodeTextToOpticalFrames`, `buildParityFrames`, `getTotalFrameCount`, `parseOpticalDataFrame`, `parseOpticalParityFrame`, `computePayloadHash`, `OpticalDataCollector`, `OPTICAL_CHUNK_PRESETS`, `splitFirstN`, `encodeB45Header`, `decodeB45Header`.
 
+#### `src/lib/opticalSdp.ts`
+- **Purpose:** WebRTC SDP compressor, host candidate filter, multi-frame sequenced QR frame splitter (`splitOpticalFrames`), and incremental stream collector (`OpticalFrameCollector`) supporting animated QR carousels, out-of-order frame reassembly, and camera-free manual copy/paste.
+- **Exports:** `compactSdp`, `encodeOpticalSdp`, `decodeOpticalSdp`, `isOpticalSdp`, `isOpticalFrame`, `splitOpticalFrames`, `computeShortHash`, `OpticalFrameCollector`.
+
 #### `src/lib/transferEstimate.ts`
 - **Purpose:** Universal transfer time estimation engine providing baseline transfer speeds per channel, live measured throughput overrides, optical camera frame calculations (with `framesPerTick` multiplier for 2x2 Grid mode), and human-friendly duration formatting.
 - **Exports:** `estimateSeconds`, `formatDuration`, `estimateCameraFrames`, `getPayloadBytes`, `ChannelId`.
@@ -337,10 +439,6 @@ flowchart TD
 #### `src/lib/wifiQr.ts`
 - **Purpose:** Standardized Wi-Fi configuration string generator (`WIFI:T:WPA;S:...`) and parser recognized by iOS/Android camera apps, with Android intent deep-links.
 - **Exports:** `buildWifiQrString`, `parseWifiQrString`, `ANDROID_INTENTS`.
-
-#### `src/lib/opticalSdp.ts`
-- **Purpose:** WebRTC SDP compressor, host candidate filter, multi-frame sequenced QR frame splitter (`splitOpticalFrames`), and incremental stream collector (`OpticalFrameCollector`) supporting animated QR carousels, out-of-order frame reassembly, and camera-free manual copy/paste.
-- **Exports:** `compactSdp`, `encodeOpticalSdp`, `decodeOpticalSdp`, `isOpticalSdp`, `isOpticalFrame`, `splitOpticalFrames`, `computeShortHash`, `OpticalFrameCollector`.
 
 #### `src/lib/codeGenerator.ts`
 - **Purpose:** Cryptographically secure 6-digit room PIN generation, custom key/mobile number preservation, normalization, and flexible 4–20 character room key validation.
@@ -350,13 +448,17 @@ flowchart TD
 - **Purpose:** ArrayBuffer slicing (64KB chunks), async chunk generator, stream reassembly to Blob or UTF-8 text, and byte/speed formatting.
 - **Exports:** `createFileHeader`, `createTextHeader`, `formatBytes`, `formatSpeed`, `sliceBlobIntoChunks`, `reassembleChunksToBlob`, `reassembleChunksToText`.
 
+#### `src/lib/deviceIdentity.ts`
+- **Purpose:** Generates non-colliding device identities, operating system detection (`desktop`, `laptop`, `mobile`, `tablet`), and playful visual avatar presets (animals, celestial bodies, and colors) for local subnet radar.
+- **Exports:** `getDeviceProfile(): DeviceProfile`, `saveDeviceProfile(profile: DeviceProfile): void`, `AVATAR_PRESETS`, `DeviceProfile`, `AvatarPreset`, `DeviceFormFactor`.
+
 #### `src/lib/signalStore.ts`
 - **Purpose:** Dual-mode storage adapter for ephemeral signaling rooms. Seamlessly switches between zero-dependency Redis REST mode (using native `fetch` with Upstash Redis / Vercel KV REST API) and in-memory TTL mode with capacity guard and automatic 15-minute pruning.
 - **Exports:** `signalStore`, `MemorySignalStore`, `RedisSignalStore`, `isRedisConfigured`, `getSignalStore`.
 
 #### `src/lib/iceConfig.ts`
-- **Purpose:** Resilient WebRTC ICE / STUN configuration providing multi-provider public STUN pool (Google + Cloudflare), optional TURN relay injection (`NEXT_PUBLIC_TURN_URL`), mode-specific RTCConfiguration generator (`getRtcConfig`), and 10-second ICE connection timeout watchdog.
-- **Exports:** `PUBLIC_STUN_SERVERS`, `getTurnServers`, `getRtcConfig`, `ICE_CONNECTION_TIMEOUT_MS`, `FIREWALL_FALLBACK_MESSAGE`.
+- **Purpose:** Resilient WebRTC ICE / STUN configuration providing multi-provider public STUN pool (Google + Cloudflare), optional TURN relay injection (`NEXT_PUBLIC_TURN_URL`), and mode-specific RTCConfiguration generator (`getRtcConfig`).
+- **Exports:** `PUBLIC_STUN_SERVERS`, `getTurnServers`, `getRtcConfig`, `FIREWALL_FALLBACK_MESSAGE`.
 
 #### `src/lib/diskStream.ts`
 - **Purpose:** Large-file streaming layer leveraging File System Access API (`showSaveFilePicker`) for browser files > 100MB, streaming chunks directly to user disk to prevent tab memory exhaustion while safely falling back to in-memory Blob reassembly when unsupported (Safari, Firefox, small files).
@@ -378,11 +480,17 @@ flowchart TD
 
 ### 3.5 Domain Types (`src/types/`)
 
-| File | Key Exported Types |
-| :--- | :--- |
-| `src/types/transfer.ts` | `FileMetadata`, `TextMetadata`, `TransferPayloadHeader`, `TransferProgressState`, `TransferStatus`. |
-| `src/types/signaling.ts` | `PeerRole`, `SignalPayloadType`, `SignalMessage`, `SignalingRoomState`. |
-| `src/types/mode.ts` | `TransferMode`, `InternetFormat`, `TransferRole`, `ModeStatus`, `BrowserCapabilities`. |
+#### `src/types/mode.ts`
+- **Purpose:** Domain type definitions for transfer channels, online/offline status, and browser hardware capabilities.
+- **Exports:** `TransferMode` (`"internet" | "same-network" | "hotspot" | "bluetooth" | "camera" | "cable"`), `InternetFormat`, `TransferRole`, `ModeStatus`, `BrowserCapabilities`.
+
+#### `src/types/signaling.ts`
+- **Purpose:** Domain type definitions for WebRTC ephemeral signaling rooms and message payloads.
+- **Exports:** `PeerRole` (`"sender" | "receiver"`), `SignalPayloadType` (`"offer" | "answer" | "candidate"`), `SignalMessage`, `SignalingRoomState`.
+
+#### `src/types/transfer.ts`
+- **Purpose:** Domain type definitions for file chunking, metadata headers, and transfer progress states.
+- **Exports:** `FileMetadata`, `TextMetadata`, `TransferPayloadHeader`, `TransferProgressState`, `TransferStatus` (`"idle" | "connecting" | "waiting-acceptance" | "transferring" | "completed" | "error" | "cancelled"`).
 
 ---
 
@@ -400,5 +508,4 @@ flowchart TD
 ---
 
 ## 4. Sprint Status: All Sprints Completed & Production Verified
-All nineteen sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, human-readable word recovery codes, and live connection diagnostics with masked network group labels) are fully implemented, verified with 195 passing unit tests across 33 test suites, zero lint warnings, and production build ready.
-```
+All twenty-five sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, human-readable word recovery codes, live connection diagnostics with masked network group labels, and Bluetooth channel restoration) are fully implemented, verified with 224 passing unit tests across 35 test suites, zero lint warnings, and production build ready.

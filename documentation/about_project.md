@@ -218,16 +218,16 @@ Web standards enforce security sandboxes that prevent web applications from beha
 
 Below is the complete ASCII directory tree reflecting the workspace files and directories:
 
-```
+`
 quicksend/
 ├── .gitignore
 ├── AGENTS.md
+├── README.md
 ├── eslint.config.mjs
 ├── next-env.d.ts
 ├── next.config.ts
 ├── package-lock.json
 ├── package.json
-├── README.md
 ├── tsconfig.json
 ├── vercel.json
 ├── vitest.config.mts
@@ -238,10 +238,11 @@ quicksend/
 │   └── codebase_map.md
 ├── public/
 │   ├── favicon.ico
-│   ├── icon.svg
 │   ├── file.svg
 │   ├── globe.svg
+│   ├── icon.svg
 │   ├── next.svg
+│   ├── preview.jpg
 │   ├── sw.js
 │   ├── vercel.svg
 │   └── window.svg
@@ -279,9 +280,11 @@ quicksend/
     │   │   ├── SpeedIndicator.test.tsx
     │   │   ├── TransferModal.test.tsx
     │   │   └── UltrasonicCard.test.tsx
+    │   ├── .gitkeep
     │   ├── AppHeader.tsx
     │   ├── CableTransferCard.tsx
     │   ├── CameraStreamCard.tsx
+    │   ├── ConnectionDiagnostics.tsx
     │   ├── Dropzone.tsx
     │   ├── EstimateBadge.tsx
     │   ├── FileTypeBadge.tsx
@@ -309,6 +312,7 @@ quicksend/
     │   │   ├── useTheme.test.tsx
     │   │   ├── useTransferHistory.test.ts
     │   │   └── useWebRTC.test.ts
+    │   ├── .gitkeep
     │   ├── useHtml5Scanner.ts
     │   ├── useLocalDiscovery.ts
     │   ├── useNearbyShare.ts
@@ -335,6 +339,7 @@ quicksend/
     │   │   ├── transferEstimate.test.ts
     │   │   ├── ultrasonicStream.test.ts
     │   │   └── wifiQr.test.ts
+    │   ├── .gitkeep
     │   ├── base45.ts
     │   ├── chunker.ts
     │   ├── codeGenerator.ts
@@ -347,13 +352,14 @@ quicksend/
     │   ├── opticalSdp.ts
     │   ├── quadDecode.ts
     │   ├── recoveryWords.ts
-    │   ├── signalStore.ts
     │   ├── signalingClient.ts
+    │   ├── signalStore.ts
     │   ├── transferEstimate.ts
     │   ├── ultrasonicStream.ts
     │   └── wifiQr.ts
     └── types/
+        ├── .gitkeep
         ├── mode.ts
         ├── signaling.ts
         └── transfer.ts
-```
+`
