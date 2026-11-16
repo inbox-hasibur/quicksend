@@ -14,11 +14,14 @@ import {
 } from "lucide-react";
 import type { TransferProgressState } from "@/types/transfer";
 import { formatBytes, formatSpeed } from "@/lib/chunker";
+import { formatRoomCode } from "@/lib/codeGenerator";
 import { FileTypeBadge } from "@/components/FileTypeBadge";
 import { estimateSeconds, formatDuration } from "@/lib/transferEstimate";
 
 interface TransferModalProps {
   progress: TransferProgressState;
+  isOpen?: boolean;
+  roomCode?: string;
   onAccept: () => void;
   onReject: () => void;
   onClose: () => void;
@@ -26,6 +29,8 @@ interface TransferModalProps {
 
 export function TransferModal({
   progress,
+  isOpen,
+  roomCode,
   onAccept,
   onReject,
   onClose,
@@ -59,8 +64,8 @@ export function TransferModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
-  // Modal is only visible when transfer is active or completed/rejected and not dismissed
-  if (!currentTransferKey || isDismissed) {
+  // Modal is only visible when transfer is active or completed/rejected, not dismissed, and isOpen is not false
+  if (isOpen === false || !currentTransferKey || isDismissed) {
     return null;
   }
 
@@ -135,7 +140,7 @@ export function TransferModal({
         {/* Content Details */}
         <div className="space-y-4">
           {/* File or Text info card */}
-          {(progress.fileName || progress.totalBytes > 0 || progress.itemType === "file" || progress.textContent) ? (
+          {(Boolean(progress.fileName) || (progress.totalBytes > 0 && progress.itemType === "file") || Boolean(progress.textContent)) ? (
             <div className="flex items-start gap-3 p-4 rounded-2xl border border-[var(--border-hairline)] dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-850/60">
               {progress.itemType === "file" ? (
                 <FileTypeBadge fileName={progress.fileName} className="mt-0.5" />
@@ -181,7 +186,7 @@ export function TransferModal({
           ) : (
             <div className="p-4 rounded-2xl border border-[var(--border-hairline)] dark:border-neutral-800 bg-neutral-50/60 dark:bg-neutral-850/60 text-center space-y-1">
               <p className="font-bold text-sm text-neutral-900 dark:text-neutral-100">
-                Connecting to Peer
+                {roomCode ? `Connecting to sender (${formatRoomCode(roomCode)})...` : "Connecting to sender..."}
               </p>
               <p className="text-xs text-neutral-500">
                 Establishing direct peer connection...

@@ -10,6 +10,7 @@ import {
   RefreshCw,
   AlertCircle,
   Users,
+  ShieldCheck,
 } from "lucide-react";
 import { Dropzone } from "@/components/Dropzone";
 import { EstimateBadge } from "@/components/EstimateBadge";
@@ -21,6 +22,7 @@ import { useWebRTC } from "@/hooks/useWebRTC";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
 import { getPayloadBytes } from "@/lib/transferEstimate";
 import type { TransferRole } from "@/types/mode";
+import type { TransferProgressState } from "@/types/transfer";
 
 type KeyStrategy = "auto" | "phone" | "keyword" | "qr";
 
@@ -48,6 +50,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     roomCode,
     isConnected,
     progress,
+    brokerNotice,
     startSender,
     startReceiver,
     sendFiles,
@@ -56,6 +59,31 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     rejectIncomingTransfer,
     cleanup,
   } = useWebRTC("internet");
+
+  // Enrich sender progress with selected payload metadata so it never displays "0 Bytes"
+  const enrichedProgress: TransferProgressState = {
+    ...progress,
+    fileName: progress.fileName || selectedPayload.files[0]?.name,
+    fileSize:
+      progress.fileSize ||
+      (selectedPayload.files.length > 0
+        ? selectedPayload.files.reduce((acc, f) => acc + f.size, 0)
+        : undefined),
+    totalBytes:
+      progress.totalBytes > 0
+        ? progress.totalBytes
+        : getPayloadBytes(selectedPayload.files, selectedPayload.text),
+    totalFiles:
+      progress.totalFiles ||
+      (selectedPayload.files.length > 1 ? selectedPayload.files.length : undefined),
+    itemType: progress.itemType || (selectedPayload.files.length > 0 ? "file" : "text"),
+    textContent: progress.textContent || selectedPayload.text,
+  };
+
+  // Only open modal on Sender when peer initiates connection/transfer (waiting-acceptance, transferring, completed, error)
+  // While Sender is waiting for a peer (status === "connecting" or "idle"), keep QR/PIN 100% visible
+  const isSenderWaiting = role === "send" && (progress.status === "idle" || progress.status === "connecting");
+  const isModalOpen = !isSenderWaiting && progress.status !== "idle";
 
   // Sender session start
   const handleStartSender = async () => {
@@ -323,9 +351,23 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                 <span>
                   {isConnected
                     ? "Peer Connected! Streaming payload..."
-                    : `Waiting for receiver: "${formatRoomCode(roomCode)}"`}
+                    : `Waiting for receiver to connect... (${formatRoomCode(roomCode)})`}
                 </span>
               </div>
+
+              {/* Informative Broker Notice if cloud broker is offline */}
+              {brokerNotice && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-[11px] font-mono">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                  <span>{brokerNotice}</span>
+                </div>
+              )}
+
+              {/* Zero Server Upload Guarantee */}
+              <p className="text-[11px] text-[var(--text-muted)] text-center flex items-center justify-center gap-1">
+                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                <span>Zero server uploads — files stay on your device until direct P2P transfer begins</span>
+              </p>
 
               <button
                 type="button"
@@ -446,7 +488,9 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
 
       {/* Live Transfer & Acceptance Modal */}
       <TransferModal
-        progress={progress}
+        isOpen={isModalOpen}
+        progress={enrichedProgress}
+        roomCode={roomCode || inputCode}
         onAccept={acceptIncomingTransfer}
         onReject={rejectIncomingTransfer}
         onClose={handleReset}

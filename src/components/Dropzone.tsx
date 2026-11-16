@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, ChangeEvent, DragEvent } from "react";
-import { UploadCloud, X } from "lucide-react";
+import { UploadCloud, X, ShieldCheck } from "lucide-react";
 import { formatBytes } from "@/lib/chunker";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { FileTypeBadge } from "@/components/FileTypeBadge";
@@ -104,6 +104,10 @@ export function Dropzone({ onSelectionChange }: DropzoneProps) {
             </p>
             <p className="text-xs text-[var(--text-muted)] mt-1">
               Documents, photos, videos, archives up to gigabytes
+            </p>
+            <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1.5 flex items-center justify-center gap-1 font-medium">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              <span>Zero server uploads — files stay on your device until direct P2P transfer</span>
             </p>
           </div>
 

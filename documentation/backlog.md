@@ -235,3 +235,21 @@ Detailed task checklists and verification records for Sprints 1 through 22 have 
 - [x] Updated `codebase_map.md` with complete 38-suite test coverage (235 tests), refreshed timestamps, and ensured full 1:1 file parity with the repository.
 - [x] Updated `AGENTS.md` documentation sync rule for lean, targeted updates.
 
+### Sprint 30: Sender QR Visibility and Smart ICE Watchdog Hardening
+- [x] Sender QR/PIN Non-blocking Display:
+  - Kept sender QR and 6-digit PIN fully visible and unblurred in `InternetSharingCard.tsx` while waiting for peer connection.
+  - Replaced blocking modal during passive waiting with an inline status indicator (`"Waiting for receiver to connect..."`).
+  - Restricted `TransferModal.tsx` trigger on the sender side to active handshake/transfer states (`waiting-acceptance`, `transferring`, `completed`, `error`).
+  - Added clean connecting state in `TransferModal.tsx` displaying `"Connecting to sender..."` with room PIN instead of `"File Payload 0 Bytes"`.
+  - Added zero-upload reassurance messaging in `Dropzone.tsx` clarifying files stay local on device until direct P2P transfer begins.
+- [x] Smart ICE Watchdog & Dual-Transport Arbitration:
+  - Preserved indefinite passive waiting with zero forced timeout before peer handshake.
+  - Implemented 15s ICE handshake watchdog in `useWebRTC.ts` triggering automatic `restartIce()` at 7s when ICE is stuck in `checking`.
+  - Surfaced descriptive error message advising user of 4G/firewall block and suggesting alternative channels (Same Wi-Fi, Hotspot, TURN relay).
+  - Ensured cleanup state properly resets across new sessions to prevent dropped ICE events.
+- [x] Verification & Automated Tests:
+  - Updated `src/components/__tests__/TransferModal.test.tsx` and `src/hooks/__tests__/useWebRTC.test.ts`.
+  - All 38 test files, 238 tests passing (100% pass rate).
+  - ESLint 9 checks passing with zero warnings or errors.
+  - Production build passing cleanly with Turbopack (`npm run build`).
+

@@ -21,7 +21,6 @@ import {
 } from "@/lib/diskStream";
 import {
   getRtcConfig,
-  FIREWALL_FALLBACK_MESSAGE,
 } from "@/lib/iceConfig";
 import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
 import type { PeerRole, SignalMessage } from "@/types/signaling";
@@ -74,7 +73,8 @@ export interface DebugLogEntry {
   msg: string;
 }
 
-const FIREWALL_MSG_WITH_DIAGNOSTICS = `${FIREWALL_FALLBACK_MESSAGE}\nOpen Connection details below and copy the report.`;
+export const FIREWALL_BLOCKED_MESSAGE =
+  "Direct connection blocked by 4G/mobile network or campus firewall. Try Same Wi-Fi, Hotspot, or configure a TURN relay.";
 
 export interface DrainableChannel {
   bufferedAmount: number;
@@ -165,6 +165,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const [roomCode, setRoomCode] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [pendingHeader, setPendingHeader] = useState<TransferPayloadHeader | null>(null);
+  const [brokerNotice, setBrokerNotice] = useState<string | null>(null);
 
   const [progress, setProgress] = useState<TransferProgressState>({
     status: "idle",
@@ -271,6 +272,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const isCleaningUpRef = useRef<boolean>(false);
   const sessionGenRef = useRef<number>(0);
   const hasRestartedIceRef = useRef<boolean>(false);
+  const iceRestartTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const iceWatchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const clearIceTimeout = useCallback(() => {
     if (iceTimerRef.current) {
@@ -279,9 +282,101 @@ export function useWebRTC(mode: TransferMode = "internet") {
     }
   }, []);
 
+  const clearHandshakeWatchdog = useCallback(() => {
+    if (iceRestartTimerRef.current) {
+      clearTimeout(iceRestartTimerRef.current);
+      iceRestartTimerRef.current = null;
+    }
+    if (iceWatchdogTimerRef.current) {
+      clearTimeout(iceWatchdogTimerRef.current);
+      iceWatchdogTimerRef.current = null;
+    }
+  }, []);
+
+  // Smart 15-second ICE watchdog with automatic restartIce around 7s
+  // Started ONLY after peer joins or offer/answer exchange begins; passive waiting has NO timeout
+  const startHandshakeWatchdog = useCallback(
+    (currentRole: PeerRole) => {
+      if (isConnectedRef.current || activeTransportRef.current === "peerjs") {
+        return;
+      }
+      if (iceWatchdogTimerRef.current) {
+        return;
+      }
+
+      addLog("Handshake initiated: starting 15s ICE watchdog (restartIce at 7s)");
+
+      // 1. Attempt pc.restartIce() around 7s
+      iceRestartTimerRef.current = setTimeout(() => {
+        if (
+          isCleaningUpRef.current ||
+          isConnectedRef.current ||
+          activeTransportRef.current === "peerjs"
+        ) {
+          return;
+        }
+        const pc = pcRef.current;
+        if (pc && !hasRestartedIceRef.current && typeof pc.restartIce === "function") {
+          hasRestartedIceRef.current = true;
+          addLog("ICE negotiation taking >7s, attempting pc.restartIce()...");
+          try {
+            pc.restartIce();
+            if (currentRole === "sender") {
+              pc.createOffer({ iceRestart: true })
+                .then((offer) => pc.setLocalDescription(offer).then(() => offer))
+                .then((offer) => signalingRef.current.sendSignal("offer", offer))
+                .catch((err) => {
+                  addLog(`ICE restart offer failed: ${err}`);
+                });
+            }
+          } catch (err) {
+            addLog(`pc.restartIce() call failed: ${err}`);
+          }
+        }
+      }, 7000);
+
+      // 2. If ICE still fails to connect after 15s, show clear honest error
+      iceWatchdogTimerRef.current = setTimeout(() => {
+        if (
+          isCleaningUpRef.current ||
+          isConnectedRef.current ||
+          activeTransportRef.current === "peerjs"
+        ) {
+          return;
+        }
+        addLog("ICE connection failed after 15s watchdog: 4G/firewall block");
+        clearHandshakeWatchdog();
+        isConnectedRef.current = false;
+        setIsConnected(false);
+
+        setDiagnostics((d) => ({
+          ...d,
+          iceState: "failed",
+          lastError: FIREWALL_BLOCKED_MESSAGE,
+        }));
+
+        setProgress((prev) => {
+          if (
+            prev.status === "completed" ||
+            prev.status === "idle" ||
+            prev.progressPercentage >= 100
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            status: "error",
+            errorMessage: FIREWALL_BLOCKED_MESSAGE,
+          };
+        });
+      }, 15000);
+    },
+    [addLog, clearHandshakeWatchdog]
+  );
+
   const startIceTimeout = useCallback(() => {
     clearIceTimeout();
-    // Connections and waiting states remain open until user cancels or WebRTC permanently fails
+    // Passive listening waiting states remain open indefinitely with NO timeout
   }, [clearIceTimeout]);
 
   // Active channel accessor for backpressure monitoring
@@ -351,6 +446,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
     isCleaningUpRef.current = true;
     hasRestartedIceRef.current = false;
     clearIceTimeout();
+    clearHandshakeWatchdog();
+    setBrokerNotice(null);
     activeTransportRef.current = null;
     isConnectedRef.current = false;
     hasAcceptedRef.current = false;
@@ -447,7 +544,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     setTimeout(() => {
       isCleaningUpRef.current = false;
     }, 50);
-  }, [clearIceTimeout]);
+  }, [clearIceTimeout, clearHandshakeWatchdog]);
 
   useEffect(() => {
     return () => {
@@ -675,10 +772,21 @@ export function useWebRTC(mode: TransferMode = "internet") {
       dc.onopen = () => {
         addLog("DataChannel open");
         setDiagnostics((d) => ({ ...d, channelState: "open" }));
+        clearHandshakeWatchdog();
         clearIceTimeout();
+        if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
+          return;
+        }
         activeTransportRef.current = "webrtc";
         isConnectedRef.current = true;
         setIsConnected(true);
+        if (dataConnRef.current && !dataConnRef.current.open) {
+          try {
+            dataConnRef.current.close();
+          } catch {
+            // Ignore
+          }
+        }
       };
 
       dc.onclose = () => {
@@ -715,7 +823,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         handleIncomingData(event.data);
       };
     },
-    [clearIceTimeout, handleIncomingData, addLog]
+    [clearIceTimeout, clearHandshakeWatchdog, handleIncomingData, addLog]
   );
 
   // Setup Peer Connection
@@ -759,7 +867,10 @@ export function useWebRTC(mode: TransferMode = "internet") {
         const state = pc.iceConnectionState;
         addLog(`ICE state: ${state}`);
         setDiagnostics((d) => ({ ...d, iceState: state }));
-        if (state === "connected" || state === "completed") {
+        if (state === "checking") {
+          startHandshakeWatchdog(currentRole);
+        } else if (state === "connected" || state === "completed") {
+          clearHandshakeWatchdog();
           checkSelectedPair(pc);
         }
         // If PeerJS is active or connected, ignore raw WebRTC ICE failures
@@ -787,8 +898,9 @@ export function useWebRTC(mode: TransferMode = "internet") {
             }
           }
 
-          setDiagnostics((d) => ({ ...d, lastError: FIREWALL_MSG_WITH_DIAGNOSTICS }));
+          setDiagnostics((d) => ({ ...d, lastError: FIREWALL_BLOCKED_MESSAGE }));
           clearIceTimeout();
+          clearHandshakeWatchdog();
           isConnectedRef.current = false;
           setIsConnected(false);
           setProgress((prev) => {
@@ -796,7 +908,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
             return {
               ...prev,
               status: "error",
-              errorMessage: FIREWALL_MSG_WITH_DIAGNOSTICS,
+              errorMessage: FIREWALL_BLOCKED_MESSAGE,
             };
           });
         }
@@ -819,7 +931,11 @@ export function useWebRTC(mode: TransferMode = "internet") {
       pc.onconnectionstatechange = () => {
         if (isCleaningUpRef.current || !pcRef.current) return;
         if (pc.connectionState === "connected") {
+          clearHandshakeWatchdog();
           clearIceTimeout();
+          if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
+            return;
+          }
           activeTransportRef.current = "webrtc";
           isConnectedRef.current = true;
           setIsConnected(true);
@@ -856,15 +972,16 @@ export function useWebRTC(mode: TransferMode = "internet") {
             isConnectedRef.current = false;
             setIsConnected(false);
             clearIceTimeout();
+            clearHandshakeWatchdog();
             setProgress((prev) => {
               if (prev.status === "completed" || prev.status === "idle" || prev.progressPercentage >= 100) return prev;
               return {
                 ...prev,
                 status: "error",
-                errorMessage: FIREWALL_MSG_WITH_DIAGNOSTICS,
+                errorMessage: FIREWALL_BLOCKED_MESSAGE,
               };
             });
-            setDiagnostics((d) => ({ ...d, lastError: FIREWALL_MSG_WITH_DIAGNOSTICS }));
+            setDiagnostics((d) => ({ ...d, lastError: FIREWALL_BLOCKED_MESSAGE }));
           } else {
             isConnectedRef.current = false;
             setIsConnected(false);
@@ -874,6 +991,9 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       if (currentRole === "receiver") {
         pc.ondatachannel = (event) => {
+          if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
+            return;
+          }
           const dc = event.channel;
           dcRef.current = dc;
           activeTransportRef.current = "webrtc";
@@ -883,20 +1003,24 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       return pc;
     },
-    [mode, setupDataChannel, clearIceTimeout, addLog, checkSelectedPair]
+    [mode, setupDataChannel, clearIceTimeout, clearHandshakeWatchdog, startHandshakeWatchdog, addLog, checkSelectedPair]
   );
 
   // Process incoming signaling messages
   const handleSignalMessage = useCallback(
     async (message: SignalMessage, currentRole: PeerRole) => {
       // Background raw-WebRTC signaling must never override an active PeerJS transport
-      if (activeTransportRef.current === "peerjs") {
+      if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
         return;
       }
       const pc = pcRef.current;
 
       switch (message.type) {
         case "peer-joined": {
+          if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
+            return;
+          }
+          startHandshakeWatchdog("sender");
           if (currentRole === "sender" && pc) {
             const dc = pc.createDataChannel("share-channel", { ordered: true });
             dcRef.current = dc;
@@ -913,6 +1037,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
         case "offer": {
           if (currentRole === "receiver") {
+            startHandshakeWatchdog("receiver");
             const pcInstance = pc || createPeerConnection("receiver");
             await pcInstance.setRemoteDescription(
               new RTCSessionDescription(message.payload as RTCSessionDescriptionInit)
@@ -942,6 +1067,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
         case "answer": {
           if (currentRole === "sender" && pc) {
+            startHandshakeWatchdog("sender");
             addLog("Answer received");
             await pc.setRemoteDescription(
               new RTCSessionDescription(message.payload as RTCSessionDescriptionInit)
@@ -1001,13 +1127,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
         }
       }
     },
-    [createPeerConnection, setupDataChannel, addLog]
+    [createPeerConnection, setupDataChannel, startHandshakeWatchdog, addLog]
   );
 
   // Sender starts a session with dual PeerJS cloud broker + signaling fallback
   const startSender = useCallback(
     async (customCode?: string): Promise<{ roomId: string; code: string }> => {
       cleanup();
+      isCleaningUpRef.current = false;
       const currentSession = sessionGenRef.current;
       setRole("sender");
       setProgress({
@@ -1059,7 +1186,16 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
               const handleOpen = () => {
                 if (sessionGenRef.current !== currentSession) return;
+                if (activeTransportRef.current === "webrtc" && isConnectedRef.current) {
+                  try {
+                    conn.close();
+                  } catch {
+                    // Ignore
+                  }
+                  return;
+                }
                 clearIceTimeout();
+                clearHandshakeWatchdog();
                 activeTransportRef.current = "peerjs";
                 if (conn.dataChannel) {
                   dcRef.current = conn.dataChannel;
@@ -1107,7 +1243,13 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
             peer.on("error", (err: unknown) => {
               const e = err as { type?: string };
-              console.debug("PeerJS notice (fallback active):", e?.type);
+              const errorType = e?.type || "broker-error";
+              addLog(`PeerJS cloud broker notice: ${errorType}. HTTP signaling fallback active.`);
+              setDiagnostics((d) => ({
+                ...d,
+                lastError: `Cloud broker notice (${errorType}). Using HTTP signaling fallback.`,
+              }));
+              setBrokerNotice("Cloud broker unavailable; direct relay fallback active.");
             });
           })
           .catch(() => {});
@@ -1130,13 +1272,14 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       return { roomId: newRoomId, code: generatedCode };
     },
-    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, mode, addLog]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, clearHandshakeWatchdog, mode, addLog]
   );
 
   // Receiver joins a session with dual PeerJS cloud broker + signaling fallback
   const startReceiver = useCallback(
     async (code: string): Promise<void> => {
       cleanup();
+      isCleaningUpRef.current = false;
       const currentSession = sessionGenRef.current;
       setRole("receiver");
       setProgress({
@@ -1196,7 +1339,16 @@ export function useWebRTC(mode: TransferMode = "internet") {
                     clearTimeout(retryTimer);
                     retryTimer = null;
                   }
+                  if (activeTransportRef.current === "webrtc" && isConnectedRef.current) {
+                    try {
+                      conn.close();
+                    } catch {
+                      // Ignore
+                    }
+                    return;
+                  }
                   clearIceTimeout();
+                  clearHandshakeWatchdog();
                   activeTransportRef.current = "peerjs";
                   if (conn.dataChannel) {
                     dcRef.current = conn.dataChannel;
@@ -1281,7 +1433,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         })
         .catch(() => {});
     },
-    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, mode, addLog]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, clearHandshakeWatchdog, mode, addLog]
   );
 
   // Sequential Multi-File Batch Queue Sender
@@ -1546,6 +1698,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     isConnected,
     progress,
     pendingHeader,
+    brokerNotice,
     startSender,
     startReceiver,
     sendFiles,

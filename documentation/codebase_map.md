@@ -29,7 +29,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS 3.4 (Glassmorphic dark/light design system)"]
-        Vitest["Vitest 5.1 + happy-dom (235 Passing Tests across 38 Suites)"]
+        Vitest["Vitest 5.1 + happy-dom (238 Passing Tests across 38 Suites)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -538,7 +538,7 @@ flowchart TD
 
 ---
 
-### 3.8 Automated Vitest Test Suites (38 Test Suites, 235 Passing Tests)
+### 3.8 Automated Vitest Test Suites (38 Test Suites, 238 Passing Tests)
 
 | Test Suite Path | Target Module | Verified Coverage & Capabilities |
 | :--- | :--- | :--- |
@@ -584,4 +584,4 @@ flowchart TD
 ---
 
 ## 4. Sprint Status: All Sprints Completed & Production Verified
-All twenty-nine sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, human-readable word recovery codes, live connection diagnostics with masked network group labels, Bluetooth channel restoration, dead code & asset elimination, camera component modularization, radar & direct connect component deduplication, and documentation streamlining) are fully implemented, verified with 235 passing unit tests across 38 test suites, zero lint warnings, and clean production Turbopack build.
+All thirty sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, human-readable word recovery codes, live connection diagnostics with masked network group labels, Bluetooth channel restoration, dead code & asset elimination, camera component modularization, radar & direct connect component deduplication, documentation streamlining, and sender QR non-blocking visibility with 15s smart ICE watchdog) are fully implemented, verified with 238 passing unit tests across 38 test suites, zero lint warnings, and clean production Turbopack build.

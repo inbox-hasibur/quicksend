@@ -48,7 +48,7 @@ describe("TransferModal Component", () => {
     expect(container.innerHTML).toBe("");
   });
 
-  it("should render connecting state with Cancel Transfer button that calls onClose", async () => {
+  it("should render connecting state without 0 Bytes placeholder and with Cancel button", async () => {
     const connectingProgress: TransferProgressState = {
       status: "connecting",
       itemType: "file",
@@ -64,6 +64,7 @@ describe("TransferModal Component", () => {
       root.render(
         <TransferModal
           progress={connectingProgress}
+          roomCode="834291"
           onAccept={vi.fn()}
           onReject={vi.fn()}
           onClose={onClose}
@@ -72,6 +73,10 @@ describe("TransferModal Component", () => {
     });
 
     expect(container.textContent).toContain("Connecting...");
+    expect(container.textContent).toContain("Connecting to sender (834-291)...");
+    expect(container.textContent).not.toContain("0 Bytes");
+    expect(container.textContent).not.toContain("File Payload");
+
     const cancelBtn = container.querySelector('[data-testid="cancel-transfer-btn"]') as HTMLButtonElement;
     expect(cancelBtn).not.toBeNull();
     expect(cancelBtn.textContent).toContain("Cancel Transfer");
@@ -82,6 +87,62 @@ describe("TransferModal Component", () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(container.querySelector('[role="dialog"]')).toBeNull();
+  });
+
+  it("should not render when isOpen is false (keeping Sender QR unblurred while waiting)", async () => {
+    const connectingProgress: TransferProgressState = {
+      status: "connecting",
+      itemType: "file",
+      bytesTransferred: 0,
+      totalBytes: 0,
+      progressPercentage: 0,
+      speedBps: 0,
+    };
+
+    await act(async () => {
+      root.render(
+        <TransferModal
+          isOpen={false}
+          progress={connectingProgress}
+          roomCode="123456"
+          onAccept={vi.fn()}
+          onReject={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+    });
+
+    // Must be completely unrendered
+    expect(container.innerHTML).toBe("");
+  });
+
+  it("should display real file metadata and never 0 Bytes when selected files are provided during connecting", async () => {
+    const connectingWithFile: TransferProgressState = {
+      status: "connecting",
+      itemType: "file",
+      fileName: "backup.zip",
+      fileSize: 10485760,
+      bytesTransferred: 0,
+      totalBytes: 10485760,
+      progressPercentage: 0,
+      speedBps: 0,
+    };
+
+    await act(async () => {
+      root.render(
+        <TransferModal
+          progress={connectingWithFile}
+          onAccept={vi.fn()}
+          onReject={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain("backup.zip");
+    expect(container.textContent).toContain("10 MB");
+    expect(container.textContent).not.toContain("0 Bytes");
+    expect(container.textContent).not.toContain("File Payload");
   });
 
   it("should render transferring state with Cancel Transfer button that calls onClose", async () => {

@@ -130,6 +130,7 @@ describe("useWebRTC hook", () => {
   let container: HTMLDivElement;
   let root: Root;
   let currentHook: ReturnType<typeof useWebRTC>;
+  let mockPcs: any[] = []; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   function HookTester() {
     currentHook = useWebRTC("internet");
@@ -145,33 +146,41 @@ describe("useWebRTC hook", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    if (typeof globalThis.RTCPeerConnection === "undefined") {
-      class MockRTCPeerConnection {
-        iceConnectionState = "new";
-        iceGatheringState = "new";
-        signalingState = "stable";
-        connectionState = "new";
-        restartIce = vi.fn();
-        createDataChannel = vi.fn().mockReturnValue({
-          binaryType: "arraybuffer",
-          readyState: "connecting",
-          send: vi.fn(),
-          close: vi.fn(),
-          bufferedAmount: 0,
-          bufferedAmountLowThreshold: 0,
-          addEventListener: vi.fn(),
-          removeEventListener: vi.fn(),
-        });
-        createOffer = vi.fn().mockResolvedValue({ type: "offer", sdp: "mock-sdp" });
-        setLocalDescription = vi.fn().mockResolvedValue(undefined);
-        setRemoteDescription = vi.fn().mockResolvedValue(undefined);
-        createAnswer = vi.fn().mockResolvedValue({ type: "answer", sdp: "mock-sdp" });
-        addIceCandidate = vi.fn().mockResolvedValue(undefined);
-        close = vi.fn();
+    mockPcs = [];
+    class MockRTCPeerConnection {
+      iceConnectionState = "new";
+      iceGatheringState = "new";
+      signalingState = "stable";
+      connectionState = "new";
+      restartIce = vi.fn();
+      onicecandidate: ((ev: unknown) => void) | null = null;
+      oniceconnectionstatechange: (() => void) | null = null;
+      onconnectionstatechange: (() => void) | null = null;
+      onsignalingstatechange: (() => void) | null = null;
+      onicegatheringstatechange: (() => void) | null = null;
+      ondatachannel: ((ev: unknown) => void) | null = null;
+      createDataChannel = vi.fn().mockReturnValue({
+        binaryType: "arraybuffer",
+        readyState: "connecting",
+        send: vi.fn(),
+        close: vi.fn(),
+        bufferedAmount: 0,
+        bufferedAmountLowThreshold: 0,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      });
+      createOffer = vi.fn().mockResolvedValue({ type: "offer", sdp: "mock-sdp" });
+      setLocalDescription = vi.fn().mockResolvedValue(undefined);
+      setRemoteDescription = vi.fn().mockResolvedValue(undefined);
+      createAnswer = vi.fn().mockResolvedValue({ type: "answer", sdp: "mock-sdp" });
+      addIceCandidate = vi.fn().mockResolvedValue(undefined);
+      close = vi.fn();
+      constructor() {
+        mockPcs.push(this);
       }
-      // @ts-expect-error Assigning mock to global
-      globalThis.RTCPeerConnection = MockRTCPeerConnection;
     }
+    // @ts-expect-error Assigning mock to global
+    globalThis.RTCPeerConnection = MockRTCPeerConnection;
   });
 
   afterEach(async () => {
@@ -183,7 +192,7 @@ describe("useWebRTC hook", () => {
     vi.unstubAllGlobals();
   });
 
-  it("does not prematurely fail with a 10s ICE timeout when waiting for connection", async () => {
+  it("does not prematurely fail with a 10s ICE timeout when waiting for connection (passive waiting)", async () => {
     vi.useFakeTimers();
 
     await act(async () => {
@@ -206,9 +215,9 @@ describe("useWebRTC hook", () => {
     // It must remain connecting, NOT transition to error
     expect(currentHook.progress.status).toBe("connecting");
 
-    // Advance further to 30 seconds
+    // Advance further to 60 seconds (indefinite passive listening)
     await act(async () => {
-      vi.advanceTimersByTime(18000);
+      vi.advanceTimersByTime(48000);
     });
 
     expect(currentHook.progress.status).toBe("connecting");
@@ -218,6 +227,53 @@ describe("useWebRTC hook", () => {
       currentHook.cleanup();
     });
 
+    expect(currentHook.progress.status).toBe("idle");
+  });
+
+  it("triggers restartIce at 7s and surfaces 4G/firewall error at 15s when ICE is stuck", async () => {
+    vi.useFakeTimers();
+
+    await act(async () => {
+      root.render(React.createElement(HookTester));
+    });
+
+    await act(async () => {
+      currentHook.startSender();
+    });
+
+    const activePc = mockPcs.find((p) => typeof p.oniceconnectionstatechange === "function") || mockPcs[0];
+    expect(activePc).toBeDefined();
+
+    // Peer connects and ICE checking begins
+    await act(async () => {
+      activePc.iceConnectionState = "checking";
+      activePc.oniceconnectionstatechange?.();
+    });
+
+    expect(currentHook.progress.status).toBe("connecting");
+
+    // Advance to 7 seconds: restartIce must be called
+    await act(async () => {
+      vi.advanceTimersByTime(7000);
+    });
+
+    expect(activePc.restartIce).toHaveBeenCalled();
+    expect(currentHook.progress.status).toBe("connecting");
+
+    // Advance to 15 seconds: watchdog expires and surfaces clear 4G/firewall error
+    await act(async () => {
+      vi.advanceTimersByTime(8000);
+    });
+
+    expect(currentHook.progress.status).toBe("error");
+    expect(currentHook.progress.errorMessage).toContain(
+      "Direct connection blocked by 4G/mobile network or campus firewall"
+    );
+
+    // Clean up
+    await act(async () => {
+      currentHook.cleanup();
+    });
     expect(currentHook.progress.status).toBe("idle");
   });
 });
