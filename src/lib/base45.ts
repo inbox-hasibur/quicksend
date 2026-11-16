@@ -3,7 +3,7 @@
  * Designed for QR code Alphanumeric Mode to achieve ~97% byte packing efficiency.
  */
 
-export const BASE45_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
+const BASE45_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ $%*+-./:";
 
 const DECODE_MAP = new Int8Array(128).fill(-1);
 for (let i = 0; i < BASE45_ALPHABET.length; i++) {

@@ -232,20 +232,14 @@ quicksend/
 ├── vercel.json
 ├── vitest.config.mts
 ├── documentation/
-│   ├── .gitkeep
 │   ├── about_project.md
 │   ├── backlog.md
 │   └── codebase_map.md
 ├── public/
 │   ├── favicon.ico
-│   ├── file.svg
-│   ├── globe.svg
 │   ├── icon.svg
-│   ├── next.svg
 │   ├── preview.jpg
-│   ├── sw.js
-│   ├── vercel.svg
-│   └── window.svg
+│   └── sw.js
 └── src/
     ├── app/
     │   ├── api/
@@ -280,7 +274,6 @@ quicksend/
     │   │   ├── SpeedIndicator.test.tsx
     │   │   ├── TransferModal.test.tsx
     │   │   └── UltrasonicCard.test.tsx
-    │   ├── .gitkeep
     │   ├── AppHeader.tsx
     │   ├── CableTransferCard.tsx
     │   ├── CameraStreamCard.tsx
@@ -292,7 +285,6 @@ quicksend/
     │   ├── InternetSharingCard.tsx
     │   ├── ModeSelector.tsx
     │   ├── NearbyShareCard.tsx
-    │   ├── NetworkStatusBadge.tsx
     │   ├── OpticalHandshakeModal.tsx
     │   ├── QRCodeDisplay.tsx
     │   ├── QRScannerModal.tsx
@@ -306,13 +298,13 @@ quicksend/
     │   └── UltrasonicCard.tsx
     ├── hooks/
     │   ├── __tests__/
+    │   │   ├── nearbyShare.test.ts
     │   │   ├── useHtml5Scanner.test.ts
     │   │   ├── useLocalDiscovery.test.tsx
     │   │   ├── useQuadScanner.test.ts
     │   │   ├── useTheme.test.tsx
     │   │   ├── useTransferHistory.test.ts
     │   │   └── useWebRTC.test.ts
-    │   ├── .gitkeep
     │   ├── useHtml5Scanner.ts
     │   ├── useLocalDiscovery.ts
     │   ├── useNearbyShare.ts
@@ -330,7 +322,6 @@ quicksend/
     │   │   ├── diskStream.test.ts
     │   │   ├── iceConfig.test.ts
     │   │   ├── modeAvailability.test.ts
-    │   │   ├── nearbyShare.test.ts
     │   │   ├── opticalDataStream.test.ts
     │   │   ├── opticalRecovery.test.ts
     │   │   ├── opticalSdp.test.ts
@@ -339,7 +330,6 @@ quicksend/
     │   │   ├── transferEstimate.test.ts
     │   │   ├── ultrasonicStream.test.ts
     │   │   └── wifiQr.test.ts
-    │   ├── .gitkeep
     │   ├── base45.ts
     │   ├── chunker.ts
     │   ├── codeGenerator.ts
@@ -358,7 +348,6 @@ quicksend/
     │   ├── ultrasonicStream.ts
     │   └── wifiQr.ts
     └── types/
-        ├── .gitkeep
         ├── mode.ts
         ├── signaling.ts
         └── transfer.ts

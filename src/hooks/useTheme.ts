@@ -33,7 +33,7 @@ function subscribe(callback: () => void) {
   };
 }
 
-export function getThemeSnapshot(): Theme {
+function getThemeSnapshot(): Theme {
   if (typeof window === "undefined") return "system";
   try {
     const stored = window.localStorage.getItem(THEME_STORAGE_KEY);
@@ -50,7 +50,7 @@ function getServerSnapshot(): Theme {
   return "system";
 }
 
-export function applyThemeToDOM(theme: Theme): "light" | "dark" {
+function applyThemeToDOM(theme: Theme): "light" | "dark" {
   if (typeof window === "undefined") return "light";
   const isDark =
     theme === "dark" ||

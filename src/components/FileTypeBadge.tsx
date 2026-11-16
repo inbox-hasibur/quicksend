@@ -1,5 +1,3 @@
-import React from "react";
-
 export function getFileTypeInfo(fileName?: string, mimeType?: string) {
   const ext = fileName ? fileName.split(".").pop()?.toLowerCase() : "";
 

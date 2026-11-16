@@ -3,7 +3,7 @@ import type { FileMetadata, TextMetadata, TransferPayloadHeader } from "@/types/
 export const DEFAULT_CHUNK_SIZE = 16 * 1024; // 16 KB safe WebRTC chunk size (prevents SCTP packet overflow)
 export const MAX_CHECKSUM_FILE_SIZE = 150 * 1024 * 1024; // 150 MB threshold for real-time SHA-256
 
-export interface BatchFileOptions {
+interface BatchFileOptions {
   batchId?: string;
   fileIndex?: number;
   totalFiles?: number;

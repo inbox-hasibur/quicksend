@@ -42,7 +42,7 @@ export const OPTICAL_CHUNK_PRESETS = {
 
 export type OpticalChunkPreset = keyof typeof OPTICAL_CHUNK_PRESETS;
 
-export const DEFAULT_CHUNK_RAW_BYTES = OPTICAL_CHUNK_PRESETS.medium; // 200 bytes default
+const DEFAULT_CHUNK_RAW_BYTES = OPTICAL_CHUNK_PRESETS.medium; // 200 bytes default
 
 /**
  * Fast 32-bit FNV-1a payload checksum formatted as 8-character uppercase hex.
@@ -56,7 +56,7 @@ export function computePayloadHash(bytes: Uint8Array): string {
   return (hash >>> 0).toString(16).toUpperCase().padStart(8, "0");
 }
 
-export function base64ToBytes(b64: string): Uint8Array {
+function base64ToBytes(b64: string): Uint8Array {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) {
@@ -65,20 +65,12 @@ export function base64ToBytes(b64: string): Uint8Array {
   return bytes;
 }
 
-export function bytesToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i++) {
-    bin += String.fromCharCode(bytes[i]);
-  }
-  return btoa(bin);
-}
-
-export function encodeB45Header(str: string): string {
+function encodeB45Header(str: string): string {
   const rawB45 = encodeBase45(new TextEncoder().encode(str));
   return rawB45.replace(/%/g, "%P").replace(/:/g, "%C");
 }
 
-export function decodeB45Header(str: string): string {
+function decodeB45Header(str: string): string {
   const unescaped = str.replace(/%C/g, ":").replace(/%P/g, "%");
   const bytes = decodeBase45(unescaped);
   if (!bytes) return "";
@@ -244,19 +236,6 @@ export function getTotalFrameCount(dataFrameCount: number): number {
   return dataFrameCount + Math.ceil(dataFrameCount / 10);
 }
 
-export const totalFrameCount = getTotalFrameCount;
-
-/**
- * Validates whether a scanned QR string matches the QuickSend optical data frame signature.
- */
-export function isOpticalDataFrame(payload: string): boolean {
-  return (
-    typeof payload === "string" &&
-    payload.endsWith(".") &&
-    (payload.startsWith("QS2:") || payload.startsWith("QP2:"))
-  );
-}
-
 /**
  * Parses an incoming optical data frame string.
  */
@@ -369,7 +348,7 @@ export interface ParsedParityFrame {
 /**
  * Parses an incoming optical parity frame (QP2:<g>:<S>:<HASH>:<lastLen>:<base45 xor>.).
  */
-export function parseOpticalParityFrame(raw: string): ParsedParityFrame | null {
+function parseOpticalParityFrame(raw: string): ParsedParityFrame | null {
   try {
     if (!raw || typeof raw !== "string" || !raw.startsWith("QP2:") || !raw.endsWith(".")) {
       return null;

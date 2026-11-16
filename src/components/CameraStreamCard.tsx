@@ -35,13 +35,13 @@ import { formatBytes } from "@/lib/chunker";
 type OpticalRole = "send" | "receive";
 export type CameraLayout = "single" | "2x2" | "2x3";
 
-export function parseLayoutDims(layout: CameraLayout): { cols: number; rows: number } {
+function parseLayoutDims(layout: CameraLayout): { cols: number; rows: number } {
   if (layout === "single") return { cols: 1, rows: 1 };
   const [cols, rows] = layout.split("x").map(Number);
   return { cols: cols || 1, rows: rows || 1 };
 }
 
-export function getFramesPerTick(layout: CameraLayout): number {
+function getFramesPerTick(layout: CameraLayout): number {
   const { cols, rows } = parseLayoutDims(layout);
   return cols * rows;
 }

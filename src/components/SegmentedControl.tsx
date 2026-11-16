@@ -1,6 +1,6 @@
 "use client";
 
-import React, { KeyboardEvent } from "react";
+import type { KeyboardEvent } from "react";
 
 export interface SegmentedControlOption {
   value: string;

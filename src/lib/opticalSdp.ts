@@ -1,4 +1,4 @@
-export interface OpticalSdpPackage {
+interface OpticalSdpPackage {
   type: "offer" | "answer";
   sdp: string;
   candidates?: RTCIceCandidateInit[];

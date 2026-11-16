@@ -39,7 +39,7 @@ export function cropImageData(
   } as ImageData;
 }
 
-export function getGridRects(
+function getGridRects(
   W: number,
   H: number,
   cols: number,

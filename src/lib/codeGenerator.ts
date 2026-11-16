@@ -24,7 +24,7 @@ export function formatRoomCode(code: string): string {
  * Extracts a room code from a raw string, URL, or query parameter.
  * Handles inputs like "https://quicksend.vercel.app/?room=834291", "/?room=834291", or bare keys.
  */
-export function extractRoomCodeFromUrl(raw: string): string {
+function extractRoomCodeFromUrl(raw: string): string {
   if (!raw) return "";
   const trimmed = raw.trim();
   try {

@@ -22,7 +22,7 @@ export const PUBLIC_STUN_SERVERS: RTCIceServer[] = [
  * Optional default TURN relay servers pool.
  * Kept empty by default to prevent non-routable blackholes (such as defunct openrelay endpoints).
  */
-export const PUBLIC_TURN_SERVERS: RTCIceServer[] = [];
+const PUBLIC_TURN_SERVERS: RTCIceServer[] = [];
 
 /**
  * Extracts optional TURN server configuration from environment variables if present.

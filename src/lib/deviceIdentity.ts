@@ -82,7 +82,7 @@ export function subscribeToDeviceProfile(callback: () => void) {
   };
 }
 
-export function notifyProfileListeners() {
+function notifyProfileListeners() {
   for (const listener of profileListeners) {
     listener();
   }
@@ -163,7 +163,7 @@ export function getLocalDeviceProfile(): DeviceProfile {
   return cachedLocalProfile;
 }
 
-export function invalidateDeviceProfileCache(): DeviceProfile {
+function invalidateDeviceProfileCache(): DeviceProfile {
   cachedLocalProfile = computeLocalDeviceProfile();
   notifyProfileListeners();
   return cachedLocalProfile;

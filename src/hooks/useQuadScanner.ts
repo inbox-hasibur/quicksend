@@ -4,7 +4,7 @@ import { useRef, useState, useCallback, useEffect } from "react";
 import { decodeGrid, jsqrDecodeOne } from "@/lib/quadDecode";
 
 export type LayoutCandidate = "1x1" | "2x2" | "2x3";
-export const LAYOUT_CANDIDATES: LayoutCandidate[] = ["1x1", "2x2", "2x3"];
+const LAYOUT_CANDIDATES: LayoutCandidate[] = ["1x1", "2x2", "2x3"];
 
 /**
  * Pure helper to pick decoding layout based on miss streaks.

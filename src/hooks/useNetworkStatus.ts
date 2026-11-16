@@ -24,7 +24,7 @@ function getServerNetworkSnapshot(): boolean {
  * Real-time network status hook tracking navigator.onLine and online/offline events.
  * Uses useSyncExternalStore for tear-free, hydration-safe state synchronization.
  */
-export function useNetworkStatus(): boolean {
+function useNetworkStatus(): boolean {
   return useSyncExternalStore(
     subscribeNetwork,
     getNetworkSnapshot,

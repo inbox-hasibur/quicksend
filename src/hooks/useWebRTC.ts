@@ -74,7 +74,7 @@ export interface DebugLogEntry {
   msg: string;
 }
 
-export const FIREWALL_MSG_WITH_DIAGNOSTICS = `${FIREWALL_FALLBACK_MESSAGE}\nOpen Connection details below and copy the report.`;
+const FIREWALL_MSG_WITH_DIAGNOSTICS = `${FIREWALL_FALLBACK_MESSAGE}\nOpen Connection details below and copy the report.`;
 
 export interface DrainableChannel {
   bufferedAmount: number;

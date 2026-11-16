@@ -33,7 +33,6 @@ export class MemorySignalStore implements SignalStoreAdapter {
   private rooms: Map<string, SignalingRoomState> = new Map();
   private codeToRoomId: Map<string, string> = new Map();
   private genericKeys: Map<string, { value: string; expiresAt: number }> = new Map();
-  private lastCleanup: number = Date.now();
   private ttlMs: number;
   private maxRooms: number;
 
