@@ -540,7 +540,7 @@ export function UltrasonicCard() {
                 }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   role === "send"
-                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-xs"
+                    ? "bg-[var(--accent)] text-[var(--bg)] shadow-xs"
                     : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
@@ -556,7 +556,7 @@ export function UltrasonicCard() {
                 }}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                   role === "receive"
-                    ? "bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-xs"
+                    ? "bg-[var(--accent)] text-[var(--bg)] shadow-xs"
                     : "text-[var(--text-muted)] hover:text-[var(--text)]"
                 }`}
               >
@@ -573,10 +573,10 @@ export function UltrasonicCard() {
                 className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm transition-transform ${
                   isBroadcasting
                     ? "bg-purple-600 animate-pulse scale-105"
-                    : "bg-neutral-900 dark:bg-white"
+                    : "bg-[var(--accent)]"
                 }`}
               >
-                <Volume2 className="w-7 h-7 text-white dark:text-neutral-900" />
+                <Volume2 className="w-7 h-7 text-[var(--bg)]" />
               </div>
 
               {isBroadcasting ? (
@@ -594,7 +594,7 @@ export function UltrasonicCard() {
 
                   {broadcastProgress && (
                     <div className="space-y-1">
-                      <div className="w-full h-2 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden">
+                      <div className="w-full h-2 bg-[var(--surface-muted)] rounded-full overflow-hidden">
                         <div
                           className="h-full bg-purple-500 transition-all duration-100"
                           style={{
@@ -624,9 +624,9 @@ export function UltrasonicCard() {
                     type="button"
                     onClick={startBroadcasting}
                     disabled={selectedPayload.files.length === 0 && !selectedPayload.text.trim()}
-                    className="w-full py-3 px-5 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="w-full py-3 px-5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
-                    <Play className="w-3.5 h-3.5 fill-current text-white dark:text-neutral-900" />
+                    <Play className="w-3.5 h-3.5 fill-current text-[var(--bg)]" />
                     <span>Transmit via Sound</span>
                   </button>
                   <p className="text-[10px] text-[var(--text-muted)]">
@@ -699,9 +699,9 @@ export function UltrasonicCard() {
                 <button
                   type="button"
                   onClick={startListening}
-                  className="w-full max-w-xs py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all inline-flex items-center justify-center gap-2 cursor-pointer"
+                  className="w-full max-w-xs py-2.5 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all inline-flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Mic className="w-3.5 h-3.5 fill-current text-white dark:text-neutral-900" />
+                  <Mic className="w-3.5 h-3.5 fill-current text-[var(--bg)]" />
                   <span>Start Microphone Scanner</span>
                 </button>
               )}

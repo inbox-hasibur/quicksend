@@ -29,17 +29,17 @@ export function SpeedIndicator({
 
   return (
     <div
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-100/90 dark:bg-neutral-800/90 border border-slate-200/80 dark:border-neutral-700/80 shadow-2xs select-none ${className}`}
+      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--surface-subtle)] border border-[var(--border-hairline)] shadow-2xs select-none ${className}`}
       title={`Transfer Speed Rating: ${speedBars} of ${total}`}
     >
       {showIcon && (
         <Gauge
-          className="w-3.5 h-3.5 text-slate-500 dark:text-slate-400 shrink-0"
+          className="w-3.5 h-3.5 text-[var(--text-muted)] shrink-0"
           aria-hidden="true"
         />
       )}
       {showLabel && (
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 font-mono">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-muted)] font-mono">
           Speed
         </span>
       )}
@@ -62,7 +62,7 @@ export function SpeedIndicator({
               className={`w-1 rounded-xs transition-colors ${
                 isFilled
                   ? activeColor
-                  : "bg-slate-200 dark:bg-white/15 border border-slate-300/50 dark:border-white/10"
+                  : "bg-[var(--border-hairline)] opacity-40"
               }`}
             />
           );

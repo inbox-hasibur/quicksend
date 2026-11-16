@@ -81,8 +81,8 @@
 
 ## Section 2: Sprint-wise Breakdown
 
-### Historical Sprints Archive (Sprint 1 – Sprint 22)
-Detailed task checklists and verification records for Sprints 1 through 22 have been moved to [documentation/archive/backlog_sprints_old.md](archive/backlog_sprints_old.md).
+### Historical Sprints Archive (Sprint 1 – Sprint 25)
+Detailed task checklists and verification records for Sprints 1 through 25 have been moved to [documentation/archive/backlog_sprints_old.md](archive/backlog_sprints_old.md).
 
 | Sprint | Title | Summary |
 | :--- | :--- | :--- |
@@ -104,64 +104,11 @@ Detailed task checklists and verification records for Sprints 1 through 22 have 
 | **Sprint 20** | Cross-IP Nearby Pairing Codes & WebRTC Send Path Hardening | Implemented 4-digit nearby pairing codes and hardened WebRTC chunk send pipelines. |
 | **Sprint 21** | Honest Bluetooth Mode Reorganization & Radar Navigation | Restructured Bluetooth mode to prioritize OS share sheets (Quick Share / AirDrop). |
 | **Sprint 22** | Nearby Pair Redesign & Cross-Group PIN Allocation | Added unique 4-digit PIN allocation and peer beam requests for cross-group discovery. |
+| **Sprint 23** | Core Navigation Reset & Transfer Cancellation | Added header home reset, removed 10s ICE kill, and added universal transfer cancellation. |
+| **Sprint 24** | Optical Camera Stream Reliability | Set single QR default, auto-detection scanner, and end-to-end file receive/download actions. |
+| **Sprint 25** | Bluetooth Channel Restoration | Restored Bluetooth channel name/tile, removed PIN clutter, and built clean OS share flow. |
 
 ---
-
-### Sprint 23: Core Navigation Reset, Connection Timeout Elimination, Transfer Cancellation, and Internet/LAN Transport Reliability
-- [x] Navbar Logo/Title Home Reset (`src/components/AppHeader.tsx`, `src/components/ModeSelector.tsx`):
-  - Made QuickSend logo and title in `AppHeader.tsx` a clickable button/link (`cursor-pointer`) that resets app state to Home Hub ("All Channels") from any active channel.
-  - Dispatched `quicksend:go-home` custom window event and called `router.replace("/")` to clear `?room=` parameter without hard refresh.
-  - Subscribed `ModeSelector.tsx` to `quicksend:go-home` event to reset `selectedModeOverride` to `"home"`.
-- [x] Connection Timeout Elimination & ICE Restart (`src/hooks/useWebRTC.ts`):
-  - Removed aggressive 10s `ICE_CONNECTION_TIMEOUT_MS` fatal error kill; connections and waiting states remain open until user cancels or WebRTC permanently fails.
-  - Implemented single-shot ICE restart via `hasRestartedIceRef` upon ICE or connection failure (`pc.restartIce()` and new offer creation) before flagging permanent failure.
-- [x] Universal Transfer Cancellation (`src/components/TransferModal.tsx`):
-  - Rendered explicit **"Cancel Transfer"** button across `"connecting"`, `"waiting-acceptance"`, and `"transferring"` states.
-  - Enabled header `X` close button and Escape key dismiss during active transfer states.
-  - Modal mounts on `"connecting"` state to ensure immediate cancelability from the first second of peer connection negotiation.
-- [x] Dual-Transport PeerJS & Same-Network Reliability (`src/hooks/useWebRTC.ts`, `src/components/SameNetworkCard.tsx`):
-  - Updated PeerJS broker IDs to `qs-v2-${code.toLowerCase()}` to prevent collisions on public `0.peerjs.com` cloud server.
-  - Implemented silent 1.5s retry loop on `peer-unavailable` error in receiver when sender hasn't fully registered.
-  - Strictly isolated `activeTransportRef` so raw-WebRTC signaling and background timers never override active or connecting PeerJS sessions.
-  - Simplified `SameNetworkCard.tsx` by removing confusing duplicate 4-digit code section and preserving ONE clean collapsible fallback titled `"Connect by PIN or QR"`.
-- [x] Testing & Verification (`src/components/__tests__/TransferModal.test.tsx`, `src/hooks/__tests__/useWebRTC.test.ts`):
-  - Added unit tests in `TransferModal.test.tsx` verifying Cancel Transfer during `"connecting"` and `"transferring"`.
-  - Added test in `useWebRTC.test.ts` verifying starting a sender does not trigger a fatal error after 10 or 30 seconds.
-  - Verified full test suite (34 suites, 224 tests passing), zero ESLint warnings, and zero Next.js build errors.
-
-### Sprint 24: Optical Camera Stream Reliability & Tab Crash Elimination
-- [x] Single + Medium Sender Defaults (`src/components/CameraStreamCard.tsx`):
-  - Set default sender layout to `"single"` (with `"2x2"` and `"2x3"` retained as optional layouts) and default density to `"medium"`.
-  - Confirmed absence of large-payload advisory banners, relying cleanly on `EstimateBadge` for duration estimation.
-- [x] Receiver Scanner Auto-Detection & Crash-Free Pipeline (`src/hooks/useQuadScanner.ts`, `src/lib/quadDecode.ts`):
-  - Set `LAYOUT_CANDIDATES` and initial scanner candidate to `"1x1"` so standard webcams and mobile cameras lock onto single QR codes first.
-  - Reused a single offscreen `<canvas>` stored in `canvasRef` rather than allocating new canvas elements on every frame.
-  - Capped maximum decode dimensions to 720px to prevent memory spikes and browser tab crashes ("This page couldn't load") on mobile devices.
-  - Optimized `decodeGrid` in `quadDecode.ts` to skip redundant image cropping on 1x1 full-frame decodes.
-- [x] End-to-End Camera Receive & Download Actions (`src/components/CameraStreamCard.tsx`, `public/sw.js`):
-  - Ingested incoming `QS2:` data and `QP2:` parity frames directly into `OpticalDataCollector`.
-  - Upon 100% completion: cleanly stopped the camera scanner, reassembled the verified `Blob` / UTF-8 text, logged to `useTransferHistory`, safely triggered programmatic file download, and displayed a prominent **"Save / Download File"** card action.
-  - Hardened `public/sw.js` navigation and fetch error catches to never resolve with `undefined` or crash browser tabs.
-- [x] Unit Testing & Verification (`src/components/__tests__/CameraStreamCard.test.tsx`, `src/hooks/__tests__/useQuadScanner.test.ts`):
-  - Added `CameraStreamCard.test.tsx` verifying default Single + Medium layouts without advisory banners, multi-frame `QS2:` receive with parity recovery, clean camera stop, and prominent Save / Download button.
-  - Updated `useQuadScanner.test.ts` candidate rotation tests for `"1x1"` priority.
-  - Full suite verification: 35 test files, 226 tests passing, zero lint warnings, clean build.
-
-### Sprint 25: Bluetooth Channel Restoration & Clutter Removal
-- [x] Rebranding & Home Hub Tile Restoration (`src/components/ModeSelector.tsx`, `src/lib/modeAvailability.ts`):
-  - Restored 4th channel name to **`Bluetooth`** with the `Bluetooth` icon and subtitle `"Send via system Bluetooth, Quick Share, or AirDrop"`.
-  - Maintained `"bluetooth"` in the 5-channel Home Hub (`["internet", "same-network", "hotspot", "bluetooth", "camera"]` + `"cable"`).
-  - Updated `modeAvailability.ts` with `"Direct Radio / Share"` badge and honest capability description.
-- [x] Honest & Clean Bluetooth Workspace (`src/components/NearbyShareCard.tsx`):
-  - Removed 4-digit PIN allocation, peer radar grid, and 45-second pairing request modal clutter.
-  - Deleted unused components `NearbyPeerCard.tsx` and `NearbyPairRequestModal.tsx`.
-  - Structured 2-step workspace: Step 1 file/text attachment via `Dropzone` with `EstimateBadge`, Step 2 primary "Send via Bluetooth / Quick Share / AirDrop" button via `shareViaNative` logging to `useTransferHistory`.
-  - Added honest guidance card explaining browser sandbox limits on raw incoming Bluetooth radio, with 1-tap Android Bluetooth settings shortcut and Wi-Fi Hotspot recommendation for browser-to-browser transfers.
-  - Tucked optional Web Bluetooth BLE hardware sensor connection in a clean bottom collapsible `<details>`.
-- [x] Unit Testing & Verification (`src/components/__tests__/NearbyShareCard.test.tsx`, `src/lib/__tests__/modeAvailability.test.ts`):
-  - Updated `NearbyShareCard.test.tsx` to verify Bluetooth title, subtitle, honest receiving guidance card, native share trigger with history logging, and BLE hardware scanning.
-  - Updated `modeAvailability.test.ts` for Bluetooth channel metadata.
-  - Full suite verification: 35 test files, 226 tests passing, zero lint warnings, clean build.
 
 ### Sprint 26: Dead File, Dead Code & Asset Elimination
 - [x] Starter Asset & Gitkeep Pruning:
@@ -241,7 +188,6 @@ Detailed task checklists and verification records for Sprints 1 through 22 have 
   - Replaced blocking modal during passive waiting with an inline status indicator (`"Waiting for receiver to connect..."`).
   - Restricted `TransferModal.tsx` trigger on the sender side to active handshake/transfer states (`waiting-acceptance`, `transferring`, `completed`, `error`).
   - Added clean connecting state in `TransferModal.tsx` displaying `"Connecting to sender..."` with room PIN instead of `"File Payload 0 Bytes"`.
-  - Added zero-upload reassurance messaging in `Dropzone.tsx` clarifying files stay local on device until direct P2P transfer begins.
 - [x] Smart ICE Watchdog & Dual-Transport Arbitration:
   - Preserved indefinite passive waiting with zero forced timeout before peer handshake.
   - Implemented 15s ICE handshake watchdog in `useWebRTC.ts` triggering automatic `restartIce()` at 7s when ICE is stuck in `checking`.
@@ -251,5 +197,19 @@ Detailed task checklists and verification records for Sprints 1 through 22 have 
   - Updated `src/components/__tests__/TransferModal.test.tsx` and `src/hooks/__tests__/useWebRTC.test.ts`.
   - All 38 test files, 238 tests passing (100% pass rate).
   - ESLint 9 checks passing with zero warnings or errors.
+  - Production build passing cleanly with Turbopack (`npm run build`).
+
+### Sprint 31: Global Dark/Light Theme Contrast Fix and Privacy Reassurance Copy Removal
+- [x] Global Semantic Color Token Migration (`src/app/globals.css`, `src/components/*`):
+  - Added semantic theme tokens in `globals.css` for `--surface-muted` and `--shadow-card` across light and dark modes.
+  - Audited all components and modals across the application to replace non-existent or hardcoded classes (such as `dark:bg-neutral-850`, `dark:bg-neutral-750`, `bg-neutral-900 ... dark:bg-white`) with unified CSS variables (`var(--accent)`, `var(--accent-hover)`, `var(--bg)`, `var(--surface)`, `var(--surface-subtle)`, `var(--surface-muted)`, `var(--border-hairline)`, `var(--text)`, `var(--text-muted)`).
+  - Fixed dark mode contrast defect in `TransferModal.tsx` preventing white text on light boxes in dark theme.
+  - Standardized interactive action buttons across all channel cards (`DirectConnectPanel`, `SameNetworkCard`, `HotspotAssistantCard`, `CableTransferCard`, `NearbyShareCard`, `CameraSender`, `CameraReceiver`, `ReceiverCompleteView`, `ReceiverProgressView`, `UltrasonicCard`) to use high-contrast `--accent` tokens.
+- [x] Reassurance & Privacy Copy Removal:
+  - Removed redundant `"Zero server uploads — files stay on your device until direct P2P transfer"` and other duplicate reassurance banners from `Dropzone.tsx`, `InternetSharingCard.tsx`, and `README.md`.
+  - Cleaned up `README.md` hero badges (removed duplicate test and platform clutter, kept core technology and live links).
+- [x] Verification & Automated Tests:
+  - All 38 test suites, 238 tests passing with 100% pass rate.
+  - ESLint 9 checks passing with 0 errors and 0 warnings.
   - Production build passing cleanly with Turbopack (`npm run build`).
 

@@ -83,7 +83,7 @@ export function DirectConnectPanel({
             <button
               type="button"
               onClick={onShowQr}
-              className="px-2.5 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
+              className="px-2.5 py-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               title="Show Session QR"
             >
               <QrCode className="w-3.5 h-3.5" />
@@ -117,7 +117,7 @@ export function DirectConnectPanel({
             type="button"
             onClick={handleConnectClick}
             disabled={isConnecting || !peerPinValue.trim()}
-            className="px-3.5 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer whitespace-nowrap disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
+            className="px-3.5 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer whitespace-nowrap disabled:opacity-50 flex items-center gap-1.5 shadow-2xs"
           >
             {isConnecting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>Connect</span>}
           </button>

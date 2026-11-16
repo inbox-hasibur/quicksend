@@ -285,7 +285,7 @@ export function CableTransferCard() {
                   type="button"
                   onClick={handleRequestUsb}
                   disabled={!hasUsb}
-                  className="w-full py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Usb className="w-3.5 h-3.5" />
                   <span>Pair USB Device</span>
@@ -327,7 +327,7 @@ export function CableTransferCard() {
                   type="button"
                   onClick={handleRequestSerial}
                   disabled={!hasSerial}
-                  className="w-full py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
                 >
                   <Cable className="w-3.5 h-3.5" />
                   <span>Open Serial Port</span>
@@ -364,7 +364,7 @@ export function CableTransferCard() {
 
             <span className="font-bold text-sm text-[var(--text)]">Cable Session QR</span>
 
-            <div className="p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
+            <div className="p-4 bg-white rounded-2xl shadow-sm border border-[var(--border-hairline)]">
               <QRCodeSVG
                 value={`${getOrigin()}/?room=${localPin}`}
                 size={180}

@@ -17,7 +17,7 @@ export function AppHeader() {
   };
 
   return (
-    <header className="z-10 w-full max-w-4xl flex items-center justify-between px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl bg-white dark:bg-[#151822] border border-[var(--border-hairline)] shadow-2xs mb-5 sm:mb-8 transition-colors">
+    <header className="z-10 w-full max-w-4xl flex items-center justify-between px-3.5 sm:px-4 py-2.5 sm:py-3 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-2xs mb-5 sm:mb-8 transition-colors">
       {/* Brand identity: Clickable Home link */}
       <Link
         href="/"
@@ -25,7 +25,7 @@ export function AppHeader() {
         className="flex items-center gap-2 sm:gap-2.5 group hover:opacity-90 transition-opacity cursor-pointer select-none"
         title="QuickSend Home"
       >
-        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 shadow-2xs flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+        <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-xl bg-[var(--accent)] text-[var(--bg)] shadow-2xs flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
           <Zap className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-current" />
         </div>
         <div className="flex items-center">

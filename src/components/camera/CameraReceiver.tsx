@@ -414,7 +414,7 @@ export function CameraReceiver({
 
             {/* Sibling overlay when camera is inactive */}
             {!isCameraActive && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-white/95 dark:bg-neutral-900/95 backdrop-blur-2xs rounded-2xl border border-[var(--border-hairline)] z-10 space-y-3">
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center bg-[var(--surface-glass)] backdrop-blur-2xs rounded-2xl border border-[var(--border-hairline)] z-10 space-y-3">
                 <div className="w-12 h-12 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--accent)] shadow-2xs">
                   <Camera className="w-6 h-6" />
                 </div>
@@ -428,7 +428,7 @@ export function CameraReceiver({
                   type="button"
                   onClick={() => startCamera()}
                   disabled={isCameraStarting}
-                  className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-xs shadow-xs transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-semibold text-xs shadow-xs transition-opacity flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
                   {isCameraStarting ? (
                     <>

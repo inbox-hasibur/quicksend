@@ -10,7 +10,6 @@ import {
   RefreshCw,
   AlertCircle,
   Users,
-  ShieldCheck,
 } from "lucide-react";
 import { Dropzone } from "@/components/Dropzone";
 import { EstimateBadge } from "@/components/EstimateBadge";
@@ -185,12 +184,12 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     <div className="space-y-6">
       {/* 1. ROLE SWITCHER (Segmented Pill Style inspired by demo images) */}
       {!roomCode && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-neutral-100 dark:border-neutral-800/80">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-[var(--border-hairline)]">
           <div>
-            <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+            <h3 className="font-bold text-base text-[var(--text)]">
               {role === "send" ? "Send Files or Text" : "Receive Files"}
             </h3>
-            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">
+            <p className="text-xs text-[var(--text-muted)] mt-0.5">
               {role === "send"
                 ? "Choose your pairing key method and drop files"
                 : "Enter the sender's PIN, mobile number, or scan QR"}
@@ -226,10 +225,10 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               {/* Key Strategy Segmented Pills */}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-semibold text-neutral-500 dark:text-neutral-400">
+                  <span className="text-xs font-semibold text-[var(--text-muted)]">
                     Pairing Method
                   </span>
-                  <span className="text-[11px] text-neutral-400">
+                  <span className="text-[11px] text-[var(--text-muted)]">
                     {keyStrategy === "phone"
                       ? "Use your phone number"
                       : keyStrategy === "keyword"
@@ -256,8 +255,8 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                 {/* Sub-input for Mobile Number */}
                 {keyStrategy === "phone" && (
                   <div className="p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-2 animate-in fade-in">
-                    <label className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400" />
+                    <label className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                       <span>Sender Mobile Number</span>
                     </label>
                     <input
@@ -265,7 +264,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                       value={customSenderKey}
                       onChange={(e) => setCustomSenderKey(e.target.value)}
                       placeholder="e.g. 01712345678"
-                      className="w-full p-3 text-sm font-mono rounded-xl border border-[var(--border-hairline)] bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400"
+                      className="w-full p-3 text-sm font-mono rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] placeholder:text-[var(--text-muted)]"
                     />
                     <p className="text-[11px] text-[var(--text-muted)]">
                       Use a phone number you already know by heart so you can easily type it on the receiving device.
@@ -276,8 +275,8 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                 {/* Sub-input for Keyword */}
                 {keyStrategy === "keyword" && (
                   <div className="p-4 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-2 animate-in fade-in">
-                    <label className="text-xs font-semibold text-neutral-800 dark:text-neutral-200 flex items-center gap-1.5">
-                      <Sparkles className="h-3.5 w-3.5 text-neutral-600 dark:text-neutral-400" />
+                    <label className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                       <span>Custom Secret Keyword</span>
                     </label>
                     <input
@@ -285,7 +284,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                       value={customSenderKey}
                       onChange={(e) => setCustomSenderKey(e.target.value)}
                       placeholder="e.g. HR998877 or LAB2026"
-                      className="w-full p-3 text-sm font-mono uppercase font-bold rounded-xl border border-[var(--border-hairline)] bg-white dark:bg-neutral-800 focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400"
+                      className="w-full p-3 text-sm font-mono uppercase font-bold rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] placeholder:text-[var(--text-muted)]"
                     />
                     <p className="text-[11px] text-[var(--text-muted)]">
                       Type any secret code word. You and the receiver will use this exact key to connect.
@@ -308,7 +307,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                 type="button"
                 onClick={handleStartSender}
                 disabled={isConnecting}
-                className="w-full py-3.5 px-6 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full py-3.5 px-6 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
                 {isConnecting ? (
                   <>
@@ -335,7 +334,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               <QRCodeDisplay code={roomCode} />
 
               {/* Peer Status Pill */}
-              <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-neutral-100 dark:bg-neutral-800 text-xs font-mono text-neutral-700 dark:text-neutral-200 shadow-xs">
+              <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-xs font-mono text-[var(--text)] shadow-xs">
                 <span className="relative flex h-2 w-2">
                   <span
                     className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
@@ -363,16 +362,10 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                 </div>
               )}
 
-              {/* Zero Server Upload Guarantee */}
-              <p className="text-[11px] text-[var(--text-muted)] text-center flex items-center justify-center gap-1">
-                <ShieldCheck className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                <span>Zero server uploads — files stay on your device until direct P2P transfer begins</span>
-              </p>
-
               <button
                 type="button"
                 onClick={handleReset}
-                className="text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 underline cursor-pointer"
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] underline cursor-pointer"
               >
                 Cancel &amp; Close Session
               </button>
@@ -387,7 +380,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
           {!roomCode ? (
             <div className="space-y-5 max-w-md mx-auto">
               <div className="p-6 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-center space-y-4">
-                <div className="h-11 w-11 mx-auto rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs flex items-center justify-center text-neutral-800 dark:text-neutral-200">
+                <div className="h-11 w-11 mx-auto rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-2xs flex items-center justify-center text-[var(--text)]">
                   <KeyRound className="h-5 w-5" />
                 </div>
 
@@ -407,14 +400,14 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                     value={inputCode}
                     onChange={(e) => setInputCode(e.target.value)}
                     placeholder="e.g. 834-291 or 01712345678"
-                    className="w-full py-3 px-4 rounded-xl border border-[var(--border-hairline)] bg-white dark:bg-neutral-800 text-center font-mono font-bold text-base tracking-wider focus:outline-none focus:ring-2 focus:ring-neutral-900 dark:focus:ring-white placeholder:font-normal placeholder:tracking-normal placeholder:text-[var(--text-muted)]"
+                    className="w-full py-3 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] text-center font-mono font-bold text-base tracking-wider focus:outline-none focus:ring-2 focus:ring-[var(--accent)] placeholder:font-normal placeholder:tracking-normal placeholder:text-[var(--text-muted)]"
                   />
 
                   <button
                     type="button"
                     onClick={() => handleStartReceiver()}
                     disabled={isConnecting || !isValidRoomCode(inputCode)}
-                    className="w-full py-3.5 px-6 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full py-3.5 px-6 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2"
                   >
                     {isConnecting ? (
                       <>
@@ -443,23 +436,23 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               <button
                 type="button"
                 onClick={() => setIsScannerOpen(true)}
-                className="w-full py-3 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] hover:bg-neutral-200/60 dark:hover:bg-neutral-750 text-[var(--text)] font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
+                className="w-full py-3 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-muted)] text-[var(--text)] font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-2xs"
               >
-                <Camera className="h-4 w-4 text-neutral-600 dark:text-neutral-400" />
+                <Camera className="h-4 w-4 text-[var(--text-muted)]" />
                 <span>Scan Camera QR Code</span>
               </button>
             </div>
           ) : (
             <div className="space-y-4 text-center max-w-md mx-auto py-4">
               <div className="p-8 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] flex flex-col items-center gap-3.5">
-                <div className="h-12 w-12 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs flex items-center justify-center text-neutral-800 dark:text-neutral-200">
+                <div className="h-12 w-12 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-2xs flex items-center justify-center text-[var(--text)]">
                   <Users className="h-6 w-6 animate-pulse" />
                 </div>
                 <div>
                   <h4 className="font-bold text-base text-[var(--text)]">
                     Connecting to &ldquo;{formatRoomCode(roomCode)}&rdquo;
                   </h4>
-                  <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-1">
+                  <p className="text-xs text-[var(--text-muted)] mt-1">
                     {isConnected
                       ? "Connected to sender! Awaiting payload..."
                       : "Exchanging WebRTC signaling..."}
@@ -470,7 +463,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               <button
                 type="button"
                 onClick={handleReset}
-                className="text-xs text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 underline cursor-pointer"
+                className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] underline cursor-pointer"
               >
                 Disconnect &amp; Leave
               </button>

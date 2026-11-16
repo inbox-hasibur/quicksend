@@ -45,7 +45,7 @@ export function ReceiverProgressView({
       </div>
 
       {/* Progress bar */}
-      <div className="w-full h-2 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden">
+      <div className="w-full h-2 bg-[var(--surface-muted)] rounded-full overflow-hidden">
         <div
           className="h-full bg-emerald-500 transition-all duration-150"
           style={{ width: `${scanProgress.percentage}%` }}
@@ -88,7 +88,7 @@ export function ReceiverProgressView({
                       <button
                         type="button"
                         onClick={() => onCopyRecoveryCode(code)}
-                        className="px-2.5 py-1 rounded-lg bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
+                        className="px-2.5 py-1 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer flex items-center gap-1"
                       >
                         {recoveryCodeCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
                         {recoveryCodeCopied ? "Copied" : "Copy"}

@@ -91,24 +91,24 @@ export function QRScannerModal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200"
       translate="no"
     >
-      <div className="relative w-full max-w-md rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 p-6 shadow-2xl">
+      <div className="relative w-full max-w-md rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] p-6 shadow-[var(--shadow-card)]">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
               <Camera className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-base text-neutral-900 dark:text-neutral-100">
+              <h3 className="font-semibold text-base text-[var(--text)]">
                 Scan Room QR Code
               </h3>
-              <p className="text-xs text-neutral-400">Point your camera at the sender&apos;s QR code</p>
+              <p className="text-xs text-[var(--text-muted)]">Point your camera at the sender&apos;s QR code</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -138,7 +138,7 @@ export function QRScannerModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="mt-3 px-4 py-1.5 rounded-lg bg-neutral-800 text-xs font-semibold hover:bg-neutral-700 transition-colors"
+                className="mt-3 px-4 py-1.5 rounded-lg bg-[var(--surface-subtle)] hover:bg-[var(--surface-muted)] text-[var(--text)] border border-[var(--border-hairline)] text-xs font-semibold transition-colors cursor-pointer"
               >
                 Close &amp; Enter PIN Manually
               </button>

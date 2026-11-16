@@ -274,7 +274,7 @@ export function SameNetworkCard() {
           <button
             type="button"
             onClick={() => handleSendToPeer(targetPeer)}
-            className="w-full py-3 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
+            className="w-full py-3 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
           >
             <span>Send to {targetPeer.avatarEmoji} {targetPeer.codename || targetPeer.name}</span>
             <Send className="w-4 h-4" />
@@ -368,13 +368,13 @@ export function SameNetworkCard() {
               <button
                 type="button"
                 onClick={() => setIsShowQrModalOpen(false)}
-                className="p-1 rounded-full text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors cursor-pointer"
+                className="p-1 rounded-full text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-muted)] transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="p-4 bg-white rounded-2xl border border-neutral-200 inline-block mx-auto shadow-sm">
+            <div className="p-4 bg-white rounded-2xl border border-[var(--border-hairline)] inline-block mx-auto shadow-sm">
               <QRCodeSVG
                 value={
                   typeof window !== "undefined"
@@ -399,7 +399,7 @@ export function SameNetworkCard() {
             <button
               type="button"
               onClick={() => setIsShowQrModalOpen(false)}
-              className="w-full py-2.5 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-semibold transition-all cursor-pointer shadow-xs"
+              className="w-full py-2.5 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] text-xs font-semibold transition-all cursor-pointer shadow-xs"
             >
               Done
             </button>

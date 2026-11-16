@@ -321,7 +321,7 @@ export function HotspotAssistantCard() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-center gap-4 pt-1">
-                  <div className="p-3 bg-white rounded-xl shadow-2xs border border-neutral-200">
+                  <div className="p-3 bg-white rounded-xl shadow-2xs border border-[var(--border-hairline)]">
                     <QRCodeSVG value={wifiQrString} size={130} level="M" />
                   </div>
                   <div className="text-xs text-[var(--text-muted)] space-y-1">
@@ -378,7 +378,7 @@ export function HotspotAssistantCard() {
           <button
             type="button"
             onClick={() => handleSendToPeer(targetPeer)}
-            className="w-full py-3 px-4 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
+            className="w-full py-3 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer mt-1"
           >
             <span>Send to {targetPeer.avatarEmoji} {targetPeer.codename || targetPeer.name}</span>
             <Send className="w-4 h-4" />
@@ -483,7 +483,7 @@ export function HotspotAssistantCard() {
 
             <span className="font-bold text-sm text-[var(--text)]">Hotspot Session PIN</span>
 
-            <div className="p-4 bg-white rounded-2xl shadow-sm border border-neutral-200">
+            <div className="p-4 bg-white rounded-2xl shadow-sm border border-[var(--border-hairline)]">
               <QRCodeSVG
                 value={`${getOrigin()}/?room=${localDevicePin}`}
                 size={180}

@@ -1,6 +1,6 @@
 # QuickSend: Codebase Map & Dependency Graph
 
-> **Last Updated:** Sprint 29 Complete (Documentation Streamlining & Backlog Archive)
+> **Last Updated:** Sprint 31 Complete (Global Dark/Light Theme Contrast Fix & Privacy Reassurance Copy Removal)
 > **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 

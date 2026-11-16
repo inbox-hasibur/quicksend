@@ -58,8 +58,8 @@ export function SegmentedControl({
             onKeyDown={(e) => handleKeyDown(e, idx)}
             className={`pill px-4 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer ${
               isActive
-                ? "pill-active bg-white dark:bg-neutral-800 text-neutral-900 dark:text-neutral-100 shadow-xs"
-                : "text-neutral-500 hover:text-neutral-900 dark:text-neutral-400 dark:hover:text-neutral-100"
+                ? "pill-active bg-[var(--surface)] text-[var(--text)] shadow-xs"
+                : "text-[var(--text-muted)] hover:text-[var(--text)]"
             }`}
           >
             {opt.label}

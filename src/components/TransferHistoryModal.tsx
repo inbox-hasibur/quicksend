@@ -35,18 +35,18 @@ export function TransferHistoryModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg rounded-3xl bg-white dark:bg-[#14151B] border border-neutral-200/80 dark:border-neutral-800 shadow-[0_20px_50px_rgba(0,0,0,0.2)] p-6 sm:p-7 space-y-5">
+      <div className="relative w-full max-w-lg rounded-3xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-[var(--shadow-card)] p-6 sm:p-7 space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-hairline)]">
           <div className="flex items-center gap-2.5">
-            <div className="h-9 w-9 rounded-2xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-700 dark:text-neutral-300">
+            <div className="h-9 w-9 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] flex items-center justify-center text-[var(--text)]">
               <Clock className="h-4 w-4" />
             </div>
             <div>
-              <h3 className="font-bold text-base text-neutral-900 dark:text-neutral-100">
+              <h3 className="font-bold text-base text-[var(--text)]">
                 Session History
               </h3>
-              <p className="text-[11px] text-neutral-400 font-mono">
+              <p className="text-[11px] text-[var(--text-muted)] font-mono">
                 Ephemeral log • Cleared automatically on tab close
               </p>
             </div>
@@ -55,7 +55,7 @@ export function TransferHistoryModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400 hover:text-neutral-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+            className="p-1.5 rounded-full hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -65,13 +65,13 @@ export function TransferHistoryModal({
         {/* Content */}
         {history.length === 0 ? (
           <div className="py-12 text-center space-y-2">
-            <div className="h-12 w-12 rounded-2xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center mx-auto text-neutral-400">
+            <div className="h-12 w-12 rounded-2xl bg-[var(--surface-subtle)] flex items-center justify-center mx-auto text-[var(--text-muted)]">
               <File className="h-6 w-6" />
             </div>
-            <h4 className="font-bold text-sm text-neutral-700 dark:text-neutral-300">
+            <h4 className="font-bold text-sm text-[var(--text)]">
               No transfers yet
             </h4>
-            <p className="text-xs text-neutral-400 max-w-xs mx-auto">
+            <p className="text-xs text-[var(--text-muted)] max-w-xs mx-auto">
               Items you send or receive in this session will appear here for quick reference and copying.
             </p>
           </div>
@@ -80,14 +80,14 @@ export function TransferHistoryModal({
             {history.map((item) => (
               <div
                 key={item.id}
-                className="flex items-center justify-between p-3 rounded-2xl border border-neutral-200/70 dark:border-neutral-800 bg-neutral-50/50 dark:bg-neutral-850/50 text-xs shadow-2xs"
+                className="flex items-center justify-between p-3 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-xs shadow-2xs"
               >
                 <div className="flex items-center gap-3 min-w-0 pr-2">
                   <div
                     className={`h-8 w-8 shrink-0 rounded-xl flex items-center justify-center ${
                       item.direction === "sent"
-                        ? "bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400"
-                        : "bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400"
+                        ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                        : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
                     }`}
                   >
                     {item.direction === "sent" ? (
@@ -98,7 +98,7 @@ export function TransferHistoryModal({
                   </div>
 
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 font-semibold text-neutral-800 dark:text-neutral-200 truncate">
+                    <div className="flex items-center gap-1.5 font-semibold text-[var(--text)] truncate">
                       {item.itemType === "file" ? (
                         <FileTypeBadge fileName={item.name} />
                       ) : (
@@ -107,7 +107,7 @@ export function TransferHistoryModal({
                       <span className="truncate">{item.name}</span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-[11px] text-neutral-400 font-mono mt-0.5 tabular-nums">
+                    <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] font-mono mt-0.5 tabular-nums">
                       <span>{item.direction === "sent" ? "Sent" : "Received"}</span>
                       {item.size ? <span>• {formatBytes(item.size)}</span> : null}
                       <span>
@@ -122,7 +122,7 @@ export function TransferHistoryModal({
                     <button
                       type="button"
                       onClick={() => handleCopy(item.id, item.textSnippet!)}
-                      className="px-2.5 py-1 rounded-full border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-200/60 dark:hover:bg-neutral-750 text-[11px] font-medium text-neutral-600 dark:text-neutral-300 flex items-center gap-1 transition-colors cursor-pointer"
+                      className="px-2.5 py-1 rounded-full border border-[var(--border-hairline)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-[11px] font-medium text-[var(--text)] flex items-center gap-1 transition-colors cursor-pointer"
                       title="Copy text snippet"
                     >
                       {copiedId === item.id ? (
@@ -132,14 +132,14 @@ export function TransferHistoryModal({
                         </>
                       ) : (
                         <>
-                          <Copy className="h-3 w-3 text-neutral-400" />
+                          <Copy className="h-3 w-3 text-[var(--text-muted)]" />
                           <span>Copy</span>
                         </>
                       )}
                     </button>
                   )}
 
-                  <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-neutral-200/70 dark:bg-neutral-700/60 text-neutral-700 dark:text-neutral-300">
+                  <span className="shrink-0 px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-[var(--surface-muted)] text-[var(--text-muted)]">
                     {item.mode}
                   </span>
                 </div>
@@ -150,7 +150,7 @@ export function TransferHistoryModal({
 
         {/* Footer actions */}
         {history.length > 0 && (
-          <div className="pt-2 flex items-center justify-between border-t border-neutral-100 dark:border-neutral-800">
+          <div className="pt-2 flex items-center justify-between border-t border-[var(--border-hairline)]">
             <button
               type="button"
               onClick={onClear}
@@ -163,7 +163,7 @@ export function TransferHistoryModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2 rounded-full bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 text-xs font-bold transition-all cursor-pointer"
+              className="px-5 py-2 rounded-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] text-xs font-bold transition-all cursor-pointer shadow-xs"
             >
               Done
             </button>

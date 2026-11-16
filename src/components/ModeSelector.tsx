@@ -154,7 +154,7 @@ export function ModeSelector() {
                     <div>
                       {/* Top Row: Squircle Icon + Status Pill */}
                       <div className="flex items-center justify-between gap-2">
-                        <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-white dark:bg-neutral-800 border border-neutral-200/60 dark:border-neutral-700/60 shadow-2xs flex items-center justify-center text-neutral-800 dark:text-neutral-200 group-hover:scale-105 transition-transform">
+                        <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-2xs flex items-center justify-center text-[var(--text)] group-hover:scale-105 transition-transform">
                           {theme.icon}
                         </div>
 
@@ -162,7 +162,7 @@ export function ModeSelector() {
                           className={`px-2 sm:px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium border ${
                             isDisabled
                               ? "bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 border-amber-200/70"
-                              : "bg-white dark:bg-neutral-800 text-neutral-600 dark:text-neutral-300 border-neutral-200/80 dark:border-neutral-700/80"
+                              : "bg-[var(--surface)] text-[var(--text-muted)] border-[var(--border-hairline)]"
                           }`}
                         >
                           {isDisabled ? "Needs Internet" : theme.tag}
@@ -182,7 +182,7 @@ export function ModeSelector() {
                     </div>
 
                     {/* Bottom Row: Clear Action Indicator */}
-                    <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-muted)] group-hover:text-[var(--text)] mt-4 sm:mt-5 pt-3 border-t border-neutral-200/50 dark:border-neutral-800/80 transition-colors">
+                    <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-muted)] group-hover:text-[var(--text)] mt-4 sm:mt-5 pt-3 border-t border-[var(--border-hairline)] transition-colors">
                       <span>{isDisabled ? "Currently Unavailable" : "Open Channel"}</span>
                       <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
                     </div>
@@ -204,7 +204,7 @@ export function ModeSelector() {
               <button
                 type="button"
                 onClick={() => handleSelectMode(null)}
-                className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[var(--surface-subtle)] hover:bg-neutral-200/70 dark:hover:bg-neutral-750 border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text)] transition-all cursor-pointer self-start sm:self-auto"
+                className="inline-flex items-center gap-2 px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-full bg-[var(--surface-subtle)] hover:bg-[var(--surface-muted)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text)] transition-all cursor-pointer self-start sm:self-auto"
               >
                 <ArrowLeft className="h-3.5 w-3.5 text-[var(--text-muted)]" />
                 <span>All Channels</span>

@@ -150,22 +150,22 @@ export function OpticalHandshakeModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-md rounded-3xl bg-[var(--surface)] border border-[var(--border-hairline)] p-6 shadow-2xl space-y-5">
         {/* Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-neutral-100 dark:border-neutral-800">
+        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-hairline)]">
           <div className="flex items-center gap-2.5">
-            <div className="p-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400">
+            <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
               <Eye className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="font-semibold text-base text-neutral-900 dark:text-neutral-100">
+              <h3 className="font-semibold text-base text-[var(--text)]">
                 Camera-to-Camera Optical Handshake
               </h3>
-              <p className="text-xs text-neutral-400 font-mono">100% Zero-Internet P2P Signaling</p>
+              <p className="text-xs text-[var(--text-muted)] font-mono">100% Zero-Internet P2P Signaling</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-200 hover:bg-neutral-100 dark:hover:bg-neutral-800 transition-colors"
+            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
@@ -175,7 +175,7 @@ export function OpticalHandshakeModal({
         {step === "display" && localPayloadQr ? (
           <div className="flex flex-col items-center text-center space-y-4">
             {/* QR Card */}
-            <div className="p-3 bg-white rounded-2xl border border-neutral-200 shadow-sm relative">
+            <div className="p-3 bg-white rounded-2xl border border-[var(--border-hairline)] shadow-sm relative">
               <QRCodeSVG
                 value={frames[activeFrameIndex] || localPayloadQr}
                 size={220}
@@ -191,7 +191,7 @@ export function OpticalHandshakeModal({
                     <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/80 text-amber-700 dark:text-amber-300 font-mono text-[11px] font-bold">
                       Frame {activeFrameIndex + 1} / {frames.length}
                     </span>
-                    <span className="text-[11px] text-neutral-400">
+                    <span className="text-[11px] text-[var(--text-muted)]">
                       ({speed === "normal" ? "~350ms" : "~700ms"})
                     </span>
                   </div>
@@ -200,7 +200,7 @@ export function OpticalHandshakeModal({
                     <button
                       type="button"
                       onClick={() => setSpeed(speed === "normal" ? "slow" : "normal")}
-                      className="px-2 py-1 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-[11px] font-semibold text-neutral-600 dark:text-neutral-300 flex items-center gap-1 transition-colors cursor-pointer"
+                      className="px-2 py-1 rounded-lg border border-[var(--border-hairline)] hover:bg-[var(--surface-muted)] text-[11px] font-semibold text-[var(--text)] flex items-center gap-1 transition-colors cursor-pointer"
                       title="Adjust animation speed"
                     >
                       <Gauge className="h-3 w-3" />
@@ -210,7 +210,7 @@ export function OpticalHandshakeModal({
                     <button
                       type="button"
                       onClick={() => setIsPlaying(!isPlaying)}
-                      className="p-1.5 rounded-lg border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-600 dark:text-neutral-300 transition-colors cursor-pointer"
+                      className="p-1.5 rounded-lg border border-[var(--border-hairline)] hover:bg-[var(--surface-muted)] text-[var(--text)] transition-colors cursor-pointer"
                       title={isPlaying ? "Pause cycle" : "Resume cycle"}
                     >
                       {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
@@ -347,11 +347,11 @@ export function OpticalHandshakeModal({
             </button>
 
             {/* Webcam-Free Fallback: Expandable Paste Code */}
-            <div className="w-full pt-2 border-t border-neutral-100 dark:border-neutral-800 text-left">
+            <div className="w-full pt-2 border-t border-[var(--border-hairline)] text-left">
               <button
                 type="button"
                 onClick={() => setShowManualFallback(!showManualFallback)}
-                className="w-full py-1.5 text-xs font-semibold text-neutral-500 hover:text-neutral-800 dark:hover:text-neutral-200 flex items-center justify-between cursor-pointer"
+                className="w-full py-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text)] flex items-center justify-between cursor-pointer"
               >
                 <span>No camera? Paste Code manually</span>
                 {showManualFallback ? (
@@ -368,7 +368,7 @@ export function OpticalHandshakeModal({
                     value={manualCodeInput}
                     onChange={(e) => setManualCodeInput(e.target.value)}
                     placeholder="Paste OPTSDP:... code here"
-                    className="w-full p-2.5 rounded-xl border border-neutral-300 dark:border-neutral-700 bg-white dark:bg-neutral-900 text-[11px] font-mono text-neutral-800 dark:text-neutral-200 resize-none"
+                    className="w-full p-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-[11px] font-mono text-[var(--text)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   />
                   {manualError && (
                     <p className="text-[11px] text-red-500 font-medium">{manualError}</p>
@@ -376,7 +376,7 @@ export function OpticalHandshakeModal({
                   <button
                     type="button"
                     onClick={handleApplyManualCode}
-                    className="w-full py-2 px-3 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="w-full py-2 px-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                   >
                     <ClipboardPaste className="h-3.5 w-3.5" />
                     <span>Apply Handshake Code</span>

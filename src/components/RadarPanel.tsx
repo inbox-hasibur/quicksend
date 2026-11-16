@@ -93,9 +93,9 @@ export function RadarPanel({
       <div className="relative w-full aspect-[4/3] sm:aspect-[16/9] min-h-[300px] max-h-[420px] bg-[var(--surface-subtle)] border border-[var(--border-hairline)] rounded-3xl overflow-hidden flex items-center justify-center p-6 shadow-inner">
         {/* Radar Concentric Rings */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-[180px] sm:w-[220px] h-[180px] sm:h-[220px] rounded-full border border-neutral-300/80 dark:border-neutral-700/60" />
-          <div className="absolute w-[290px] sm:w-[350px] h-[290px] sm:h-[350px] rounded-full border border-neutral-300/50 dark:border-neutral-700/40" />
-          <div className="absolute w-[400px] sm:w-[480px] h-[400px] sm:h-[480px] rounded-full border border-neutral-300/30 dark:border-neutral-700/20" />
+          <div className="w-[180px] sm:w-[220px] h-[180px] sm:h-[220px] rounded-full border border-[var(--border-hairline)] opacity-80" />
+          <div className="absolute w-[290px] sm:w-[350px] h-[290px] sm:h-[350px] rounded-full border border-[var(--border-hairline)] opacity-50" />
+          <div className="absolute w-[400px] sm:w-[480px] h-[400px] sm:h-[480px] rounded-full border border-[var(--border-hairline)] opacity-30" />
         </div>
 
         {/* Sweeping Radar Scanner Line */}
@@ -117,7 +117,7 @@ export function RadarPanel({
               type="button"
               onClick={onChangeAvatar}
               title="Tap to change your avatar"
-              className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md text-white border-2 border-white dark:border-neutral-800 text-2xl select-none hover:scale-110 active:scale-95 transition-all cursor-pointer group"
+              className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-md text-white border-2 border-[var(--surface)] text-2xl select-none hover:scale-110 active:scale-95 transition-all cursor-pointer group"
               style={{ backgroundColor: myIdentity.avatarColor || "#6366F1" }}
             >
               <span className="group-hover:rotate-12 transition-transform">
@@ -157,7 +157,7 @@ export function RadarPanel({
                   className={`pointer-events-auto group relative flex items-center gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer shadow-sm hover:scale-105 ${
                     isSelected
                       ? "bg-[var(--accent)] text-[var(--surface)] border-[var(--accent)] shadow-md"
-                      : "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hairline)] hover:border-neutral-400 dark:hover:border-neutral-600"
+                      : "bg-[var(--surface)] text-[var(--text)] border-[var(--border-hairline)] hover:border-[var(--text-muted)]"
                   }`}
                   style={{
                     transform: `rotate(${idx * 75}deg) translateY(-85px) rotate(-${idx * 75}deg)`,

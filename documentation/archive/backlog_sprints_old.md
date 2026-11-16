@@ -1,6 +1,6 @@
-# QuickSend: Archived Sprints (Sprint 1 to Sprint 22)
+# QuickSend: Archived Sprints (Sprint 1 to Sprint 25)
 
-> **Archive Notice:** This file contains the complete, detailed historical task checklists and verification gates for Sprints 1 through 22. For active and recent sprint details (Sprint 23 onwards), see [backlog.md](../backlog.md).
+> **Archive Notice:** This file contains the complete, detailed historical task checklists and verification gates for Sprints 1 through 25. For active and recent sprint details (Sprint 26 onwards), see [backlog.md](../backlog.md).
 
 ---
 
@@ -406,3 +406,59 @@
 - [x] Modern README Showcase Overhaul (`README.md`):
   - Redesigned README with centered hero logo, Shields.io badges (Live App, Next.js 16, TypeScript 5, Tailwind CSS, WebRTC DTLS/SRTP, Platform, 221 Tests, MIT License), clear value proposition, and CTA launch link.
   - Structured concise "About QuickSend", core highlights, 6-channel matrix, tech stack, local setup guide, and security/privacy architecture.
+
+### Sprint 23: Core Navigation Reset, Connection Timeout Elimination, Transfer Cancellation, and Internet/LAN Transport Reliability
+- [x] Navbar Logo/Title Home Reset (`src/components/AppHeader.tsx`, `src/components/ModeSelector.tsx`):
+  - Made QuickSend logo and title in `AppHeader.tsx` a clickable button/link (`cursor-pointer`) that resets app state to Home Hub ("All Channels") from any active channel.
+  - Dispatched `quicksend:go-home` custom window event and called `router.replace("/")` to clear `?room=` parameter without hard refresh.
+  - Subscribed `ModeSelector.tsx` to `quicksend:go-home` event to reset `selectedModeOverride` to `"home"`.
+- [x] Connection Timeout Elimination & ICE Restart (`src/hooks/useWebRTC.ts`):
+  - Removed aggressive 10s `ICE_CONNECTION_TIMEOUT_MS` fatal error kill; connections and waiting states remain open until user cancels or WebRTC permanently fails.
+  - Implemented single-shot ICE restart via `hasRestartedIceRef` upon ICE or connection failure (`pc.restartIce()` and new offer creation) before flagging permanent failure.
+- [x] Universal Transfer Cancellation (`src/components/TransferModal.tsx`):
+  - Rendered explicit **"Cancel Transfer"** button across `"connecting"`, `"waiting-acceptance"`, and `"transferring"` states.
+  - Enabled header `X` close button and Escape key dismiss during active transfer states.
+  - Modal mounts on `"connecting"` state to ensure immediate cancelability from the first second of peer connection negotiation.
+- [x] Dual-Transport PeerJS & Same-Network Reliability (`src/hooks/useWebRTC.ts`, `src/components/SameNetworkCard.tsx`):
+  - Updated PeerJS broker IDs to `qs-v2-${code.toLowerCase()}` to prevent collisions on public `0.peerjs.com` cloud server.
+  - Implemented silent 1.5s retry loop on `peer-unavailable` error in receiver when sender hasn't fully registered.
+  - Strictly isolated `activeTransportRef` so raw-WebRTC signaling and background timers never override active or connecting PeerJS sessions.
+  - Simplified `SameNetworkCard.tsx` by removing confusing duplicate 4-digit code section and preserving ONE clean collapsible fallback titled `"Connect by PIN or QR"`.
+- [x] Testing & Verification (`src/components/__tests__/TransferModal.test.tsx`, `src/hooks/__tests__/useWebRTC.test.ts`):
+  - Added unit tests in `TransferModal.test.tsx` verifying Cancel Transfer during `"connecting"` and `"transferring"`.
+  - Added test in `useWebRTC.test.ts` verifying starting a sender does not trigger a fatal error after 10 or 30 seconds.
+  - Verified full test suite (34 suites, 224 tests passing), zero ESLint warnings, and zero Next.js build errors.
+
+### Sprint 24: Optical Camera Stream Reliability & Tab Crash Elimination
+- [x] Single + Medium Sender Defaults (`src/components/CameraStreamCard.tsx`):
+  - Set default sender layout to `"single"` (with `"2x2"` and `"2x3"` retained as optional layouts) and default density to `"medium"`.
+  - Confirmed absence of large-payload advisory banners, relying cleanly on `EstimateBadge` for duration estimation.
+- [x] Receiver Scanner Auto-Detection & Crash-Free Pipeline (`src/hooks/useQuadScanner.ts`, `src/lib/quadDecode.ts`):
+  - Set `LAYOUT_CANDIDATES` and initial scanner candidate to `"1x1"` so standard webcams and mobile cameras lock onto single QR codes first.
+  - Reused a single offscreen `<canvas>` stored in `canvasRef` rather than allocating new canvas elements on every frame.
+  - Capped maximum decode dimensions to 720px to prevent memory spikes and browser tab crashes ("This page couldn't load") on mobile devices.
+  - Optimized `decodeGrid` in `quadDecode.ts` to skip redundant image cropping on 1x1 full-frame decodes.
+- [x] End-to-End Camera Receive & Download Actions (`src/components/CameraStreamCard.tsx`, `public/sw.js`):
+  - Ingested incoming `QS2:` data and `QP2:` parity frames directly into `OpticalDataCollector`.
+  - Upon 100% completion: cleanly stopped the camera scanner, reassembled the verified `Blob` / UTF-8 text, logged to `useTransferHistory`, safely triggered programmatic file download, and displayed a prominent **"Save / Download File"** card action.
+  - Hardened `public/sw.js` navigation and fetch error catches to never resolve with `undefined` or crash browser tabs.
+- [x] Unit Testing & Verification (`src/components/__tests__/CameraStreamCard.test.tsx`, `src/hooks/__tests__/useQuadScanner.test.ts`):
+  - Added `CameraStreamCard.test.tsx` verifying default Single + Medium layouts without advisory banners, multi-frame `QS2:` receive with parity recovery, clean camera stop, and prominent Save / Download button.
+  - Updated `useQuadScanner.test.ts` candidate rotation tests for `"1x1"` priority.
+  - Full suite verification: 35 test files, 226 tests passing, zero lint warnings, clean build.
+
+### Sprint 25: Bluetooth Channel Restoration & Clutter Removal
+- [x] Rebranding & Home Hub Tile Restoration (`src/components/ModeSelector.tsx`, `src/lib/modeAvailability.ts`):
+  - Restored 4th channel name to **`Bluetooth`** with the `Bluetooth` icon and subtitle `"Send via system Bluetooth, Quick Share, or AirDrop"`.
+  - Maintained `"bluetooth"` in the 5-channel Home Hub (`["internet", "same-network", "hotspot", "bluetooth", "camera"]` + `"cable"`).
+  - Updated `modeAvailability.ts` with `"Direct Radio / Share"` badge and honest capability description.
+- [x] Honest & Clean Bluetooth Workspace (`src/components/NearbyShareCard.tsx`):
+  - Removed 4-digit PIN allocation, peer radar grid, and 45-second pairing request modal clutter.
+  - Deleted unused components `NearbyPeerCard.tsx` and `NearbyPairRequestModal.tsx`.
+  - Structured 2-step workspace: Step 1 file/text attachment via `Dropzone` with `EstimateBadge`, Step 2 primary "Send via Bluetooth / Quick Share / AirDrop" button via `shareViaNative` logging to `useTransferHistory`.
+  - Added honest guidance card explaining browser sandbox limits on raw incoming Bluetooth radio, with 1-tap Android Bluetooth settings shortcut and Wi-Fi Hotspot recommendation for browser-to-browser transfers.
+  - Tucked optional Web Bluetooth BLE hardware sensor connection in a clean bottom collapsible `<details>`.
+- [x] Unit Testing & Verification (`src/components/__tests__/NearbyShareCard.test.tsx`, `src/lib/__tests__/modeAvailability.test.ts`):
+  - Updated `NearbyShareCard.test.tsx` to verify Bluetooth title, subtitle, honest receiving guidance card, native share trigger with history logging, and BLE hardware scanning.
+  - Updated `modeAvailability.test.ts` for Bluetooth channel metadata.
+  - Full suite verification: 35 test files, 226 tests passing, zero lint warnings, clean build.

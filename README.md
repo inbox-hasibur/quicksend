@@ -8,16 +8,13 @@
     <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square&logo=typescript" alt="TypeScript" /></a>
     <a href="https://tailwindcss.com"><img src="https://img.shields.io/badge/Tailwind_CSS-4.0-38B2AC?style=flat-square&logo=tailwind-css" alt="Tailwind CSS" /></a>
     <a href="https://webrtc.org"><img src="https://img.shields.io/badge/WebRTC-DTLS%2FSRTP%20Encrypted-F36523?style=flat-square&logo=webrtc" alt="WebRTC Encrypted" /></a>
-    <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License MIT" />
-    <img src="https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux%20%7C%20iOS%20%7C%20Android-4B5563?style=flat-square" alt="Cross-Platform" />
   </p>
 
   <h3>The Zero-Login, Ephemeral Peer-to-Peer Transfer Engine for Web &amp; Mobile.</h3>
 
   <p>
     Transfer files of any size, directories, code snippets, or clipboard text between devices in seconds.<br />
-    Direct browser-to-browser P2P with WebRTC, local subnet radar, offline hotspot, native Bluetooth/Quick Share, and air-gapped optical QR streams in one app.<br />
-    <strong>Zero server uploads — files stay on your device until direct P2P transfer.</strong>
+    Direct browser-to-browser P2P with WebRTC, local subnet radar, offline hotspot, native Bluetooth/Quick Share, and air-gapped optical QR streams in one app.
   </p>
 
   <p>

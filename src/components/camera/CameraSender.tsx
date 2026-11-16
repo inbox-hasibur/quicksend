@@ -268,7 +268,7 @@ export function CameraSender({
               return (
                 <div
                   style={wrapperStyle}
-                  className="mx-auto p-1 rounded-xl bg-white shadow-sm border border-neutral-200"
+                  className="mx-auto p-1 rounded-xl bg-white shadow-sm border border-[var(--border-hairline)]"
                 >
                   <div
                     className="grid gap-[2px]"
@@ -332,7 +332,7 @@ export function CameraSender({
               </div>
 
               {/* Progress bar */}
-              <div className="w-full h-1.5 bg-neutral-200 dark:bg-neutral-800 rounded-full overflow-hidden">
+              <div className="w-full h-1.5 bg-[var(--surface-muted)] rounded-full overflow-hidden">
                 <div
                   className="h-full bg-[var(--accent)] transition-all duration-150"
                   style={{
@@ -377,7 +377,7 @@ export function CameraSender({
                     setIsPlaying((prev) => !prev);
                   }
                 }}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-opacity cursor-pointer"
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-opacity cursor-pointer"
               >
                 {!hasStartedStreaming || (currentFrameIndex === 0 && !isPlaying) ? (
                   <>
@@ -502,7 +502,7 @@ export function CameraSender({
                       <button
                         type="button"
                         onClick={handleApplyRecoveryCode}
-                        className="px-3 py-1.5 rounded-xl bg-neutral-900 dark:bg-white text-white dark:text-neutral-900 text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer ml-auto"
+                        className="px-3 py-1.5 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] text-xs font-semibold hover:opacity-90 transition-opacity cursor-pointer ml-auto"
                       >
                         Apply
                       </button>

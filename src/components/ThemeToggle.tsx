@@ -28,7 +28,7 @@ export function ThemeToggle() {
       onClick={toggleTheme}
       aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
       title={`Switch to ${isDark ? "light" : "dark"} mode`}
-      className="h-8 w-8 rounded-full border border-[var(--border-hairline)] bg-[var(--surface-subtle)] hover:bg-neutral-200/60 dark:hover:bg-neutral-750 flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition-all cursor-pointer shadow-2xs"
+      className="h-8 w-8 rounded-full border border-[var(--border-hairline)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-muted)] flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] transition-all cursor-pointer shadow-2xs"
     >
       {isDark ? (
         <Sun className="h-4 w-4 text-amber-400 transition-transform duration-200 hover:rotate-45" />

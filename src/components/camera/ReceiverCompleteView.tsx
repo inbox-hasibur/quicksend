@@ -52,7 +52,7 @@ export function ReceiverCompleteView({
           <button
             type="button"
             onClick={onCopyText}
-            className="w-full py-3 px-5 rounded-2xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-opacity flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full py-3 px-5 rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-opacity flex items-center justify-center gap-2 cursor-pointer"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
             <span>{copied ? "Copied to Clipboard!" : "Copy Text"}</span>
