@@ -218,20 +218,20 @@ Web standards enforce security sandboxes that prevent web applications from beha
 
 Below is the complete ASCII directory tree reflecting the workspace files and directories:
 
-`
+```
 quicksend/
 ├── .gitignore
 ├── AGENTS.md
 ├── README.md
 ├── eslint.config.mjs
-├── next-env.d.ts
 ├── next.config.ts
-├── package-lock.json
 ├── package.json
 ├── tsconfig.json
 ├── vercel.json
 ├── vitest.config.mts
 ├── documentation/
+│   ├── archive/
+│   │   └── backlog_sprints_old.md
 │   ├── about_project.md
 │   ├── backlog.md
 │   └── codebase_map.md
@@ -362,4 +362,4 @@ quicksend/
         ├── mode.ts
         ├── signaling.ts
         └── transfer.ts
-`
+```

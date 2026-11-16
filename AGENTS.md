@@ -30,19 +30,7 @@ All AI coding assistants and autonomous agents (Antigravity, Cursor, Claude Code
 ---
 
 ## 2. Mandatory Post-Execution Documentation Sync
-Immediately after completing **ANY** code change, feature implementation, refactoring, or bug fix, the agent **MUST** update the following three project governance files before concluding the task:
-
-1. **`documentation/about_project.md`**
-   - Update any relevant technical architecture, protocol, or mode specifications affected by the changes.
-   - **Refresh the ASCII File Tree** at the bottom of `about_project.md` whenever files or folders are added, removed, or moved, ensuring it remains an exact mirror of the repository.
-
-2. **`documentation/backlog.md`**
-   - Track progress by updating sprint task checkboxes from `[ ]` to `[x]` as features and subtasks are completed.
-   - Append newly identified tasks or technical debt to the corresponding sprint.
-
-3. **`documentation/codebase_map.md`**
-   - Regenerate/update the component, hook, library, and route dependency map.
-   - Document newly added functions, exported types, and their relationships.
+After every task: update only the affected entries in documentation/codebase_map.md, add one short Sprint entry to documentation/backlog.md. Update about_project.md only when product behavior or the file tree changes. Then commit and push.
 
 ---
 
@@ -57,7 +45,7 @@ Before marking any sprint task as completed (`[x]`) in `documentation/backlog.md
 ---
 
 ## 4. Mandatory Git Commit & Remote Push
-Immediately after satisfying all verification gates and completing the 3 documentation sync updates, the agent **MUST**:
+Immediately after satisfying all verification gates and completing the documentation sync update, the agent **MUST**:
 1. Stage all changed project files: `git add .`
 2. Commit changes using a clean **2 to 5 words** natural language message adhering strictly to Rule 1 (e.g. `complete internet mode implementation`).
 3. Push the commit to the remote repository: `git push origin <branch>` (e.g. `git push origin main`). Never conclude a sprint or feature without pushing to GitHub.

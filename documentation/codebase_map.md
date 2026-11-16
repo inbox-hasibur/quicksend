@@ -1,6 +1,6 @@
 # QuickSend: Codebase Map & Dependency Graph
 
-> **Last Updated:** Sprint 26 Complete (Dead Code & Asset Elimination)  
+> **Last Updated:** Sprint 29 Complete (Documentation Streamlining & Backlog Archive)
 > **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 
@@ -29,7 +29,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS 3.4 (Glassmorphic dark/light design system)"]
-        Vitest["Vitest 5.1 + happy-dom (224 Passing Tests across 35 Suites)"]
+        Vitest["Vitest 5.1 + happy-dom (235 Passing Tests across 38 Suites)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -257,12 +257,6 @@ flowchart TD
 #### `src/app/api/discover/route.ts`
 - **Purpose:** Local network subnet discovery endpoint (`GET`, `POST`). Extracts client IP, groups devices by private subnet or optional 4-digit pairing code (`code:XXXX`) for cross-IP / CGNAT environments, maintains 45-second presence TTL, and coordinates instant 1-tap beaming requests.
 - **Exports:** `GET(request: Request)`, `POST(request: Request)`, `getClientIp(request: Request): string`, `isLocalOrPrivateIp(cleanIp: string): boolean`, `DiscoveredPeer`, `IncomingBeamNotice`.
-
-#### `src/app/api/signal/__tests__/route.test.ts`
-- **Purpose:** Integration test suite verifying room creation, room query by code, peer joining, signaling delivery, error codes, and cleanup.
-
-#### `src/app/api/discover/__tests__/route.test.ts`
-- **Purpose:** Integration test suite verifying local IP detection, subnet grouping, 4-digit PIN pairing, beam delivery, and expiration.
 
 ---
 
@@ -511,7 +505,7 @@ flowchart TD
 
 ---
 
-### 3.6 Governance & Root Configuration Files
+### 3.6 Governance, Configuration & Documentation Files
 
 | File | Purpose | Key Details |
 | :--- | :--- | :--- |
@@ -521,8 +515,73 @@ flowchart TD
 | `next.config.ts` | Next.js configuration. | Turbopack CSS loaders, `cacheComponents: true`, `partialPrefetching: true`. |
 | `eslint.config.mjs` | Flat ESLint configuration. | Core Web Vitals + TypeScript rules. |
 | `vercel.json` | Production deployment configuration for Vercel. | Next.js framework preset, security CSP headers, and PWA cache-control headers. |
+| `tsconfig.json` | TypeScript compiler configuration. | ES2022 target, strict mode, Next.js plugin, and `@/*` path alias mapping. |
+| `.gitignore` | Git file ignore rules. | Excludes `node_modules`, `.next`, `.env*`, build artifacts, and system files. |
+| `README.md` | Central project showcase and repository README. | Hero layout, feature breakdown, 6-channel guide, tech stack, and setup instructions. |
+| `documentation/about_project.md` | Architectural specifications & file tree. | Core architecture, transfer channel mechanics, protocols, and ASCII directory tree. |
+| `documentation/archive/backlog_sprints_old.md` | Historical sprint archive. | Detailed task checklists and verification gates for historical Sprints 1 through 22. |
+| `documentation/backlog.md` | Active product backlog & sprint roadmap. | Feature specifications, historical sprint index table, and detailed recent sprints (23–29). |
+| `documentation/codebase_map.md` | High-density codebase dependency map. | System dependency graph, module roles, complete file index, and test mapping. |
+
+---
+
+### 3.7 Public & Static Web Assets (`public/` & `src/app/`)
+
+| File | Purpose | Key Details |
+| :--- | :--- | :--- |
+| `public/favicon.ico` | Browser tab icon. | Standard browser favicon for web visits. |
+| `public/icon.svg` | Vector application icon. | High-resolution scalable vector icon used across PWA installation and app headers. |
+| `public/preview.jpg` | Hero interface preview image. | Visual application screenshot used in README showcase and social preview cards. |
+| `public/sw.js` | PWA Service Worker script. | Caches application shell, static assets, and icons for instant offline launch. |
+| `src/app/favicon.ico` | App Router favicon fallback. | Next.js App Router metadata icon convention. |
+| `src/app/icon.svg` | App Router dynamic vector icon. | Next.js App Router dynamic icon route for browser bookmarks and PWA manifests. |
+
+---
+
+### 3.8 Automated Vitest Test Suites (38 Test Suites, 235 Passing Tests)
+
+| Test Suite Path | Target Module | Verified Coverage & Capabilities |
+| :--- | :--- | :--- |
+| `src/app/api/discover/__tests__/route.test.ts` | `api/discover/route.ts` | Local IP detection, subnet grouping, 4-digit PIN pairing, beam delivery, and TTL expiration. |
+| `src/app/api/health/__tests__/route.test.ts` | `api/health/route.ts` | Operational health check JSON payload, Redis/memory storage telemetry, and HTTP 200. |
+| `src/app/api/signal/__tests__/route.test.ts` | `api/signal/route.ts` | Room creation, room query by code, peer joining, signaling delivery, error codes, and cleanup. |
+| `src/components/__tests__/CableTransferCard.test.tsx` | `CableTransferCard.tsx` | Mode 6 cable UI, Android USB tethering shortcut button, and direct PIN connection flow. |
+| `src/components/__tests__/CameraStreamCard.test.tsx` | `CameraStreamCard.tsx` | Mode 5 optical coordinator, role switching (Send/Receive), layout switching, and rendering. |
+| `src/components/__tests__/ConnectionDiagnostics.test.tsx` | `ConnectionDiagnostics.tsx` | Diagnostics drawer rendering, ICE candidate stats, connection state changes, and error reporting. |
+| `src/components/__tests__/DirectConnectPanel.test.tsx` | `DirectConnectPanel.tsx` | Formatted PIN display, clipboard copy, input whitespace/hyphen normalization, and camera QR trigger. |
+| `src/components/__tests__/FileTypeBadge.test.tsx` | `FileTypeBadge.tsx` | Color-coded file chips across document, image, video, audio, archive, and code extensions. |
+| `src/components/__tests__/HotspotAssistantCard.test.tsx` | `HotspotAssistantCard.tsx` | Mode 3 Wi-Fi hotspot setup, Wi-Fi QR generator, peer radar, and unified fallback details. |
+| `src/components/__tests__/NearbyShareCard.test.tsx` | `NearbyShareCard.tsx` | Mode 4 Bluetooth guidance, Web Share API handoff, history logging, and BLE GATT scanner. |
+| `src/components/__tests__/RadarPanel.test.tsx` | `RadarPanel.tsx` | Concentric radar rings, center identity node, avatar modal callback, peer radial layout, and beam triggering. |
+| `src/components/__tests__/SegmentedControl.test.tsx` | `SegmentedControl.tsx` | Pill track rendering, option selection state, keyboard navigation, and custom class names. |
+| `src/components/__tests__/SpeedIndicator.test.tsx` | `SpeedIndicator.tsx` | Real-time throughput calculations, MB/s rendering, progress percentages, and status colors. |
+| `src/components/__tests__/TransferModal.test.tsx` | `TransferModal.tsx` | Transfer modal prompt, file metadata, progress tracking, transfer cancellation, and auto-download. |
+| `src/components/__tests__/UltrasonicCard.test.tsx` | `UltrasonicCard.tsx` | FSK sound transmission, audio spectrum canvas visualization, and tone modulation presets. |
+| `src/components/camera/__tests__/CameraParts.test.tsx` | `camera/Receiver*.tsx` | ReceiverProgressView block updates, word recovery codes, and ReceiverCompleteView download actions. |
+| `src/hooks/__tests__/nearbyShare.test.ts` | `useNearbyShare.ts` | Web Share API payload delegation, file support detection, and BLE hardware scanner status. |
+| `src/hooks/__tests__/useHtml5Scanner.test.ts` | `useHtml5Scanner.ts` | Single-stream camera scanner lifecycle, canvas rendering, and robust DOM error cleanup. |
+| `src/hooks/__tests__/useLocalDiscovery.test.tsx` | `useLocalDiscovery.ts` | Subnet discovery polling, peer list diffing, 4-digit PIN registration, and incoming beams. |
+| `src/hooks/__tests__/useQuadScanner.test.ts` | `useQuadScanner.ts` | Multi-quadrant scanner initialization, layout rotation, canvas recycling, and track cleanup. |
+| `src/hooks/__tests__/useTheme.test.tsx` | `useTheme.ts` | Dark/light theme state toggling, class application to document root, and localStorage persistence. |
+| `src/hooks/__tests__/useTransferHistory.test.ts` | `useTransferHistory.ts` | Transfer history logging, drawer state management, session persistence, and re-download links. |
+| `src/hooks/__tests__/useWebRTC.test.ts` | `useWebRTC.ts` | WebRTC connection setup, data channel messaging, chunk pipeline streaming, and cancellation. |
+| `src/lib/__tests__/base45.test.ts` | `base45.ts` | Base45 alphanumeric encoding and decoding round-trip with arbitrary binary buffers. |
+| `src/lib/__tests__/chunker.test.ts` | `chunker.ts` | Binary Blob chunking into 64KB packets, packet header framing, and EOF flags. |
+| `src/lib/__tests__/codeGenerator.test.ts` | `codeGenerator.ts` | 6-digit numeric room code and PIN generation, uniqueness, and format compliance. |
+| `src/lib/__tests__/deviceIdentity.test.ts` | `deviceIdentity.ts` | Random avatar emoji assignment, device model label detection, and profile persistence. |
+| `src/lib/__tests__/diskStream.test.ts` | `diskStream.ts` | File System Access API feature detection and writable stream disk writer creation. |
+| `src/lib/__tests__/iceConfig.test.ts` | `iceConfig.ts` | Multi-provider STUN server resolution, TURN credentials, and RTCConfiguration generation. |
+| `src/lib/__tests__/modeAvailability.test.ts` | `modeAvailability.ts` | Online/offline mode accessibility logic, dynamic badge labels, and descriptions. |
+| `src/lib/__tests__/opticalDataStream.test.ts` | `opticalDataStream.ts` | Optical stream reassembly, frame parsing, sequence indexing, and FNV-1a checksum validation. |
+| `src/lib/__tests__/opticalRecovery.test.ts` | `opticalRecovery.ts` | XOR parity stride computation, missing packet reconstruction, and recovery validation. |
+| `src/lib/__tests__/opticalSdp.test.ts` | `opticalSdp.ts` | SDP session description compression and serialization into scannable QR payloads. |
+| `src/lib/__tests__/quadDecode.test.ts` | `quadDecode.ts` | Canvas quadrant geometry calculation, coordinate slicing, and video frame partitioning. |
+| `src/lib/__tests__/signalStore.test.ts` | `signalStore.ts` | Memory and Redis signaling store adapters, room creation, TTL expiration, and capacity limits. |
+| `src/lib/__tests__/transferEstimate.test.ts` | `transferEstimate.ts` | Dynamic duration calculation across transfer channels and payload sizes. |
+| `src/lib/__tests__/ultrasonicStream.test.ts` | `ultrasonicStream.ts` | FSK sound nibble encoding, frequency tone mapping, tone classification, and decoding. |
+| `src/lib/__tests__/wifiQr.test.ts` | `wifiQr.ts` | Standard Wi-Fi credential QR string formatting, escaping, and authentication flags. |
 
 ---
 
 ## 4. Sprint Status: All Sprints Completed & Production Verified
-All twenty-six sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, human-readable word recovery codes, live connection diagnostics with masked network group labels, Bluetooth channel restoration, and dead code & asset elimination) are fully implemented, verified with 224 passing unit tests across 35 test suites, zero lint warnings, and production build ready.
+All twenty-nine sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, human-readable word recovery codes, live connection diagnostics with masked network group labels, Bluetooth channel restoration, dead code & asset elimination, camera component modularization, radar & direct connect component deduplication, and documentation streamlining) are fully implemented, verified with 235 passing unit tests across 38 test suites, zero lint warnings, and clean production Turbopack build.
