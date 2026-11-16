@@ -1,16 +1,20 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   PUBLIC_STUN_SERVERS,
   getTurnServers,
   getRtcConfig,
+  fetchIceConfig,
+  _resetDynamicIceCacheForTest,
   ICE_CONNECTION_TIMEOUT_MS,
   FIREWALL_FALLBACK_MESSAGE,
 } from "@/lib/iceConfig";
 
 describe("ICE & WebRTC Configuration", () => {
   const originalEnv = { ...process.env };
+  const originalFetch = globalThis.fetch;
 
   beforeEach(() => {
+    _resetDynamicIceCacheForTest();
     delete process.env.NEXT_PUBLIC_TURN_URL;
     delete process.env.NEXT_PUBLIC_TURN_USERNAME;
     delete process.env.NEXT_PUBLIC_TURN_CREDENTIAL;
@@ -18,6 +22,8 @@ describe("ICE & WebRTC Configuration", () => {
 
   afterEach(() => {
     process.env = { ...originalEnv };
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
   });
 
   it("should contain Google and Cloudflare public STUN servers", () => {
@@ -80,5 +86,52 @@ describe("ICE & WebRTC Configuration", () => {
     expect(FIREWALL_FALLBACK_MESSAGE).toContain("firewall");
     expect(FIREWALL_FALLBACK_MESSAGE).toContain("Mode 2");
     expect(FIREWALL_FALLBACK_MESSAGE).toContain("Mode 3");
+  });
+
+  describe("fetchIceConfig", () => {
+    it("should return empty iceServers for camera and hotspot modes without network calls", async () => {
+      const fetchSpy = vi.fn();
+      globalThis.fetch = fetchSpy;
+
+      const cam = await fetchIceConfig("camera");
+      expect(cam.iceServers).toEqual([]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+
+      const hot = await fetchIceConfig("hotspot");
+      expect(hot.iceServers).toEqual([]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("should fetch dynamic ICE servers from /api/turn for internet mode", async () => {
+      const mockDynamicServers: RTCIceServer[] = [
+        { urls: "turn:relay.quicksend.app:443", username: "dyn-user", credential: "dyn-pass" },
+      ];
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ iceServers: mockDynamicServers, hasTurn: true }),
+      });
+      globalThis.fetch = fetchMock;
+
+      const config = await fetchIceConfig("internet");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe("/api/turn");
+      expect(config.iceServers).toEqual(mockDynamicServers);
+      expect(config.iceCandidatePoolSize).toBe(10);
+
+      // Verify client cache prevents redundant fetch on immediate second call
+      const cached = await fetchIceConfig("internet");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(cached.iceServers).toEqual(mockDynamicServers);
+    });
+
+    it("should fall back safely to getRtcConfig when /api/turn fetch fails", async () => {
+      globalThis.fetch = vi.fn().mockRejectedValue(new Error("Fetch failed"));
+
+      const config = await fetchIceConfig("internet");
+      expect(config.iceServers?.length).toBeGreaterThan(0);
+      const urls = config.iceServers?.[0].urls as string[];
+      expect(urls.some((u) => u.includes("google"))).toBe(true);
+    });
   });
 });

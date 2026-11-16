@@ -1,6 +1,6 @@
-# QuickSend: Archived Sprints (Sprint 1 to Sprint 26)
+# QuickSend: Archived Sprints (Sprint 1 to Sprint 27)
 
-> **Archive Notice:** This file contains the complete, detailed historical task checklists and verification gates for Sprints 1 through 26. For active and recent sprint details (Sprint 27 onwards), see [backlog.md](../backlog.md).
+> **Archive Notice:** This file contains the complete, detailed historical task checklists and verification gates for Sprints 1 through 27. For active and recent sprint details (Sprint 28 onwards), see [backlog.md](../backlog.md).
 
 ---
 
@@ -495,3 +495,18 @@
   - Passing tests before cleanup: 224 passed across 35 test suites.
   - Passing tests after cleanup: 224 passed across 35 test suites.
   - Zero lint warnings, zero unused local errors, clean production build verified.
+
+### Sprint 27: Camera Stream Card Component Modularization & Refactoring
+- [x] CameraStreamCard Decomposition:
+  - Refactored monolithic `src/components/CameraStreamCard.tsx` from 1,217 lines down to 42 lines (well under 150-line target).
+  - Extracted sender-only states, tickers, and QR grid rendering into `src/components/camera/CameraSender.tsx` (557 lines).
+  - Extracted receiver-only scanner controls, auto/classic scanner switches, and diagnostics into `src/components/camera/CameraReceiver.tsx` (543 lines).
+  - Extracted receiver presentation components `ReceiverCompleteView.tsx` (82 lines) and `ReceiverProgressView.tsx` (109 lines) into `src/components/camera/`.
+  - Preserved default export, named export, and file path so `ModeSelector.tsx` remains untouched.
+  - Ensured unmounting cleanly cancels timers, camera streams, and scanner instances without regressions.
+- [x] Verification & Testing:
+  - All existing assertions in `src/components/__tests__/CameraStreamCard.test.tsx` pass without modification.
+  - Added unit test suite `src/components/camera/__tests__/CameraParts.test.tsx` covering `CameraSender`, `CameraReceiver`, `ReceiverCompleteView`, and `ReceiverProgressView`.
+  - Passing tests: 228 passed across 36 test suites (100% pass rate).
+  - ESLint 9 / React 19 compiler lint checks passing with zero warnings or errors.
+  - Clean Turbopack production build verified (`npm run build`).

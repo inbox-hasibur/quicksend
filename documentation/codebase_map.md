@@ -1,6 +1,6 @@
 # QuickSend: Codebase Map & Dependency Graph
 
-> **Last Updated:** Sprint 32 Complete (Mode 1 Code + QR Streamlining & Visual README Simplification)
+> **Last Updated:** Sprint 33 Complete (Dynamic TURN Relay Credentials & CGNAT Mobile Data Traversal)
 > **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 
@@ -29,7 +29,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS 3.4 (Glassmorphic dark/light design system)"]
-        Vitest["Vitest 5.1 + happy-dom (241 Passing Tests across 39 Suites)"]
+        Vitest["Vitest 5.1 + happy-dom (248 Passing Tests across 40 Suites)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -41,6 +41,7 @@ flowchart TD
         HealthAPI["api/health/route.ts (Health Check & Upstash/Memory Telemetry)"]
         SignalAPI["api/signal/route.ts (Room Signaling & Ephemeral Relay)"]
         DiscoverAPI["api/discover/route.ts (Subnet Discovery, CGNAT Pairing PIN, Beaming)"]
+        TurnAPI["api/turn/route.ts (Dynamic TURN Relay Credentials & CGNAT Mobile Traversal)"]
     end
 
     subgraph Src_Components["src/components/ (UI & Presentation Components)"]
@@ -258,6 +259,10 @@ flowchart TD
 - **Purpose:** Local network subnet discovery endpoint (`GET`, `POST`). Extracts client IP, groups devices by private subnet or optional 4-digit pairing code (`code:XXXX`) for cross-IP / CGNAT environments, maintains 45-second presence TTL, and coordinates instant 1-tap beaming requests.
 - **Exports:** `GET(request: Request)`, `POST(request: Request)`, `getClientIp(request: Request): string`, `isLocalOrPrivateIp(cleanIp: string): boolean`, `DiscoveredPeer`, `IncomingBeamNotice`.
 
+#### `src/app/api/turn/route.ts`
+- **Purpose:** Dynamic ICE & TURN credential endpoint (`GET`). Delivers public STUN pool, queries ephemeral TURN credentials securely from Metered.ca without exposing the secret API key to clients, supports static TURN variables, and caches server responses in memory with a 10-minute TTL.
+- **Exports:** `GET(): Promise<NextResponse>`, `_resetTurnCacheForTest(): void`.
+
 ---
 
 ### 3.2 UI Components (`src/components/`)
@@ -468,8 +473,8 @@ flowchart TD
 - **Exports:** `signalStore`, `MemorySignalStore`, `RedisSignalStore`, `isRedisConfigured`, `getSignalStore`.
 
 #### `src/lib/iceConfig.ts`
-- **Purpose:** Resilient WebRTC ICE / STUN configuration providing multi-provider public STUN pool (Google + Cloudflare), optional TURN relay injection (`NEXT_PUBLIC_TURN_URL`), and mode-specific RTCConfiguration generator (`getRtcConfig`).
-- **Exports:** `PUBLIC_STUN_SERVERS`, `getTurnServers`, `getRtcConfig`, `FIREWALL_FALLBACK_MESSAGE`.
+- **Purpose:** Resilient WebRTC ICE / STUN configuration providing multi-provider public STUN pool (Google + Cloudflare), dynamic `/api/turn` fetching with 2s timeout and client caching, optional static TURN relay injection (`NEXT_PUBLIC_TURN_URL`), and mode-specific RTCConfiguration generator (`getRtcConfig`, `fetchIceConfig`).
+- **Exports:** `PUBLIC_STUN_SERVERS`, `getTurnServers`, `getRtcConfig`, `fetchIceConfig`, `_resetDynamicIceCacheForTest`, `FIREWALL_FALLBACK_MESSAGE`.
 
 #### `src/lib/diskStream.ts`
 - **Purpose:** Large-file streaming layer leveraging File System Access API (`showSaveFilePicker`) for browser files > 100MB, streaming chunks directly to user disk to prevent tab memory exhaustion while safely falling back to in-memory Blob reassembly when unsupported (Safari, Firefox, small files).
@@ -538,19 +543,21 @@ flowchart TD
 
 ---
 
-### 3.8 Automated Vitest Test Suites (38 Test Suites, 238 Passing Tests)
+### 3.8 Automated Vitest Test Suites (40 Test Suites, 248 Passing Tests)
 
 | Test Suite Path | Target Module | Verified Coverage & Capabilities |
 | :--- | :--- | :--- |
 | `src/app/api/discover/__tests__/route.test.ts` | `api/discover/route.ts` | Local IP detection, subnet grouping, 4-digit PIN pairing, beam delivery, and TTL expiration. |
 | `src/app/api/health/__tests__/route.test.ts` | `api/health/route.ts` | Operational health check JSON payload, Redis/memory storage telemetry, and HTTP 200. |
 | `src/app/api/signal/__tests__/route.test.ts` | `api/signal/route.ts` | Room creation, room query by code, peer joining, signaling delivery, error codes, and cleanup. |
+| `src/app/api/turn/__tests__/route.test.ts` | `api/turn/route.ts` | Dynamic TURN fetching, Metered API caching, STUN fallback, and static config. |
 | `src/components/__tests__/CableTransferCard.test.tsx` | `CableTransferCard.tsx` | Mode 6 cable UI, Android USB tethering shortcut button, and direct PIN connection flow. |
 | `src/components/__tests__/CameraStreamCard.test.tsx` | `CameraStreamCard.tsx` | Mode 5 optical coordinator, role switching (Send/Receive), layout switching, and rendering. |
 | `src/components/__tests__/ConnectionDiagnostics.test.tsx` | `ConnectionDiagnostics.tsx` | Diagnostics drawer rendering, ICE candidate stats, connection state changes, and error reporting. |
 | `src/components/__tests__/DirectConnectPanel.test.tsx` | `DirectConnectPanel.tsx` | Formatted PIN display, clipboard copy, input whitespace/hyphen normalization, and camera QR trigger. |
 | `src/components/__tests__/FileTypeBadge.test.tsx` | `FileTypeBadge.tsx` | Color-coded file chips across document, image, video, audio, archive, and code extensions. |
 | `src/components/__tests__/HotspotAssistantCard.test.tsx` | `HotspotAssistantCard.tsx` | Mode 3 Wi-Fi hotspot setup, Wi-Fi QR generator, peer radar, and unified fallback details. |
+| `src/components/__tests__/InternetSharingCard.test.tsx` | `InternetSharingCard.tsx` | Send/Receive views, live QR and PIN co-location, Auto PIN/Mobile/Keyword pairing modes, and payload selection. |
 | `src/components/__tests__/NearbyShareCard.test.tsx` | `NearbyShareCard.tsx` | Mode 4 Bluetooth guidance, Web Share API handoff, history logging, and BLE GATT scanner. |
 | `src/components/__tests__/RadarPanel.test.tsx` | `RadarPanel.tsx` | Concentric radar rings, center identity node, avatar modal callback, peer radial layout, and beam triggering. |
 | `src/components/__tests__/SegmentedControl.test.tsx` | `SegmentedControl.tsx` | Pill track rendering, option selection state, keyboard navigation, and custom class names. |

@@ -81,8 +81,8 @@
 
 ## Section 2: Sprint-wise Breakdown
 
-### Historical Sprints Archive (Sprint 1 – Sprint 26)
-Detailed task checklists and verification records for Sprints 1 through 26 have been moved to [documentation/archive/backlog_sprints_old.md](archive/backlog_sprints_old.md).
+### Historical Sprints Archive (Sprint 1 – Sprint 27)
+Detailed task checklists and verification records for Sprints 1 through 27 have been moved to [documentation/archive/backlog_sprints_old.md](archive/backlog_sprints_old.md).
 
 | Sprint | Title | Summary |
 | :--- | :--- | :--- |
@@ -108,21 +108,11 @@ Detailed task checklists and verification records for Sprints 1 through 26 have 
 | **Sprint 24** | Optical Camera Stream Reliability | Set single QR default, auto-detection scanner, and end-to-end file receive/download actions. |
 | **Sprint 25** | Bluetooth Channel Restoration | Restored Bluetooth channel name/tile, removed PIN clutter, and built clean OS share flow. |
 | **Sprint 26** | Dead File, Dead Code & Asset Elimination | Pruned unused assets, dead exports, unreferenced components, and extraneous React imports. |
+| **Sprint 27** | Camera Stream Card Component Modularization | Split 1,217-line card into CameraSender, CameraReceiver, and presentation views. |
 
 ---
 
-### Sprint 27: Camera Stream Card Component Modularization & Refactoring
-- [x] CameraStreamCard Decomposition:
-  - Refactored monolithic `src/components/CameraStreamCard.tsx` from 1,217 lines down to 42 lines (well under 150-line target).
-  - Extracted sender-only states, tickers, and QR grid rendering into `src/components/camera/CameraSender.tsx` (557 lines).
-  - Extracted receiver-only scanner controls, auto/classic scanner switches, and diagnostics into `src/components/camera/CameraReceiver.tsx` (543 lines).
-  - Extracted receiver presentation components `ReceiverCompleteView.tsx` (82 lines) and `ReceiverProgressView.tsx` (109 lines) into `src/components/camera/`.
-  - Preserved default export, named export, and file path so `ModeSelector.tsx` remains untouched.
-  - Ensured unmounting cleanly cancels timers, camera streams, and scanner instances without regressions.
-- [x] Verification & Testing:
-  - All existing assertions in `src/components/__tests__/CameraStreamCard.test.tsx` pass without modification.
-  - Added unit test suite `src/components/camera/__tests__/CameraParts.test.tsx` covering `CameraSender`, `CameraReceiver`, `ReceiverCompleteView`, and `ReceiverProgressView`.
-  - Passing tests: 228 passed across 36 test suites (100% pass rate).
+### Sprint 28: Radar and Direct Connect Component Deduplication
   - ESLint 9 / React 19 compiler lint checks passing with zero warnings or errors.
   - Clean Turbopack production build verified (`npm run build`).
 
@@ -193,6 +183,21 @@ Detailed task checklists and verification records for Sprints 1 through 26 have 
 - [x] Verification & Unit Testing (`src/components/__tests__/InternetSharingCard.test.tsx`):
   - Added test suite covering Send view defaults, live QR/PIN rendering, mobile key input switching, and Receive view dual scan/input controls.
   - Passing tests: 241 tests passing across 39 suites (100% pass rate).
+  - ESLint 9 checks passing with 0 errors and 0 warnings.
+  - Turbopack production build verified cleanly (`npm run build`).
+
+### Sprint 33: Dynamic TURN Relay Credentials & CGNAT / 4G Resilient Connectivity
+- [x] Server-Side TURN Relay Route (`src/app/api/turn/route.ts`):
+  - Created `GET /api/turn` route returning `{ iceServers: RTCIceServer[], hasTurn: boolean }`.
+  - Integrated public STUN pool with optional ephemeral TURN credentials from Metered (`METERED_TURN_DOMAIN` and `METERED_TURN_API_KEY`) and static TURN environment variables (`NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USERNAME`, `NEXT_PUBLIC_TURN_CREDENTIAL`).
+  - Added 10-minute in-memory server cache and safe STUN-only fallback on network failures without exposing secret API keys.
+- [x] Dynamic ICE Fetching & Client Integration (`src/lib/iceConfig.ts`, `src/hooks/useWebRTC.ts`):
+  - Added `fetchIceConfig(mode)` in `src/lib/iceConfig.ts` with 2-second timeout, 5-minute client cache, and synchronous local fallback.
+  - Wired `fetchIceConfig(mode)` in `useWebRTC.ts` before creating `RTCPeerConnection` and initializing PeerJS for both sender and receiver roles.
+- [x] Automated Tests & Verification (`src/app/api/turn/__tests__/route.test.ts`, `src/lib/__tests__/iceConfig.test.ts`):
+  - Added unit tests verifying STUN defaults, Metered API fetching, credential hiding, caching, and fallback behavior.
+  - Added `fetchIceConfig` tests verifying offline bypass, dynamic server retrieval, and network error resilience.
+  - 248 tests passing across 40 test suites (100% pass rate).
   - ESLint 9 checks passing with 0 errors and 0 warnings.
   - Turbopack production build verified cleanly (`npm run build`).
 

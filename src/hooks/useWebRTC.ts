@@ -21,6 +21,7 @@ import {
 } from "@/lib/diskStream";
 import {
   getRtcConfig,
+  fetchIceConfig,
 } from "@/lib/iceConfig";
 import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
 import type { PeerRole, SignalMessage } from "@/types/signaling";
@@ -251,6 +252,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   const activeTransportRef = useRef<ActiveTransport>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const rtcConfigRef = useRef<RTCConfiguration | null>(null);
   const dcRef = useRef<RTCDataChannel | null>(null);
   const signalingRef = useRef<SignalingClient>(new SignalingClient());
   const receivedChunksRef = useRef<ArrayBuffer[]>([]);
@@ -828,7 +830,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
   // Setup Peer Connection
   const createPeerConnection = useCallback(
-    (currentRole: PeerRole) => {
+    (currentRole: PeerRole, customConfig?: RTCConfiguration) => {
       if (pcRef.current) {
         try {
           pcRef.current.close();
@@ -837,7 +839,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         }
       }
 
-      const config = getRtcConfig(mode);
+      const config = customConfig || rtcConfigRef.current || getRtcConfig(mode);
       const pc = new RTCPeerConnection(config);
       pcRef.current = pc;
 
@@ -1161,7 +1163,11 @@ export function useWebRTC(mode: TransferMode = "internet") {
       addLog("Sender started");
 
       startIceTimeout();
-      createPeerConnection("sender");
+
+      // Dynamically fetch ICE config with TURN servers on 4G/CGNAT
+      const dynamicConfig = await fetchIceConfig(mode);
+      rtcConfigRef.current = dynamicConfig;
+      createPeerConnection("sender", dynamicConfig);
 
       const generatedCode = customCode ? normalizeRoomCode(customCode) : generateRoomCode();
       const newRoomId = `room_${generatedCode}`;
@@ -1175,7 +1181,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
             if (sessionGenRef.current !== currentSession || !PeerClass || isConnectedRef.current) return;
             const peerId = `qs-v2-${generatedCode.toLowerCase()}`;
             const peer = new PeerClass(peerId, {
-              config: getRtcConfig(mode),
+              config: dynamicConfig,
               debug: 1,
             });
             peerInstanceRef.current = peer;
@@ -1306,7 +1312,11 @@ export function useWebRTC(mode: TransferMode = "internet") {
       addLog("Receiver started");
 
       startIceTimeout();
-      createPeerConnection("receiver");
+
+      // Dynamically fetch ICE config with TURN servers on 4G/CGNAT
+      const dynamicConfig = await fetchIceConfig(mode);
+      rtcConfigRef.current = dynamicConfig;
+      createPeerConnection("receiver", dynamicConfig);
 
       const cleanCode = normalizeRoomCode(code);
       const joinedRoomId = `room_${cleanCode}`;
@@ -1319,7 +1329,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
           .then((PeerClass) => {
             if (sessionGenRef.current !== currentSession || !PeerClass || isConnectedRef.current) return;
             const peer = new PeerClass(undefined, {
-              config: getRtcConfig(mode),
+              config: dynamicConfig,
               debug: 1,
             });
             peerInstanceRef.current = peer;

@@ -73,6 +73,64 @@ export function getRtcConfig(mode: TransferMode = "internet"): RTCConfiguration 
   };
 }
 
+let cachedDynamicConfig: { config: RTCConfiguration; expiresAt: number } | null = null;
+
+/**
+ * Resets the client-side dynamic ICE config cache. Exported for automated tests.
+ */
+export function _resetDynamicIceCacheForTest() {
+  cachedDynamicConfig = null;
+}
+
+/**
+ * Dynamically fetches ICE configuration with ephemeral TURN relay credentials for "internet" mode.
+ * Falls back safely to synchronous getRtcConfig() if offline, timed out (2s), or on network failure.
+ */
+export async function fetchIceConfig(mode: TransferMode = "internet"): Promise<RTCConfiguration> {
+  if (mode === "camera" || mode === "hotspot") {
+    return getRtcConfig(mode);
+  }
+
+  // If outside browser or not internet mode, return local config
+  if (typeof window === "undefined" || mode !== "internet") {
+    return getRtcConfig(mode);
+  }
+
+  if (cachedDynamicConfig && Date.now() < cachedDynamicConfig.expiresAt) {
+    return cachedDynamicConfig.config;
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 2000);
+
+    const res = await fetch("/api/turn", {
+      signal: controller.signal,
+      headers: { Accept: "application/json" },
+    });
+    clearTimeout(timeout);
+
+    if (res.ok) {
+      const data = await res.json();
+      if (Array.isArray(data.iceServers) && data.iceServers.length > 0) {
+        const config: RTCConfiguration = {
+          iceServers: data.iceServers,
+          iceCandidatePoolSize: 10,
+        };
+        cachedDynamicConfig = {
+          config,
+          expiresAt: Date.now() + 5 * 60 * 1000, // 5 min TTL
+        };
+        return config;
+      }
+    }
+  } catch {
+    // Safe fallback to synchronous local config
+  }
+
+  return getRtcConfig(mode);
+}
+
 export const ICE_CONNECTION_TIMEOUT_MS = 30000;
 
 export const FIREWALL_FALLBACK_MESSAGE =
