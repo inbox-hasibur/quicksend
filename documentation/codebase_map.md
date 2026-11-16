@@ -312,6 +312,14 @@ flowchart TD
 - **Purpose:** Presentational live collection progress bar and collapsible missing frames recovery code generator with 1-click clipboard copy.
 - **Exports:** `ReceiverProgressView(props: ReceiverProgressViewProps): JSX.Element`.
 
+#### `src/components/RadarPanel.tsx`
+- **Purpose:** Reusable discovery radar screen component utilized by `SameNetworkCard` and `HotspotAssistantCard`. Renders animated concentric radar rings, sweeping radar line gradient, center node representing local device identity with avatar customization trigger, radial placement of discovered peer nodes with "Tap to Send" triggers, live connection pulse indicators, and custom empty state notifications.
+- **Exports:** `RadarPanel(props: RadarPanelProps): JSX.Element`, `RadarPanelProps`, `RadarIdentity`.
+
+#### `src/components/DirectConnectPanel.tsx`
+- **Purpose:** Reusable fallback and direct PIN/QR pairing component utilized by `SameNetworkCard`, `HotspotAssistantCard`, and `CableTransferCard`. Renders local device PIN display with 1-click clipboard copy, "Show QR" modal trigger, peer PIN input field with automated whitespace and hyphen normalization, "Connect" action button, and "Scan QR Code with Camera" button.
+- **Exports:** `DirectConnectPanel(props: DirectConnectPanelProps): JSX.Element`, `DirectConnectPanelProps`.
+
 #### `src/components/CableTransferCard.tsx`
 - **Purpose:** Mode 6 Controller (Via Cable). Direct gigabit line-speed transfer over USB-C to USB-C or Ethernet cable links. Features 1-tap Android USB tethering shortcut (`ANDROID_INTENTS.TETHER_SETTINGS`), direct link-local WebRTC P2P PIN/QR pairing, and host candidate priority.
 - **Exports:** `CableTransferCard(): JSX.Element`

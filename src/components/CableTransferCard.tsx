@@ -6,15 +6,9 @@ import {
   Usb,
   Smartphone,
   ExternalLink,
-  QrCode,
   AlertCircle,
-  Camera,
-  RefreshCw,
-  Copy,
-  Check,
   X,
   Cpu,
-  ArrowRight,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { Dropzone } from "@/components/Dropzone";
@@ -23,6 +17,7 @@ import { TransferModal } from "@/components/TransferModal";
 import { QRScannerModal } from "@/components/QRScannerModal";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { SpeedIndicator } from "@/components/SpeedIndicator";
+import { DirectConnectPanel } from "@/components/DirectConnectPanel";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { ANDROID_INTENTS } from "@/lib/wifiQr";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
@@ -40,7 +35,6 @@ export function CableTransferCard() {
   // Network cable state (WebRTC P2P over direct cable link)
   const [localPin] = useState(() => Math.floor(100000 + Math.random() * 900000).toString());
   const [inputCode, setInputCode] = useState("");
-  const [copiedPin, setCopiedPin] = useState(false);
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -82,16 +76,6 @@ export function CableTransferCard() {
       }
     }
   }, [rtcRole, isConnected, progress.status, selectedPayload, sendFiles, sendPayload]);
-
-  const handleCopyPin = async () => {
-    try {
-      await navigator.clipboard.writeText(localPin);
-      setCopiedPin(true);
-      setTimeout(() => setCopiedPin(false), 2000);
-    } catch {
-      // Ignore
-    }
-  };
 
   const handleConnectPin = async (codeToUse?: string) => {
     const code = normalizeRoomCode(codeToUse || inputCode);
@@ -248,77 +232,19 @@ export function CableTransferCard() {
           </div>
 
           {/* 1-Tap Connect / Host Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Host PIN Card */}
-            <div className="p-5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3">
-              <span className="font-bold text-xs text-[var(--text)] block">
-                Host Cable Session PIN
-              </span>
-              <p className="text-[11px] text-[var(--text-muted)]">
-                Share this PIN with the connected device, or scan the QR code.
-              </p>
-              <div className="flex items-center justify-between gap-2 p-2.5 px-3 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)]">
-                <span className="font-mono text-2xl font-extrabold tracking-widest text-[var(--accent)] tabular-nums">
-                  {formatRoomCode(localPin)}
-                </span>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={handleCopyPin}
-                    className="p-1.5 rounded-lg hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
-                    title="Copy PIN"
-                  >
-                    {copiedPin ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsQrModalOpen(true)}
-                    className="p-1.5 rounded-lg hover:bg-[var(--surface-subtle)] text-[var(--text-muted)] hover:text-[var(--text)] transition-colors cursor-pointer"
-                    title="Show Session QR"
-                  >
-                    <QrCode className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Join PIN Card */}
-            <div className="p-5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3">
-              <span className="font-bold text-xs text-[var(--text)] block">
-                Connect to Host Cable PIN
-              </span>
-              <p className="text-[11px] text-[var(--text-muted)]">
-                Enter the host device&apos;s 6-digit PIN to establish the direct link.
-              </p>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Enter 6-digit PIN"
-                  value={inputCode}
-                  onChange={(e) => setInputCode(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleConnectPin()}
-                  className="flex-1 p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] font-mono text-center text-xs tracking-widest uppercase focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={() => handleConnectPin()}
-                  disabled={isConnecting || !inputCode.trim()}
-                  className="px-4 py-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 dark:bg-white dark:hover:bg-neutral-100 text-white dark:text-neutral-900 font-bold text-xs shadow-xs transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
-                >
-                  {isConnecting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <span>Connect</span>}
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsScannerOpen(true)}
-                  className="p-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] hover:bg-[var(--surface-subtle)] text-[var(--text)] transition-colors cursor-pointer shadow-2xs"
-                  title="Scan PIN QR"
-                >
-                  <Camera className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-          </div>
+          <DirectConnectPanel
+            myPin={localPin}
+            myPinLabel="Host Cable Session PIN"
+            peerPinLabel="Connect to Host Cable PIN"
+            myPinDescription="Share this PIN with the connected device, or scan the QR code."
+            peerPinDescription="Enter the host device's 6-digit PIN to establish the direct link."
+            onShowQr={() => setIsQrModalOpen(true)}
+            peerPinValue={inputCode}
+            onPeerPinChange={setInputCode}
+            onConnect={handleConnectPin}
+            onScanQr={() => setIsScannerOpen(true)}
+            isConnecting={isConnecting}
+          />
         </div>
       ) : (
         /* TAB 2: WEBUSB & SERIAL PORT (DIRECT HARDWARE) */
@@ -467,3 +393,5 @@ export function CableTransferCard() {
     </div>
   );
 }
+
+export default CableTransferCard;

@@ -267,9 +267,11 @@ quicksend/
     │   │   ├── CableTransferCard.test.tsx
     │   │   ├── CameraStreamCard.test.tsx
     │   │   ├── ConnectionDiagnostics.test.tsx
+    │   │   ├── DirectConnectPanel.test.tsx
     │   │   ├── FileTypeBadge.test.tsx
     │   │   ├── HotspotAssistantCard.test.tsx
     │   │   ├── NearbyShareCard.test.tsx
+    │   │   ├── RadarPanel.test.tsx
     │   │   ├── SegmentedControl.test.tsx
     │   │   ├── SpeedIndicator.test.tsx
     │   │   ├── TransferModal.test.tsx
@@ -285,6 +287,7 @@ quicksend/
     │   ├── CableTransferCard.tsx
     │   ├── CameraStreamCard.tsx
     │   ├── ConnectionDiagnostics.tsx
+    │   ├── DirectConnectPanel.tsx
     │   ├── Dropzone.tsx
     │   ├── EstimateBadge.tsx
     │   ├── FileTypeBadge.tsx
@@ -295,6 +298,7 @@ quicksend/
     │   ├── OpticalHandshakeModal.tsx
     │   ├── QRCodeDisplay.tsx
     │   ├── QRScannerModal.tsx
+    │   ├── RadarPanel.tsx
     │   ├── SameNetworkCard.tsx
     │   ├── SegmentedControl.tsx
     │   ├── ServiceWorkerRegister.tsx

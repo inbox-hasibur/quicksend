@@ -45,8 +45,8 @@ describe("HotspotAssistantCard Component", () => {
     expect(container.textContent).toContain("Devices on this Hotspot");
     expect(container.textContent).toContain("Scanning hotspot...");
 
-    // Check collapsible offline backup
-    expect(container.textContent).toContain("No mobile data? Use Offline Direct PIN / QR Pairing");
+    // Check collapsible fallback section
+    expect(container.textContent).toContain("Can't see your device?");
   });
 
   it("should expand offline backup pairing when toggled", async () => {
@@ -54,16 +54,11 @@ describe("HotspotAssistantCard Component", () => {
       root.render(<HotspotAssistantCard />);
     });
 
-    const toggleBtn = Array.from(container.querySelectorAll("button")).find((btn) =>
-      btn.textContent?.includes("No mobile data? Use Offline Direct PIN / QR Pairing")
-    );
-    expect(toggleBtn).toBeDefined();
+    const summary = container.querySelector("summary");
+    expect(summary?.textContent).toContain("Can't see your device?");
 
-    // Click to expand offline backup
-    await act(async () => {
-      toggleBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-
+    expect(container.textContent).toContain("Use a nearby code");
+    expect(container.textContent).toContain("Connect with PIN or QR");
     expect(container.textContent).toContain("Your Device PIN");
     expect(container.textContent).toContain("Connect to Another Device PIN");
   });

@@ -586,6 +586,24 @@
   - ESLint 9 / React 19 compiler lint checks passing with zero warnings or errors.
   - Clean Turbopack production build verified (`npm run build`).
 
+### Sprint 28: Radar and Direct Connect Component Deduplication
+- [x] RadarPanel Extraction:
+  - Created reusable `src/components/RadarPanel.tsx` extracting repeated radar concentric rings, radar sweep animation, center node identity avatar, discovered peer radial layout, status pulses, and empty state messaging.
+  - Replaced duplicate radar JSX in `src/components/SameNetworkCard.tsx` (reduced from 578 to 437 lines) and `src/components/HotspotAssistantCard.tsx` (reduced from 715 to 525 lines).
+- [x] DirectConnectPanel Extraction:
+  - Created reusable `src/components/DirectConnectPanel.tsx` extracting local device PIN display, 1-click clipboard copy, Show QR button, peer PIN input, connect button, and scan QR camera button.
+  - Normalized typed PIN input by removing spaces and hyphens before executing connection callbacks.
+  - Replaced duplicate PIN/QR connection blocks in `SameNetworkCard.tsx`, `HotspotAssistantCard.tsx`, and `CableTransferCard.tsx` (reduced from 469 to 397 lines).
+- [x] Unified "Can't see your device?" Fallback:
+  - Consolidated duplicate fallback sections in `SameNetworkCard.tsx` and `HotspotAssistantCard.tsx` into a single collapsed `<details>` titled "Can't see your device?", offering two distinct options: "Use a nearby code" and "Connect with PIN or QR".
+- [x] Verification & Automated Tests:
+  - Added test suite `src/components/__tests__/RadarPanel.test.tsx` verifying empty/active radar renders, avatar switching, and peer beaming callbacks.
+  - Added test suite `src/components/__tests__/DirectConnectPanel.test.tsx` verifying formatted PIN rendering, copy functionality, and whitespace/hyphen normalization.
+  - Updated `src/components/__tests__/HotspotAssistantCard.test.tsx` to align with the unified fallback structure.
+  - All 38 test files, 235 tests passing with 100% pass rate.
+  - ESLint 9 checks passing with zero warnings or errors.
+  - Production build passing cleanly (`npm run build`).
+
 
 
 
