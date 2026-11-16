@@ -1,6 +1,6 @@
 # QuickSend: Codebase Map & Dependency Graph
 
-> **Last Updated:** Sprint 31 Complete (Global Dark/Light Theme Contrast Fix & Privacy Reassurance Copy Removal)
+> **Last Updated:** Sprint 32 Complete (Mode 1 Code + QR Streamlining & Visual README Simplification)
 > **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 
@@ -29,7 +29,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS 3.4 (Glassmorphic dark/light design system)"]
-        Vitest["Vitest 5.1 + happy-dom (238 Passing Tests across 38 Suites)"]
+        Vitest["Vitest 5.1 + happy-dom (241 Passing Tests across 39 Suites)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]

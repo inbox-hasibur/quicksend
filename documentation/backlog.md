@@ -81,8 +81,8 @@
 
 ## Section 2: Sprint-wise Breakdown
 
-### Historical Sprints Archive (Sprint 1 – Sprint 25)
-Detailed task checklists and verification records for Sprints 1 through 25 have been moved to [documentation/archive/backlog_sprints_old.md](archive/backlog_sprints_old.md).
+### Historical Sprints Archive (Sprint 1 – Sprint 26)
+Detailed task checklists and verification records for Sprints 1 through 26 have been moved to [documentation/archive/backlog_sprints_old.md](archive/backlog_sprints_old.md).
 
 | Sprint | Title | Summary |
 | :--- | :--- | :--- |
@@ -107,41 +107,9 @@ Detailed task checklists and verification records for Sprints 1 through 25 have 
 | **Sprint 23** | Core Navigation Reset & Transfer Cancellation | Added header home reset, removed 10s ICE kill, and added universal transfer cancellation. |
 | **Sprint 24** | Optical Camera Stream Reliability | Set single QR default, auto-detection scanner, and end-to-end file receive/download actions. |
 | **Sprint 25** | Bluetooth Channel Restoration | Restored Bluetooth channel name/tile, removed PIN clutter, and built clean OS share flow. |
+| **Sprint 26** | Dead File, Dead Code & Asset Elimination | Pruned unused assets, dead exports, unreferenced components, and extraneous React imports. |
 
 ---
-
-### Sprint 26: Dead File, Dead Code & Asset Elimination
-- [x] Starter Asset & Gitkeep Pruning:
-  - Removed unused template SVG files from `public/`: `file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, and `window.svg` (zero code or config references).
-  - Preserved `public/preview.jpg` (referenced by `README.md` and project architecture docs).
-  - Preserved duplicate icon pairs (`public/favicon.ico` + `src/app/favicon.ico`, `public/icon.svg` + `src/app/icon.svg`) because `/favicon.ico` and `/icon.svg` are explicitly referenced in `layout.tsx`, `manifest.ts`, and `sw.js`.
-  - Deleted obsolete `.gitkeep` files from non-empty folders: `documentation/.gitkeep`, `src/components/.gitkeep`, `src/hooks/.gitkeep`, `src/lib/.gitkeep`, and `src/types/.gitkeep`.
-  - Confirmed `.gitignore` ignores `next-env.d.ts` and confirmed untracked status.
-- [x] Dead Component & Test Organization:
-  - Deleted proven unused component `src/components/NetworkStatusBadge.tsx` (unreferenced across all application routes and components).
-  - Relocated `src/lib/__tests__/nearbyShare.test.ts` to `src/hooks/__tests__/nearbyShare.test.ts` to properly co-locate with `useNearbyShare.ts`.
-  - Preserved `OpticalHandshakeModal.tsx` and `TransferHistoryModal.tsx` as standalone fallback utilities.
-- [x] Dead Export & Dead Code Elimination:
-  - Removed unused `export` from `parseLayoutDims` and `getFramesPerTick` in `src/components/CameraStreamCard.tsx`.
-  - Removed unused `export` from `LAYOUT_CANDIDATES` in `src/hooks/useQuadScanner.ts`.
-  - Removed unused `export` from `getThemeSnapshot` and `applyThemeToDOM` in `src/hooks/useTheme.ts`.
-  - Removed unused `export` from `useNetworkStatus` in `src/hooks/useNetworkStatus.ts` (kept internal).
-  - Removed unused `export` from `FIREWALL_MSG_WITH_DIAGNOSTICS` in `src/hooks/useWebRTC.ts`.
-  - Removed unused `export` from `BASE45_ALPHABET` in `src/lib/base45.ts`.
-  - Removed unused `export` from `extractRoomCodeFromUrl` in `src/lib/codeGenerator.ts`.
-  - Removed unused `export` from `notifyProfileListeners` and `invalidateDeviceProfileCache` in `src/lib/deviceIdentity.ts`.
-  - Removed unused `export` from `PUBLIC_TURN_SERVERS` in `src/lib/iceConfig.ts`.
-  - In `src/lib/opticalDataStream.ts`: removed `export` from `DEFAULT_CHUNK_RAW_BYTES`, `base64ToBytes`, `encodeB45Header`, `decodeB45Header`, `parseOpticalParityFrame`; deleted completely dead function `bytesToBase64`; deleted redundant `totalFrameCount` alias and unused `isOpticalDataFrame`.
-  - Removed unused `export` from `getGridRects` in `src/lib/quadDecode.ts`.
-  - In `src/lib/signalStore.ts`: deleted unused field `private lastCleanup: number`.
-  - In `src/types/mode.ts`: deleted unused type `InternetFormat`.
-  - In `src/lib/chunker.ts`: made `BatchFileOptions` internal interface.
-  - In `src/lib/opticalSdp.ts`: made `OpticalSdpPackage` internal interface.
-  - Removed unused `React` imports from 12 components and test files (`CableTransferCard.test.tsx`, `ConnectionDiagnostics.test.tsx`, `HotspotAssistantCard.test.tsx`, `SegmentedControl.test.tsx`, `SpeedIndicator.test.tsx`, `TransferModal.test.tsx`, `UltrasonicCard.test.tsx`, `FileTypeBadge.tsx`, `NearbyShareCard.tsx`, `SegmentedControl.tsx`, `useLocalDiscovery.test.tsx`, `useTheme.test.tsx`).
-- [x] Verification Gate & Test Counts:
-  - Passing tests before cleanup: 224 passed across 35 test suites.
-  - Passing tests after cleanup: 224 passed across 35 test suites.
-  - Zero lint warnings, zero unused local errors, clean production build verified.
 
 ### Sprint 27: Camera Stream Card Component Modularization & Refactoring
 - [x] CameraStreamCard Decomposition:
@@ -212,4 +180,19 @@ Detailed task checklists and verification records for Sprints 1 through 25 have 
   - All 38 test suites, 238 tests passing with 100% pass rate.
   - ESLint 9 checks passing with 0 errors and 0 warnings.
   - Production build passing cleanly with Turbopack (`npm run build`).
+
+### Sprint 32: Mode 1 Code + QR Streamlining and README Visual Simplification
+- [x] Mode 1 Always-Available Code + QR (`src/components/InternetSharingCard.tsx`):
+  - Removed separate `"Code | QR"` pairing format toggle, retaining only the clean top `Send | Receive` role switcher.
+  - In `Send` view: always displays the Pairing Key selector (`Auto PIN` | `Mobile No.` | `Keyword`) alongside the live scannable `QRCodeDisplay` and 6-digit Room PIN so receivers can connect immediately via camera or manual typing.
+  - In `Receive` view: always provides the prominent "Scan Sender's QR Code" camera button and the Room Code / PIN input with Connect button together on the same screen.
+  - Auto-initializes `startSender()` on mount for instant session creation without requiring payload selection first.
+- [x] README Simplification (`README.md`):
+  - Removed dense technical jargon (`DTLS/SCTP`, `RFC 1918`, `FNV-1a`, `NAT traversal`) and the heavy architecture sequence diagram.
+  - Kept hero showcase, badges, preview screenshot, crisp plain-English features list, 6-channel summary table, short local setup steps, and license.
+- [x] Verification & Unit Testing (`src/components/__tests__/InternetSharingCard.test.tsx`):
+  - Added test suite covering Send view defaults, live QR/PIN rendering, mobile key input switching, and Receive view dual scan/input controls.
+  - Passing tests: 241 tests passing across 39 suites (100% pass rate).
+  - ESLint 9 checks passing with 0 errors and 0 warnings.
+  - Turbopack production build verified cleanly (`npm run build`).
 

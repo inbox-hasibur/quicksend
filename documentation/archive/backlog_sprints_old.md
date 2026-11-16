@@ -1,6 +1,6 @@
-# QuickSend: Archived Sprints (Sprint 1 to Sprint 25)
+# QuickSend: Archived Sprints (Sprint 1 to Sprint 26)
 
-> **Archive Notice:** This file contains the complete, detailed historical task checklists and verification gates for Sprints 1 through 25. For active and recent sprint details (Sprint 26 onwards), see [backlog.md](../backlog.md).
+> **Archive Notice:** This file contains the complete, detailed historical task checklists and verification gates for Sprints 1 through 26. For active and recent sprint details (Sprint 27 onwards), see [backlog.md](../backlog.md).
 
 ---
 
@@ -462,3 +462,36 @@
   - Updated `NearbyShareCard.test.tsx` to verify Bluetooth title, subtitle, honest receiving guidance card, native share trigger with history logging, and BLE hardware scanning.
   - Updated `modeAvailability.test.ts` for Bluetooth channel metadata.
   - Full suite verification: 35 test files, 226 tests passing, zero lint warnings, clean build.
+
+### Sprint 26: Dead File, Dead Code & Asset Elimination
+- [x] Starter Asset & Gitkeep Pruning:
+  - Removed unused template SVG files from `public/`: `file.svg`, `globe.svg`, `next.svg`, `vercel.svg`, and `window.svg` (zero code or config references).
+  - Preserved `public/preview.jpg` (referenced by `README.md` and project architecture docs).
+  - Preserved duplicate icon pairs (`public/favicon.ico` + `src/app/favicon.ico`, `public/icon.svg` + `src/app/icon.svg`) because `/favicon.ico` and `/icon.svg` are explicitly referenced in `layout.tsx`, `manifest.ts`, and `sw.js`.
+  - Deleted obsolete `.gitkeep` files from non-empty folders: `documentation/.gitkeep`, `src/components/.gitkeep`, `src/hooks/.gitkeep`, `src/lib/.gitkeep`, and `src/types/.gitkeep`.
+  - Confirmed `.gitignore` ignores `next-env.d.ts` and confirmed untracked status.
+- [x] Dead Component & Test Organization:
+  - Deleted proven unused component `src/components/NetworkStatusBadge.tsx` (unreferenced across all application routes and components).
+  - Relocated `src/lib/__tests__/nearbyShare.test.ts` to `src/hooks/__tests__/nearbyShare.test.ts` to properly co-locate with `useNearbyShare.ts`.
+  - Preserved `OpticalHandshakeModal.tsx` and `TransferHistoryModal.tsx` as standalone fallback utilities.
+- [x] Dead Export & Dead Code Elimination:
+  - Removed unused `export` from `parseLayoutDims` and `getFramesPerTick` in `src/components/CameraStreamCard.tsx`.
+  - Removed unused `export` from `LAYOUT_CANDIDATES` in `src/hooks/useQuadScanner.ts`.
+  - Removed unused `export` from `getThemeSnapshot` and `applyThemeToDOM` in `src/hooks/useTheme.ts`.
+  - Removed unused `export` from `useNetworkStatus` in `src/hooks/useNetworkStatus.ts` (kept internal).
+  - Removed unused `export` from `FIREWALL_MSG_WITH_DIAGNOSTICS` in `src/hooks/useWebRTC.ts`.
+  - Removed unused `export` from `BASE45_ALPHABET` in `src/lib/base45.ts`.
+  - Removed unused `export` from `extractRoomCodeFromUrl` in `src/lib/codeGenerator.ts`.
+  - Removed unused `export` from `notifyProfileListeners` and `invalidateDeviceProfileCache` in `src/lib/deviceIdentity.ts`.
+  - Removed unused `export` from `PUBLIC_TURN_SERVERS` in `src/lib/iceConfig.ts`.
+  - In `src/lib/opticalDataStream.ts`: removed `export` from `DEFAULT_CHUNK_RAW_BYTES`, `base64ToBytes`, `encodeB45Header`, `decodeB45Header`, `parseOpticalParityFrame`; deleted completely dead function `bytesToBase64`; deleted redundant `totalFrameCount` alias and unused `isOpticalDataFrame`.
+  - Removed unused `export` from `getGridRects` in `src/lib/quadDecode.ts`.
+  - In `src/lib/signalStore.ts`: deleted unused field `private lastCleanup: number`.
+  - In `src/types/mode.ts`: deleted unused type `InternetFormat`.
+  - In `src/lib/chunker.ts`: made `BatchFileOptions` internal interface.
+  - In `src/lib/opticalSdp.ts`: made `OpticalSdpPackage` internal interface.
+  - Removed unused `React` imports from 12 components and test files (`CableTransferCard.test.tsx`, `ConnectionDiagnostics.test.tsx`, `HotspotAssistantCard.test.tsx`, `SegmentedControl.test.tsx`, `SpeedIndicator.test.tsx`, `TransferModal.test.tsx`, `UltrasonicCard.test.tsx`, `FileTypeBadge.tsx`, `NearbyShareCard.tsx`, `SegmentedControl.tsx`, `useLocalDiscovery.test.tsx`, `useTheme.test.tsx`).
+- [x] Verification Gate & Test Counts:
+  - Passing tests before cleanup: 224 passed across 35 test suites.
+  - Passing tests after cleanup: 224 passed across 35 test suites.
+  - Zero lint warnings, zero unused local errors, clean production build verified.
