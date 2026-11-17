@@ -1,5 +1,5 @@
 // QuickSend PWA Service Worker
-const CACHE_NAME = "quicksend-v3";
+const CACHE_NAME = "quicksend-v4";
 const APP_SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -43,6 +43,11 @@ self.addEventListener("fetch", (event) => {
 
   // Skip browser extensions and non-HTTP protocols
   if (!url.protocol.startsWith("http")) {
+    return;
+  }
+
+  // Bypass service worker for any request from external origins
+  if (url.origin !== self.location.origin) {
     return;
   }
 

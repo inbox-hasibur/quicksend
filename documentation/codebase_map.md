@@ -275,6 +275,14 @@ flowchart TD
 - **Purpose:** Relay completion & cleanup endpoint (`POST`). Idempotently purges verified blob URLs from `@vercel/blob` via `del()` using ONLY URLs found in the verified store (ignoring request body URLs) and clears room relay state. Rate-limited to 30 req/min per IP.
 - **Exports:** `POST(request: Request): Promise<NextResponse>`.
 
+#### `src/app/api/relay/upload/route.ts`
+- **Purpose:** Secure Vercel Blob client upload token generator (`POST`) using `handleUpload`. Enforces room code and strict pathname format (`^relay/<roomCode>/[A-Za-z0-9._-]{1,80}$`), client IP rate limiting (6 tokens/hr), and daily upload budget (600 MB/day).
+- **Exports:** `POST(request: Request): Promise<NextResponse>`.
+
+#### `src/app/api/relay/cleanup/route.ts`
+- **Purpose:** Automated cron cleanup endpoint (`GET`). Authenticates via `CRON_SECRET` bearer token, pages through `@vercel/blob` objects with prefix `relay/`, and purges blobs older than 30 minutes via `del()`.
+- **Exports:** `GET(request: Request): Promise<NextResponse>`.
+
 ---
 
 ### 3.2 UI Components (`src/components/`)

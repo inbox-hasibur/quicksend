@@ -647,3 +647,23 @@
   - 43 test suites, 271/271 tests passing (100% pass rate).
   - ESLint 9: 0 warnings, 0 errors.
   - Turbopack production build verified cleanly (`npm run build`).
+
+### Fix 4 (2026-11-17): Upload Token Security, Cron Cleanup, CSP & Service Worker Hardening
+- [x] Client Upload Token Route (`src/app/api/relay/upload/route.ts` & `src/app/api/relay/__tests__/upload.test.ts`):
+  - Implemented `POST /api/relay/upload` using `handleUpload` from `@vercel/blob/client` with 503 fallback when `BLOB_READ_WRITE_TOKEN` is unset.
+  - In `onBeforeGenerateToken`: parsed payload for room code and file size (1 to 50MB), enforced strict regex `^relay/<roomCode>/[A-Za-z0-9._-]{1,80}$`.
+  - Rate limiting: enforced 6 token requests per hour per IP via `hitLimit`.
+  - Daily upload budget: tracked daily byte counter `relay-bytes:<YYYY-MM-DD>` with 86400s TTL, bounding total daily uploads to 600MB.
+  - Token options: restricted content type to `application/octet-stream`, max size to `size + 16` bytes, enabled random suffix, and set 10-minute token validity.
+- [x] Automated Stale Blob Cleanup Route (`src/app/api/relay/cleanup/route.ts` & `src/app/api/relay/__tests__/cleanup.test.ts`):
+  - Implemented `GET /api/relay/cleanup` verifying `CRON_SECRET` bearer authorization when configured.
+  - Paged through `list({ prefix: "relay/", limit: 100, cursor })` and purged blobs older than 30 minutes via `del()`.
+- [x] Deployment & Security Policies (`vercel.json`, `public/sw.js`):
+  - Added daily cleanup cron schedule `0 3 * * *` to `vercel.json`.
+  - Enforced CSP `connect-src` allowing `https://vercel.com` and `https://*.blob.vercel-storage.com`.
+  - Hardened Service Worker fetch handler to return early (bypass cache) for external origins and `/api/` paths; incremented cache name to `quicksend-v4`.
+- [x] Automated Test & Build Verification:
+  - Unit tests in `src/app/api/relay/__tests__/upload.test.ts` and `src/app/api/relay/__tests__/cleanup.test.ts`.
+  - 45 test suites, 279/279 tests passing (100% pass rate).
+  - ESLint 9: 0 warnings, 0 errors.
+  - Turbopack production build verified cleanly (`npm run build`).
