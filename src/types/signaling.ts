@@ -27,4 +27,21 @@ export interface SignalingRoomState {
   senderJoined: boolean;
   receiverJoined: boolean;
   messages: SignalMessage[];
+  // Optional encrypted cloud relay payload (no encryption key is ever sent to or stored on server)
+  relay?: {
+    salt: string;
+    createdAt: number;
+    items: {
+      url: string;
+      pathname: string;
+      name: string;
+      size: number;
+      mimeType: string;
+      iv: string;
+    }[];
+    text?: {
+      cipherText: string;
+      iv: string;
+    };
+  };
 }

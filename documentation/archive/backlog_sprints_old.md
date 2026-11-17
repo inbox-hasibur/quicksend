@@ -624,3 +624,26 @@
 - [x] Build & Verification:
   - ESLint 9 checks passing with zero warnings or errors.
   - Next.js Turbopack production build verified cleanly (`npm run build`).
+
+### Fix 3 (2026-11-17): Encrypted Cloud Relay Backend Core
+- [x] Zero-Knowledge Relay Cryptography (`src/lib/relayCrypto.ts` & `src/lib/__tests__/relayCrypto.test.ts`):
+  - `generateRelayCode()`: creates 8-char Crockford-style base-32 PIN (`XXXX-XXXX`) via `crypto.getRandomValues`.
+  - `normalizeRelayCode()`: whitespace/hyphen-tolerant normalization, case conversion, and strict validation.
+  - `generateSalt()`: 16-byte random salt encoded as base64.
+  - `deriveRelayKey()`: non-extractable AES-GCM 256 key derived with PBKDF2 (SHA-256, 200,000 iterations).
+  - `encryptBytes()`, `decryptBytes()`, `encryptText()`, `decryptText()`: AES-GCM with 12-byte random IV. Throws `"Wrong relay code"` on failure, with HTTPS subtle crypto guard.
+- [x] Serverless Sliding-Window Rate Limiter (`src/lib/rateLimit.ts` & `src/lib/__tests__/rateLimit.test.ts`):
+  - `clientIp()`: extracts client IP from `x-forwarded-for` header with `"unknown"` fallback.
+  - `hitLimit()`: tracks window hits against `signalStore` with TTL, returning boolean exceeded flag.
+- [x] Room State Relay Extension (`src/types/signaling.ts`):
+  - Added optional `relay` field to `SignalingRoomState` storing salt, metadata, encrypted blob items, and optional encrypted text. Commented that no key is ever stored.
+- [x] Serverless Relay Route Handlers (`src/app/api/relay/`):
+  - `GET /api/relay/status`: returns `{ available, maxFileBytes, maxFiles, ttlMinutes }` checking `BLOB_READ_WRITE_TOKEN`.
+  - `POST /api/relay/attach`: validates room code, blob domain (`.blob.vercel-storage.com`), path prefix (`/relay/<roomCode>/`), max 5 files, 50MB size limit. Upserts room in store with 15-minute TTL.
+  - `GET /api/relay/attach`: returns relay metadata for code with 30 req/min IP rate limiting.
+  - `POST /api/relay/complete`: calls `@vercel/blob` `del()` using ONLY verified URLs in store, clears relay state idempotently.
+- [x] Automated Test & Build Verification:
+  - Route tests in `src/app/api/relay/__tests__/route.test.ts` (mocking `@vercel/blob`).
+  - 43 test suites, 271/271 tests passing (100% pass rate).
+  - ESLint 9: 0 warnings, 0 errors.
+  - Turbopack production build verified cleanly (`npm run build`).

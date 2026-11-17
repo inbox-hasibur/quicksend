@@ -263,6 +263,18 @@ flowchart TD
 - **Purpose:** Dynamic ICE & TURN credential endpoint (`GET`). Delivers public STUN pool, queries ephemeral TURN credentials securely from Metered.ca without exposing the secret API key to clients, supports static TURN variables, and caches server responses in memory with a 10-minute TTL.
 - **Exports:** `GET(): Promise<NextResponse>`, `_resetTurnCacheForTest(): void`.
 
+#### `src/app/api/relay/status/route.ts`
+- **Purpose:** Ephemeral encrypted cloud relay availability endpoint (`GET`). Returns `{ available, maxFileBytes, maxFiles, ttlMinutes }` based on `BLOB_READ_WRITE_TOKEN` with `Cache-Control: no-store`.
+- **Exports:** `GET(): Promise<NextResponse>`.
+
+#### `src/app/api/relay/attach/route.ts`
+- **Purpose:** Encrypted relay attachment endpoint (`GET`, `POST`). Validates room codes, ensures URLs belong to `.blob.vercel-storage.com` with path `/relay/<roomCode>/`, bounds file size to 50MB and items to 5. Stores relay metadata (salt, items, IVs, optional encrypted text) in `signalStore` without server-side key exposure. Rate-limited to 30 req/min per IP.
+- **Exports:** `GET(request: Request): Promise<NextResponse>`, `POST(request: Request): Promise<NextResponse>`.
+
+#### `src/app/api/relay/complete/route.ts`
+- **Purpose:** Relay completion & cleanup endpoint (`POST`). Idempotently purges verified blob URLs from `@vercel/blob` via `del()` using ONLY URLs found in the verified store (ignoring request body URLs) and clears room relay state. Rate-limited to 30 req/min per IP.
+- **Exports:** `POST(request: Request): Promise<NextResponse>`.
+
 ---
 
 ### 3.2 UI Components (`src/components/`)
@@ -479,6 +491,14 @@ flowchart TD
 #### `src/lib/diskStream.ts`
 - **Purpose:** Large-file streaming layer leveraging File System Access API (`showSaveFilePicker`) for browser files > 100MB, streaming chunks directly to user disk to prevent tab memory exhaustion while safely falling back to in-memory Blob reassembly when unsupported (Safari, Firefox, small files).
 - **Exports:** `DISK_STREAM_THRESHOLD`, `isFileSystemAccessSupported`, `createDiskStreamWriter`.
+
+#### `src/lib/relayCrypto.ts`
+- **Purpose:** Zero-knowledge client-side cryptography module for encrypted cloud relay transfers. Generates 8-character base-32 formatted relay codes (`XXXX-XXXX`), 16-byte random salts, derives non-extractable AES-GCM 256 keys via PBKDF2 (SHA-256, 200,000 iterations), and performs authenticated symmetric encryption/decryption with random 12-byte IVs.
+- **Exports:** `generateRelayCode`, `normalizeRelayCode`, `generateSalt`, `deriveRelayKey`, `encryptBytes`, `decryptBytes`, `encryptText`, `decryptText`.
+
+#### `src/lib/rateLimit.ts`
+- **Purpose:** Lightweight serverless sliding-window rate limiter utilizing `signalStore` generic key storage with TTL expiration. Extracts client IP via `x-forwarded-for`.
+- **Exports:** `clientIp(request: Request): string`, `hitLimit(key: string, limit: number, windowSeconds: number): Promise<boolean>`.
 
 #### `src/lib/ultrasonicStream.ts`
 - **Purpose:** Frequency Shift Keying (FSK) codec for acoustic sound data transfer. Converts text into hexadecimal nibbles, maps symbols to near-ultrasonic (18–20 kHz) or audible frequencies, and classifies start/stop/data tones.
