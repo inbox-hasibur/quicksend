@@ -252,7 +252,26 @@ quicksend/
     │   │   │   ├── __tests__/
     │   │   │   │   └── route.test.ts
     │   │   │   └── route.ts
-    │   │   └── signal/
+    │   │   ├── relay/
+    │   │   │   ├── __tests__/
+    │   │   │   │   ├── cleanup.test.ts
+    │   │   │   │   ├── route.test.ts
+    │   │   │   │   └── upload.test.ts
+    │   │   │   ├── attach/
+    │   │   │   │   └── route.ts
+    │   │   │   ├── cleanup/
+    │   │   │   │   └── route.ts
+    │   │   │   ├── complete/
+    │   │   │   │   └── route.ts
+    │   │   │   ├── status/
+    │   │   │   │   └── route.ts
+    │   │   │   └── upload/
+    │   │   │       └── route.ts
+    │   │   ├── signal/
+    │   │   │   ├── __tests__/
+    │   │   │   │   └── route.test.ts
+    │   │   │   └── route.ts
+    │   │   └── turn/
     │   │       ├── __tests__/
     │   │       │   └── route.test.ts
     │   │       └── route.ts
@@ -314,6 +333,7 @@ quicksend/
     │   │   ├── useHtml5Scanner.test.ts
     │   │   ├── useLocalDiscovery.test.tsx
     │   │   ├── useQuadScanner.test.ts
+    │   │   ├── useRelayTransfer.test.ts
     │   │   ├── useTheme.test.tsx
     │   │   ├── useTransferHistory.test.ts
     │   │   └── useWebRTC.test.ts
@@ -322,6 +342,7 @@ quicksend/
     │   ├── useNearbyShare.ts
     │   ├── useNetworkStatus.ts
     │   ├── useQuadScanner.ts
+    │   ├── useRelayTransfer.ts
     │   ├── useTheme.ts
     │   ├── useTransferHistory.ts
     │   └── useWebRTC.ts
@@ -338,6 +359,8 @@ quicksend/
     │   │   ├── opticalRecovery.test.ts
     │   │   ├── opticalSdp.test.ts
     │   │   ├── quadDecode.test.ts
+    │   │   ├── rateLimit.test.ts
+    │   │   ├── relayCrypto.test.ts
     │   │   ├── signalStore.test.ts
     │   │   ├── transferEstimate.test.ts
     │   │   ├── ultrasonicStream.test.ts
@@ -353,7 +376,9 @@ quicksend/
     │   ├── opticalRecovery.ts
     │   ├── opticalSdp.ts
     │   ├── quadDecode.ts
+    │   ├── rateLimit.ts
     │   ├── recoveryWords.ts
+    │   ├── relayCrypto.ts
     │   ├── signalingClient.ts
     │   ├── signalStore.ts
     │   ├── transferEstimate.ts

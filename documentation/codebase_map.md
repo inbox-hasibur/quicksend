@@ -1,6 +1,6 @@
 # QuickSend: Codebase Map & Dependency Graph
 
-> **Last Updated:** Major Milestone Sprints Roadmap & Fix 1 Complete (PeerJS 15s Watchdog & Mode 1 Diagnostics)
+> **Last Updated:** Fix 5 Complete (Mode 1 Encrypted Cloud Relay UI & Client Integration, Live ExpressTURN & Upstash Redis)
 > **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 
@@ -29,7 +29,8 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS 3.4 (Glassmorphic dark/light design system)"]
-        Vitest["Vitest 5.1 + happy-dom (251 Passing Tests across 40 Suites)"]
+        BlobPkg["@vercel/blob (Vercel Blob Client & Serverless SDK)"]
+        Vitest["Vitest 5.1 + happy-dom (289 Passing Tests across 46 Suites)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -42,6 +43,11 @@ flowchart TD
         SignalAPI["api/signal/route.ts (Room Signaling & Ephemeral Relay)"]
         DiscoverAPI["api/discover/route.ts (Subnet Discovery, CGNAT Pairing PIN, Beaming)"]
         TurnAPI["api/turn/route.ts (Dynamic TURN Relay Credentials & CGNAT Mobile Traversal)"]
+        RelayStatusAPI["api/relay/status/route.ts (Encrypted Relay Availability & Limits)"]
+        RelayAttachAPI["api/relay/attach/route.ts (Relay Metadata & Ciphertext Registry)"]
+        RelayCompleteAPI["api/relay/complete/route.ts (Relay Blob Purge & Session Complete)"]
+        RelayUploadAPI["api/relay/upload/route.ts (Vercel Blob Client Upload Token Handler)"]
+        RelayCleanupAPI["api/relay/cleanup/route.ts (Automated 30-min Stale Blob Cron)"]
     end
 
     subgraph Src_Components["src/components/ (UI & Presentation Components)"]
@@ -98,6 +104,8 @@ flowchart TD
         ModeAvail["modeAvailability.ts (isModeAvailable, getModeStatus, getAllModesStatus)"]
         SigClient["signalingClient.ts (SignalingClient: Room & Signal Polling Engine)"]
         SignalStore["signalStore.ts (Dual-Mode: Upstash Redis REST + Memory TTL)"]
+        RelayCrypto["relayCrypto.ts (Client AES-GCM 256 Cryptography)"]
+        RateLimit["rateLimit.ts (Serverless Sliding-Window Rate Limiter)"]
         Ultrasonic["ultrasonicStream.ts (Frequency Shift Keying FSK Codec)"]
     end
 
@@ -129,6 +137,7 @@ flowchart TD
     ModeSel --> CableCard
 
     InternetCard --> UseRTC
+    InternetCard --> UseRelay
     InternetCard --> DropzoneComp
     InternetCard --> QRDisp
     InternetCard --> QRModal
@@ -192,6 +201,19 @@ flowchart TD
     TransferMod --> Chunker
     TransferMod --> SpeedInd
     TransferMod --> DiskStream
+    TransferMod --> UseRelay
+
+    UseRelay --> RelayCrypto
+    UseRelay --> RelayStatusAPI
+    UseRelay --> RelayAttachAPI
+    UseRelay --> RelayCompleteAPI
+    UseRelay --> RelayUploadAPI
+    RelayAttachAPI --> SignalStore
+    RelayCompleteAPI --> SignalStore
+    RelayCompleteAPI --> BlobPkg
+    RelayUploadAPI --> BlobPkg
+    RelayUploadAPI --> RateLimit
+    RelayCleanupAPI --> BlobPkg
 
     UseRTC --> SigClient
     UseRTC --> Chunker
@@ -212,10 +234,12 @@ flowchart TD
 
 | Directory | Role & Responsibilities | Key Dependencies |
 | :--- | :--- | :--- |
-| `src/app/` | Next.js 16 App Router entry points, layout, metadata, error boundary, and route handlers (`/api/health`, `/api/signal`, `/api/discover`). | `next`, `react`, `lucide-react`, Tailwind CSS |
+| `src/app/` | Next.js 16 App Router entry points, layout, metadata, error boundary, and route handlers (`/api/health`, `/api/signal`, `/api/discover`, `/api/turn`, `/api/relay/*`). | `next`, `react`, `lucide-react`, Tailwind CSS |
 | `src/app/api/signal/` | Ephemeral serverless WebRTC room signaling and ICE/SDP message queue. | `src/lib/signalStore`, `src/lib/codeGenerator`, `src/types/signaling` |
 | `src/app/api/discover/` | Local subnet peer discovery, IP detection, CGNAT 4-digit pairing PIN, and beaming endpoints. | `src/lib/signalStore`, `src/lib/deviceIdentity` |
 | `src/app/api/health/` | Public health check returning runtime environment, Redis/Memory storage telemetry, and uptime. | `src/lib/signalStore` |
+| `src/app/api/turn/` | Ephemeral TURN credentials resolver querying Metered.ca with in-memory caching and STUN fallback. | `src/lib/iceConfig` |
+| `src/app/api/relay/` | Zero-knowledge encrypted cloud relay routes (`status`, `attach`, `complete`, `upload`, `cleanup`). | `@vercel/blob`, `src/lib/signalStore`, `src/lib/rateLimit` |
 | `src/components/` | Presentation & interactive units: 6-channel mode selector, channel controller cards, diagnostic drawer, dropzone, QR displays, modals, badges, and progress indicators. | `lucide-react`, `qrcode.react`, `html5-qrcode`, `src/hooks/`, `src/lib/` |
 | `src/hooks/` | Stateful React lifecycle hooks managing WebRTC connections (`useWebRTC`), subnet discovery (`useLocalDiscovery`), camera scanners (`useQuadScanner`, `useHtml5Scanner`), theme, and history. | `react`, `src/lib/`, browser runtime APIs |
 | `src/lib/` | Pure TypeScript domain libraries: Base45 encoding, word recovery codes, multi-QR grid splitting, optical XOR parity stream, chunking, STUN/TURN ICE config, disk streaming, and transfer estimation. | `src/types/`, `vitest` |
@@ -577,12 +601,15 @@ flowchart TD
 
 ---
 
-### 3.8 Automated Vitest Test Suites (40 Test Suites, 251 Passing Tests)
+### 3.8 Automated Vitest Test Suites (46 Test Suites, 289 Passing Tests)
 
 | Test Suite Path | Target Module | Verified Coverage & Capabilities |
 | :--- | :--- | :--- |
 | `src/app/api/discover/__tests__/route.test.ts` | `api/discover/route.ts` | Local IP detection, subnet grouping, 4-digit PIN pairing, beam delivery, and TTL expiration. |
 | `src/app/api/health/__tests__/route.test.ts` | `api/health/route.ts` | Operational health check JSON payload, Redis/memory storage telemetry, and HTTP 200. |
+| `src/app/api/relay/__tests__/cleanup.test.ts` | `api/relay/cleanup/route.ts` | Bearer CRON_SECRET auth, Blob list cursor pagination, 30-minute stale blob del() purge. |
+| `src/app/api/relay/__tests__/route.test.ts` | `api/relay/status & attach & complete` | 503 without token, domain validation, size bounding, and idempotent verified blob deletion. |
+| `src/app/api/relay/__tests__/upload.test.ts` | `api/relay/upload/route.ts` | Client upload token generation, IP rate limiting (6/hr), daily budget (600MB) checks. |
 | `src/app/api/signal/__tests__/route.test.ts` | `api/signal/route.ts` | Room creation, room query by code, peer joining, signaling delivery, error codes, and cleanup. |
 | `src/app/api/turn/__tests__/route.test.ts` | `api/turn/route.ts` | Dynamic TURN fetching, Metered API caching, STUN fallback, and static config. |
 | `src/components/__tests__/CableTransferCard.test.tsx` | `CableTransferCard.tsx` | Mode 6 cable UI, Android USB tethering shortcut button, and direct PIN connection flow. |
@@ -591,18 +618,19 @@ flowchart TD
 | `src/components/__tests__/DirectConnectPanel.test.tsx` | `DirectConnectPanel.tsx` | Formatted PIN display, clipboard copy, input whitespace/hyphen normalization, and camera QR trigger. |
 | `src/components/__tests__/FileTypeBadge.test.tsx` | `FileTypeBadge.tsx` | Color-coded file chips across document, image, video, audio, archive, and code extensions. |
 | `src/components/__tests__/HotspotAssistantCard.test.tsx` | `HotspotAssistantCard.tsx` | Mode 3 Wi-Fi hotspot setup, Wi-Fi QR generator, peer radar, and unified fallback details. |
-| `src/components/__tests__/InternetSharingCard.test.tsx` | `InternetSharingCard.tsx` | Send/Receive views, live QR and PIN co-location, Auto PIN/Mobile/Keyword pairing modes, ConnectionDiagnostics rendering, and TURN warning notice. |
+| `src/components/__tests__/InternetSharingCard.test.tsx` | `InternetSharingCard.tsx` | Send/Receive views, live QR and PIN co-location, Auto PIN/Mobile/Keyword pairing modes, ConnectionDiagnostics rendering, relay consent, and ready PIN. |
 | `src/components/__tests__/NearbyShareCard.test.tsx` | `NearbyShareCard.tsx` | Mode 4 Bluetooth guidance, Web Share API handoff, history logging, and BLE GATT scanner. |
 | `src/components/__tests__/RadarPanel.test.tsx` | `RadarPanel.tsx` | Concentric radar rings, center identity node, avatar modal callback, peer radial layout, and beam triggering. |
 | `src/components/__tests__/SegmentedControl.test.tsx` | `SegmentedControl.tsx` | Pill track rendering, option selection state, keyboard navigation, and custom class names. |
 | `src/components/__tests__/SpeedIndicator.test.tsx` | `SpeedIndicator.tsx` | Real-time throughput calculations, MB/s rendering, progress percentages, and status colors. |
-| `src/components/__tests__/TransferModal.test.tsx` | `TransferModal.tsx` | Transfer modal prompt, file metadata, progress tracking, transfer cancellation, and auto-download. |
+| `src/components/__tests__/TransferModal.test.tsx` | `TransferModal.tsx` | Transfer modal prompt, file metadata, progress tracking, transfer cancellation, auto-download, relay error button, and encrypted card. |
 | `src/components/__tests__/UltrasonicCard.test.tsx` | `UltrasonicCard.tsx` | FSK sound transmission, audio spectrum canvas visualization, and tone modulation presets. |
 | `src/components/camera/__tests__/CameraParts.test.tsx` | `camera/Receiver*.tsx` | ReceiverProgressView block updates, word recovery codes, and ReceiverCompleteView download actions. |
 | `src/hooks/__tests__/nearbyShare.test.ts` | `useNearbyShare.ts` | Web Share API payload delegation, file support detection, and BLE hardware scanner status. |
 | `src/hooks/__tests__/useHtml5Scanner.test.ts` | `useHtml5Scanner.ts` | Single-stream camera scanner lifecycle, canvas rendering, and robust DOM error cleanup. |
 | `src/hooks/__tests__/useLocalDiscovery.test.tsx` | `useLocalDiscovery.ts` | Subnet discovery polling, peer list diffing, 4-digit PIN registration, and incoming beams. |
 | `src/hooks/__tests__/useQuadScanner.test.ts` | `useQuadScanner.ts` | Multi-quadrant scanner initialization, layout rotation, canvas recycling, and track cleanup. |
+| `src/hooks/__tests__/useRelayTransfer.test.ts` | `useRelayTransfer.ts` | Status fetching, polling cancellation, encrypted download handling, and wrong PIN error guard. |
 | `src/hooks/__tests__/useTheme.test.tsx` | `useTheme.ts` | Dark/light theme state toggling, class application to document root, and localStorage persistence. |
 | `src/hooks/__tests__/useTransferHistory.test.ts` | `useTransferHistory.ts` | Transfer history logging, drawer state management, session persistence, and re-download links. |
 | `src/hooks/__tests__/useWebRTC.test.ts` | `useWebRTC.ts` | WebRTC connection setup, 12s/15s receiver dial timeouts, PeerJS conn.peerConnection ICE watchdog, buffer draining, and room/firewall diagnostics. |
@@ -617,6 +645,8 @@ flowchart TD
 | `src/lib/__tests__/opticalRecovery.test.ts` | `opticalRecovery.ts` | XOR parity stride computation, missing packet reconstruction, and recovery validation. |
 | `src/lib/__tests__/opticalSdp.test.ts` | `opticalSdp.ts` | SDP session description compression and serialization into scannable QR payloads. |
 | `src/lib/__tests__/quadDecode.test.ts` | `quadDecode.ts` | Canvas quadrant geometry calculation, coordinate slicing, and video frame partitioning. |
+| `src/lib/__tests__/rateLimit.test.ts` | `rateLimit.ts` | Sliding window hit rate counting, window expiration, IP extraction fallback. |
+| `src/lib/__tests__/relayCrypto.test.ts` | `relayCrypto.ts` | PBKDF2 key derivation, AES-GCM 256 encryption/decryption, bit-tampering detection. |
 | `src/lib/__tests__/signalStore.test.ts` | `signalStore.ts` | Memory and Redis signaling store adapters, room creation, TTL expiration, and capacity limits. |
 | `src/lib/__tests__/transferEstimate.test.ts` | `transferEstimate.ts` | Dynamic duration calculation across transfer channels and payload sizes. |
 | `src/lib/__tests__/ultrasonicStream.test.ts` | `ultrasonicStream.ts` | FSK sound nibble encoding, frequency tone mapping, tone classification, and decoding. |
@@ -624,5 +654,5 @@ flowchart TD
 
 ---
 
-## 4. Sprint Status: All Sprints Completed & Production Verified
-All thirty sprints (including tactile redesign, dual-mode signaling store, multi-file batch streaming, disk streaming, multi-frame animated optical QR signaling with manual fallback, minimal navbar/footer redesign, ultrasonic sound data transfer, universal transfer time estimation badges, isolated HTML5 scanner lifecycle, optical XOR parity frames, Base45 alphanumeric QR mode, 2x3 portrait grid layout with 2x2 Large default, auto-layout detection, human-readable word recovery codes, live connection diagnostics with masked network group labels, Bluetooth channel restoration, dead code & asset elimination, camera component modularization, radar & direct connect component deduplication, documentation streamlining, and sender QR non-blocking visibility with 15s smart ICE watchdog) are fully implemented, verified with 238 passing unit tests across 38 test suites, zero lint warnings, and clean production Turbopack build.
+## 4. Sprint & Maintenance Status: All Sprints & Fixes Verified
+All historical sprints and recent production maintenance fixes (Fix 1: PeerJS 15s watchdog; Fix 2: README simplification; Fix 3: Encrypted cloud relay backend core; Fix 4: Upload token rate limiting, cron cleanup, CSP & SW hardening; Fix 5: Encrypted cloud relay UI, client PBKDF2/AES-GCM encryption, `#rc=` PIN fragment appending, and live ExpressTURN + Upstash Redis integration) are fully implemented, verified with 289 passing unit tests across 46 test suites, zero lint warnings, and clean production Turbopack build.
