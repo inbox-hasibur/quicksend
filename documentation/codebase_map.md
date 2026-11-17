@@ -71,6 +71,7 @@ flowchart TD
 
     subgraph Src_Hooks["src/hooks/ (Custom React Hooks)"]
         UseRTC["useWebRTC.ts (useWebRTC: Peer Connection & Stream Controller)"]
+        UseRelay["useRelayTransfer.ts (useRelayTransfer: Encrypted Cloud Relay Controller)"]
         UseLocalDisc["useLocalDiscovery.ts (Radar Subnet Discovery & 4-Digit Pairing)"]
         UseNearby["useNearbyShare.ts (useNearbyShare: Web Share & Web-BLE Client)"]
         UseNet["useNetworkStatus.ts (useBrowserCapabilities)"]
@@ -296,7 +297,7 @@ flowchart TD
 - **Exports:** `ModeSelector(): JSX.Element`
 
 #### `src/components/InternetSharingCard.tsx`
-- **Purpose:** Mode 1 Interactive Controller (Via Internet). Provides co-located scannable QR code and 6-digit PIN across both Send and Receive screens, flexible sender pairing strategies (Auto PIN, Mobile Number, Custom Keyword), real-time `<ConnectionDiagnostics />` telemetry, and dynamic `/api/turn` warning banner.
+- **Purpose:** Mode 1 Interactive Controller (Via Internet). Provides co-located scannable QR code and 6-digit PIN across both Send and Receive screens, flexible sender pairing strategies (Auto PIN, Mobile Number, Custom Keyword), real-time `<ConnectionDiagnostics />` telemetry, dynamic `/api/turn` warning banner, and opt-in "Send via encrypted cloud relay" fallback with client-side encryption and `#rc=` PIN fragment appending.
 - **Exports:** `InternetSharingCard({ initialRoomCode }: InternetSharingCardProps): JSX.Element`
 
 #### `src/components/SameNetworkCard.tsx`
@@ -397,8 +398,9 @@ flowchart TD
   2. *Waiting for Acceptance:* Receiver prompt with file/text preview and Accept / Cancel Transfer actions.
   3. *Transferring:* Live progress bar, throughput speed (MB/s), byte counts, and active "Cancel Transfer" action.
   4. *Completed:* Auto-download confirmation for files, or one-click copy button for text snippets.
-  5. *Error / Declined:* Informative status feedback with immediate dismiss via close button or Escape key.
-- **Exports:** `TransferModal({ progress, onAccept, onReject, onClose }: TransferModalProps): JSX.Element | null`
+  5. *Error / Declined:* Informative status feedback with immediate dismiss via close button or Escape key, plus optional "Send via encrypted cloud relay" fallback trigger.
+  6. *Encrypted Cloud Relay Receive:* Displays encrypted payload card, prefilled relay code input, decrypt progress, and error feedback.
+- **Exports:** `TransferModal(props: TransferModalProps): JSX.Element | null`
 
 #### `src/components/ServiceWorkerRegister.tsx`
 - **Purpose:** Registers `/sw.js` in production environments and logs service worker registration status.
@@ -411,6 +413,10 @@ flowchart TD
 #### `src/hooks/useWebRTC.ts`
 - **Purpose:** Complete WebRTC peer connection and DataChannel manager. Orchestrates signaling exchange, candidate queuing, binary chunk slicing with buffer backpressure via `waitForDrain`, dynamic TURN fetching via `fetchIceConfig`, 12-second Peer/Signaling watchdog, 15-second receiver dial timeout with clear room not found vs 4G firewall error differentiation, automated one-shot `pc.restartIce()`, PeerJS internal `conn.peerConnection` ICE tracking, transport isolation (`activeTransportRef`), live diagnostics metrics collection (ICE, gathering, signaling, channel, candidate counts, selected pair), and 40-entry debug log ring buffer.
 - **Exports:** `useWebRTC(mode): { role, roomId, roomCode, isConnected, progress, pendingHeader, brokerNotice, startSender, startReceiver, sendFiles, sendText, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup, debugLog, diagnostics }`, `waitForDrain`, `DrainableChannel`, `WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`, `FIREWALL_BLOCKED_MESSAGE`, `ROOM_NOT_FOUND_MESSAGE`.
+
+#### `src/hooks/useRelayTransfer.ts`
+- **Purpose:** Client-side encrypted cloud relay controller. Derives AES-GCM 256 keys via PBKDF2 without server key exposure, encrypts files and text into binary octet streams, coordinates direct client uploads via `@vercel/blob/client`, handles 4s polling on receiver, downloads and decrypts payloads, and triggers automatic completion cleanup.
+- **Exports:** `useRelayTransfer(): UseRelayTransferReturn`, `UseRelayTransferReturn`, `RelayStatus`, `RelayPayloadData`.
 
 #### `src/hooks/useLocalDiscovery.ts`
 - **Purpose:** Local network peer discovery via `/api/discover`. Manages peer heartbeat polling, dynamic avatar conflict resolution, incoming beam handling, optional 4-digit pairing code for cross-IP / CGNAT discovery, and exposes detailed poll status (`DiscoveryStatus` with `groupLabel` and `ipFamily`).

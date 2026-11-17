@@ -41,7 +41,7 @@ export default function Home() {
             Direct Transfer
           </span>
           <span>•</span>
-          <span>No Server Storage</span>
+          <span>Direct by default</span>
           <span>•</span>
           <span>Private</span>
         </div>

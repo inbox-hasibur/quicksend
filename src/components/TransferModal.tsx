@@ -11,6 +11,8 @@ import {
   ArrowDownToLine,
   Zap,
   ShieldCheck,
+  Lock,
+  RefreshCw,
 } from "lucide-react";
 import type { TransferProgressState } from "@/types/transfer";
 import { formatBytes, formatSpeed } from "@/lib/chunker";
@@ -18,13 +20,23 @@ import { formatRoomCode } from "@/lib/codeGenerator";
 import { FileTypeBadge } from "@/components/FileTypeBadge";
 import { estimateSeconds, formatDuration } from "@/lib/transferEstimate";
 
-interface TransferModalProps {
+export interface TransferModalProps {
   progress: TransferProgressState;
   isOpen?: boolean;
   roomCode?: string;
   onAccept: () => void;
   onReject: () => void;
   onClose: () => void;
+  onRelay?: () => void;
+  isRelayAvailable?: boolean;
+  relayPayload?: {
+    salt: string;
+    items: { name: string; size: number }[];
+    text?: { cipherText: string; iv: string };
+  } | null;
+  onDownloadRelay?: (relayCode: string) => Promise<void> | void;
+  isDownloadingRelay?: boolean;
+  relayError?: string | null;
 }
 
 export function TransferModal({
@@ -34,9 +46,32 @@ export function TransferModal({
   onAccept,
   onReject,
   onClose,
+  onRelay,
+  isRelayAvailable,
+  relayPayload,
+  onDownloadRelay,
+  isDownloadingRelay,
+  relayError,
 }: TransferModalProps) {
   const [copied, setCopied] = useState(false);
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
+  const [enteredRelayCode, setEnteredRelayCode] = useState(() => {
+    if (typeof window !== "undefined" && window.location.hash.startsWith("#rc=")) {
+      return decodeURIComponent(window.location.hash.slice(4));
+    }
+    return "";
+  });
+  const [localRelayError, setLocalRelayError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      if (typeof window !== "undefined" && window.location.hash.startsWith("#rc=")) {
+        setEnteredRelayCode(decodeURIComponent(window.location.hash.slice(4)));
+      }
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
 
   // Derive unique key for current status + payload + error so dismissal is 100% deterministic
   const currentTransferKey =
@@ -64,8 +99,8 @@ export function TransferModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   });
 
-  // Modal is only visible when transfer is active or completed/rejected, not dismissed, and isOpen is not false
-  if (isOpen === false || !currentTransferKey || isDismissed) {
+  // Modal is only visible when transfer is active, completed/rejected, or relay payload detected, not dismissed, and isOpen is not false
+  if (isOpen === false || (!currentTransferKey && !relayPayload) || isDismissed) {
     return null;
   }
 
@@ -375,6 +410,95 @@ export function TransferModal({
             </div>
           )}
 
+          {/* Encrypted Relay Download Card for Receiver */}
+          {relayPayload && (
+            <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3 text-left">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[var(--text)]">
+                  Encrypted Cloud Relay Ready
+                </span>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--accent)] text-[var(--bg)]">
+                  Encrypted
+                </span>
+              </div>
+
+              {/* Items List */}
+              <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                {relayPayload.items.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between text-xs p-2 rounded-lg bg-[var(--surface)] border border-[var(--border-hairline)]"
+                  >
+                    <span className="truncate max-w-[200px] font-medium text-[var(--text)]">
+                      {item.name}
+                    </span>
+                    <span className="text-[11px] text-[var(--text-muted)] font-mono shrink-0 ml-2">
+                      {formatBytes(item.size)}
+                    </span>
+                  </div>
+                ))}
+                {relayPayload.text && (
+                  <div className="flex items-center justify-between text-xs p-2 rounded-lg bg-[var(--surface)] border border-[var(--border-hairline)]">
+                    <span className="font-medium text-[var(--text)]">Encrypted text snippet</span>
+                    <span className="text-[11px] text-[var(--text-muted)] font-mono">Text</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Relay Code Input */}
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-semibold text-[var(--text-muted)] block">
+                  Relay code
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. XXXX-XXXX"
+                  value={enteredRelayCode}
+                  onChange={(e) => {
+                    setEnteredRelayCode(e.target.value);
+                    setLocalRelayError(null);
+                  }}
+                  className="w-full p-2.5 rounded-xl text-xs font-mono font-bold tracking-wider uppercase border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                />
+              </div>
+
+              {/* Error display */}
+              {(localRelayError || relayError) && (
+                <div className="text-[11px] text-red-600 dark:text-red-400 font-medium">
+                  {localRelayError || relayError}
+                </div>
+              )}
+
+              {/* Download Button */}
+              <button
+                type="button"
+                onClick={async () => {
+                  if (!enteredRelayCode.trim()) return;
+                  try {
+                    setLocalRelayError(null);
+                    await onDownloadRelay?.(enteredRelayCode.trim());
+                  } catch (err) {
+                    setLocalRelayError(err instanceof Error ? err.message : "Wrong relay code");
+                  }
+                }}
+                disabled={isDownloadingRelay || !enteredRelayCode.trim()}
+                className="w-full py-2.5 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-40"
+              >
+                {isDownloadingRelay ? (
+                  <>
+                    <RefreshCw className="h-4 w-4 animate-spin" />
+                    <span>Decrypting &amp; Downloading...</span>
+                  </>
+                ) : (
+                  <>
+                    <ArrowDownToLine className="h-4 w-4" />
+                    <span>Download</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* 4. Error / Rejected views */}
           {(progress.status === "rejected" || progress.status === "error") && (
             <div className="space-y-3">
@@ -382,6 +506,16 @@ export function TransferModal({
                 <AlertCircle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
                 <span>{progress.errorMessage || "Transfer was declined or interrupted."}</span>
               </div>
+              {onRelay && isRelayAvailable && (
+                <button
+                  type="button"
+                  onClick={onRelay}
+                  className="w-full py-2.5 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                >
+                  <Lock className="h-4 w-4" />
+                  <span>Send via encrypted cloud relay</span>
+                </button>
+              )}
               <button
                 type="button"
                 data-testid="transfer-modal-bottom-close"

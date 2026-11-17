@@ -667,3 +667,23 @@
   - 45 test suites, 279/279 tests passing (100% pass rate).
   - ESLint 9: 0 warnings, 0 errors.
   - Turbopack production build verified cleanly (`npm run build`).
+
+### Fix 5 (2026-11-17): Mode 1 Encrypted Cloud Relay UI & Client Integration
+- [x] Client Relay Transfer Controller (`src/hooks/useRelayTransfer.ts` & `src/hooks/__tests__/useRelayTransfer.test.ts`):
+  - Created custom hook tracking relay configuration status (`/api/relay/status`), transfer phase state machine (`idle` | `encrypting` | `uploading` | `ready` | `error`), progress percent, and generated relay PIN.
+  - Sender: `startRelayUpload(roomCode, files, text)` enforces file count and size limits, derives AES-GCM 256 key client-side via PBKDF2 with 200,000 iterations, encrypts files/text into binary octet streams with random 12-byte IVs, uploads encrypted blobs to `/api/relay/upload` using `@vercel/blob/client`, and posts ciphertext metadata to `/api/relay/attach`.
+  - Receiver: `pollRelay(roomCode)` polls `/api/relay/attach` with 4s intervals up to 120s; `downloadRelay(relay, relayCode)` normalizes PIN, derives key, downloads blobs, decrypts contents, triggers downloads or clipboard copy, logs to `useTransferHistory` with mode `internet`, and calls `/api/relay/complete`. Throws `"Wrong relay code"` without calling complete on decrypt failure.
+- [x] Mode 1 UI & Dialog Integration (`src/components/InternetSharingCard.tsx`, `src/components/TransferModal.tsx`):
+  - Added opt-in "Send via encrypted cloud relay" button on sender when files/text are staged and relay is available.
+  - Added clear ephemeral consent disclosure before upload: *"This uploads an encrypted copy to temporary cloud storage. It is deleted after download or within 24 hours."*
+  - Displayed large 8-char relay PIN with copy button upon upload completion, informing sender: *"Receiver enters PIN <pin>, then this relay code."*
+  - Automatically appended `#rc=<relayCode>` hash fragment to generated QR URL for zero-friction scanning without sending the key to the server.
+  - Updated `TransferModal` on sender error to present the encrypted cloud relay fallback option.
+  - Integrated encrypted download view on receiver with encrypted badge, prefilled/hashchange-listening PIN input, and decrypt action.
+  - Replaced amber TURN styling with clean neutral design tokens (`var(--surface-subtle)`, `var(--border-hairline)`, `var(--text-muted)`).
+- [x] Branding & Footer Alignment (`src/app/page.tsx`):
+  - Updated footer bullet from "No Server Storage" to "Direct by default" to accurately convey peer-to-peer priority while accommodating the opt-in encrypted relay.
+- [x] Automated Test & Build Verification:
+  - 46 test suites, 289/289 tests passing (100% pass rate).
+  - ESLint 9: 0 warnings, 0 errors.
+  - Turbopack production build verified cleanly (`npm run build`).

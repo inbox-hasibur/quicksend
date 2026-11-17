@@ -2,9 +2,36 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { act, useState } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { InternetSharingCard } from "@/components/InternetSharingCard";
+import Home from "@/app/page";
+
+import type { RelayPayloadData } from "@/hooks/useRelayTransfer";
 
 // @ts-expect-error React act environment flag
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+const mockRelayHook = {
+  relayStatus: { available: true, maxFileBytes: 52428800, maxFiles: 5, ttlMinutes: 15 },
+  relayState: "idle",
+  progress: 0,
+  relayCode: null as string | null,
+  error: null as string | null,
+  relayPayload: null as RelayPayloadData | null,
+  isDownloading: false,
+  startRelayUpload: vi.fn(),
+  cancelRelay: vi.fn(),
+  pollRelay: vi.fn(),
+  stopPolling: vi.fn(),
+  downloadRelay: vi.fn(),
+};
+
+vi.mock("@/hooks/useRelayTransfer", () => ({
+  useRelayTransfer: () => mockRelayHook,
+}));
 
 vi.mock("@/hooks/useWebRTC", () => {
   return {
@@ -162,9 +189,90 @@ describe("InternetSharingCard Component", () => {
     // Connection diagnostics details element rendered
     expect(container.textContent).toContain("Connection details");
 
-    // TURN warning notice rendered
+    // TURN warning notice rendered without amber classes
     expect(container.textContent).toContain("TURN relay not configured — works on same Wi-Fi; 4G mobile data may require TURN.");
+    const turnNotice = Array.from(container.querySelectorAll("div")).find((d) =>
+      d.textContent?.includes("TURN relay not configured")
+    );
+    expect(turnNotice).toBeDefined();
+    expect(turnNotice?.className).not.toMatch(/amber/);
 
     vi.unstubAllGlobals();
+  });
+
+  it("hides relay button when status.available is false", async () => {
+    mockRelayHook.relayStatus = { available: false, maxFileBytes: 52428800, maxFiles: 5, ttlMinutes: 15 };
+
+    await act(async () => {
+      root.render(<InternetSharingCard />);
+    });
+
+    expect(container.textContent).not.toContain("Send via encrypted cloud relay");
+  });
+
+  it("shows consent line when relay button is clicked", async () => {
+    mockRelayHook.relayStatus = { available: true, maxFileBytes: 52428800, maxFiles: 5, ttlMinutes: 15 };
+    mockRelayHook.relayState = "idle";
+
+    await act(async () => {
+      root.render(<InternetSharingCard />);
+    });
+
+    // Simulate file drop or text input in Dropzone
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    if (fileInput) {
+      const file = new File(["dummy content"], "doc.txt", { type: "text/plain" });
+      await act(async () => {
+        Object.defineProperty(fileInput, "files", { value: [file] });
+        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
+
+    const relayBtn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Send via encrypted cloud relay")
+    );
+    expect(relayBtn).toBeDefined();
+
+    await act(async () => {
+      relayBtn?.click();
+    });
+
+    expect(container.textContent).toContain(
+      "This uploads an encrypted copy to temporary cloud storage. It is deleted after download or within 24 hours."
+    );
+    expect(container.textContent).toContain("Continue");
+  });
+
+  it("shows relay code in large text when relayState is ready", async () => {
+    mockRelayHook.relayStatus = { available: true, maxFileBytes: 52428800, maxFiles: 5, ttlMinutes: 15 };
+    mockRelayHook.relayState = "ready";
+    mockRelayHook.relayCode = "K7M2-9QXA";
+
+    await act(async () => {
+      root.render(<InternetSharingCard />);
+    });
+
+    // Simulate file selection so relay container is visible
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    if (fileInput) {
+      const file = new File(["dummy content"], "doc.txt", { type: "text/plain" });
+      await act(async () => {
+        Object.defineProperty(fileInput, "files", { value: [file] });
+        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
+
+    expect(container.textContent).toContain("K7M2-9QXA");
+    expect(container.textContent).toContain("Receiver enters PIN 834-291, then this relay code.");
+    expect(container.textContent).toContain("Copy Code");
+  });
+
+  it("renders page footer with 'Direct by default' and no 'No Server Storage'", async () => {
+    await act(async () => {
+      root.render(<Home />);
+    });
+
+    expect(container.textContent).toContain("Direct by default");
+    expect(container.textContent).not.toContain("No Server Storage");
   });
 });

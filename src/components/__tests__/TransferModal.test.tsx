@@ -294,4 +294,138 @@ describe("TransferModal Component", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(container.querySelector('[role="dialog"]')).toBeNull();
   });
+
+  it("shows the relay download card with the Encrypted badge and Download button", async () => {
+    const fakeRelay = {
+      salt: "c2FsdA==",
+      createdAt: Date.now(),
+      items: [{ name: "report.pdf", size: 1048576 }],
+    };
+
+    const idleProgress: TransferProgressState = {
+      status: "idle",
+      itemType: "file",
+      bytesTransferred: 0,
+      totalBytes: 0,
+      progressPercentage: 0,
+      speedBps: 0,
+    };
+
+    await act(async () => {
+      root.render(
+        <TransferModal
+          progress={idleProgress}
+          relayPayload={fakeRelay}
+          onAccept={vi.fn()}
+          onReject={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain("Encrypted Cloud Relay Ready");
+    expect(container.textContent).toContain("Encrypted");
+    expect(container.textContent).toContain("report.pdf");
+    expect(container.textContent).toContain("1 MB");
+    expect(container.textContent).toContain("Relay code");
+
+    const downloadBtn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Download")
+    );
+    expect(downloadBtn).toBeDefined();
+  });
+
+  it("shows an error when wrong code is entered during relay download", async () => {
+    const fakeRelay = {
+      salt: "c2FsdA==",
+      createdAt: Date.now(),
+      items: [{ name: "secret.bin", size: 500 }],
+    };
+
+    const idleProgress: TransferProgressState = {
+      status: "idle",
+      itemType: "file",
+      bytesTransferred: 0,
+      totalBytes: 0,
+      progressPercentage: 0,
+      speedBps: 0,
+    };
+
+    const onDownload = vi.fn().mockRejectedValue(new Error("Wrong relay code"));
+
+    await act(async () => {
+      root.render(
+        <TransferModal
+          progress={idleProgress}
+          relayPayload={fakeRelay}
+          onDownloadRelay={onDownload}
+          onAccept={vi.fn()}
+          onReject={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+    });
+
+    const input = container.querySelector("input[placeholder*='XXXX-XXXX']") as HTMLInputElement;
+    expect(input).not.toBeNull();
+
+    await act(async () => {
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value"
+      )?.set;
+      nativeSetter?.call(input, "WRONG-CD");
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
+    const downloadBtn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Download")
+    );
+
+    await act(async () => {
+      downloadBtn?.click();
+    });
+
+    expect(onDownload).toHaveBeenCalledWith("WRONG-CD");
+    expect(container.textContent).toContain("Wrong relay code");
+  });
+
+  it("shows 'Send via encrypted cloud relay' button in error state when relay is available", async () => {
+    const errorProgress: TransferProgressState = {
+      status: "error",
+      errorMessage: "Blocked by 4G mobile network or firewall — TURN relay required",
+      itemType: "file",
+      bytesTransferred: 0,
+      totalBytes: 0,
+      progressPercentage: 0,
+      speedBps: 0,
+    };
+
+    const onRelay = vi.fn();
+
+    await act(async () => {
+      root.render(
+        <TransferModal
+          progress={errorProgress}
+          onRelay={onRelay}
+          isRelayAvailable={true}
+          onAccept={vi.fn()}
+          onReject={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+    });
+
+    const relayBtn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Send via encrypted cloud relay")
+    );
+    expect(relayBtn).toBeDefined();
+
+    await act(async () => {
+      relayBtn?.click();
+    });
+
+    expect(onRelay).toHaveBeenCalledTimes(1);
+  });
 });

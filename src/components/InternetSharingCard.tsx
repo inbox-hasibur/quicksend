@@ -10,6 +10,9 @@ import {
   RefreshCw,
   AlertCircle,
   Users,
+  Lock,
+  Copy,
+  Check,
 } from "lucide-react";
 import { Dropzone } from "@/components/Dropzone";
 import { EstimateBadge } from "@/components/EstimateBadge";
@@ -19,6 +22,7 @@ import { TransferModal } from "@/components/TransferModal";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
 import { useWebRTC } from "@/hooks/useWebRTC";
+import { useRelayTransfer } from "@/hooks/useRelayTransfer";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
 import { getPayloadBytes } from "@/lib/transferEstimate";
 import type { TransferRole } from "@/types/mode";
@@ -44,7 +48,24 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [hasTurn, setHasTurn] = useState<boolean | null>(null);
+  const [showRelayConsent, setShowRelayConsent] = useState(false);
+  const [copiedRelayCode, setCopiedRelayCode] = useState(false);
   const hasAutoConnectedRef = useRef(false);
+
+  const {
+    relayStatus,
+    relayState,
+    progress: relayProgress,
+    relayCode,
+    error: relayError,
+    relayPayload,
+    isDownloading: isDownloadingRelay,
+    startRelayUpload,
+    cancelRelay,
+    pollRelay,
+    stopPolling,
+    downloadRelay,
+  } = useRelayTransfer();
 
   // Check /api/turn once when Mode 1 opens to detect TURN relay availability
   useEffect(() => {
@@ -172,6 +193,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
       try {
         setIsConnecting(true);
         setErrorMsg(null);
+        pollRelay(code);
         await startReceiver(code);
       } catch (err) {
         setErrorMsg(err instanceof Error ? err.message : "Failed to join room. Verify key & retry.");
@@ -179,8 +201,15 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
         setIsConnecting(false);
       }
     },
-    [inputCode, startReceiver]
+    [inputCode, startReceiver, pollRelay]
   );
+
+  // Stop polling relay when WebRTC connection succeeds
+  useEffect(() => {
+    if (isConnected) {
+      stopPolling();
+    }
+  }, [isConnected, stopPolling]);
 
   // Auto-connect receiver ONCE if initialRoomCode was passed in URL query param (?room=123456)
   useEffect(() => {
@@ -205,6 +234,8 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
 
   const handleReset = () => {
     hasAutoConnectedRef.current = true;
+    stopPolling();
+    cancelRelay();
     cleanup();
     setErrorMsg(null);
     if (role === "send") {
@@ -257,8 +288,8 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
 
       {/* Subtle TURN Relay Notice */}
       {hasTurn === false && (
-        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
-          <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-[var(--text-muted)] text-xs">
+          <AlertCircle className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
           <span>TURN relay not configured — works on same Wi-Fi; 4G mobile data may require TURN.</span>
         </div>
       )}
@@ -276,6 +307,106 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
               channel="internet"
               totalBytes={getPayloadBytes(selectedPayload.files, selectedPayload.text)}
             />
+
+            {Boolean(relayStatus?.available) &&
+              (selectedPayload.files.length > 0 || selectedPayload.text.trim().length > 0) && (
+                <div className="space-y-3 pt-1">
+                  {!showRelayConsent && relayState === "idle" && (
+                    <button
+                      type="button"
+                      onClick={() => setShowRelayConsent(true)}
+                      className="w-full py-2.5 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-muted)] text-[var(--text)] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <Lock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+                      <span>Send via encrypted cloud relay</span>
+                    </button>
+                  )}
+
+                  {showRelayConsent && relayState === "idle" && (
+                    <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3 animate-in fade-in">
+                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">
+                        This uploads an encrypted copy to temporary cloud storage. It is deleted after download or within 24 hours.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowRelayConsent(false);
+                            if (roomCode) {
+                              startRelayUpload(roomCode, selectedPayload.files, selectedPayload.text);
+                            }
+                          }}
+                          className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-semibold text-xs cursor-pointer transition-colors"
+                        >
+                          Continue
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowRelayConsent(false)}
+                          className="px-4 py-2 rounded-xl border border-[var(--border-hairline)] hover:bg-[var(--surface-muted)] text-[var(--text)] font-semibold text-xs cursor-pointer transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {(relayState === "encrypting" || relayState === "uploading") && (
+                    <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-2 text-center animate-in fade-in">
+                      <div className="flex items-center justify-between text-xs font-medium text-[var(--text)]">
+                        <span>
+                          {relayState === "encrypting"
+                            ? "Encrypting with client key..."
+                            : "Uploading encrypted copy..."}
+                        </span>
+                        <span className="font-mono">{relayProgress}%</span>
+                      </div>
+                      <div className="w-full bg-[var(--surface)] h-2 rounded-full overflow-hidden border border-[var(--border-hairline)]">
+                        <div
+                          className="bg-[var(--accent)] h-full transition-all duration-300"
+                          style={{ width: `${relayProgress}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {relayState === "ready" && relayCode && (
+                    <div className="p-5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3 text-center animate-in fade-in">
+                      <span className="text-xs font-semibold text-[var(--text-muted)] block">
+                        Encrypted Cloud Relay Code
+                      </span>
+                      <div className="text-2xl font-mono font-bold tracking-wider text-[var(--text)] select-all">
+                        {relayCode}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(relayCode);
+                          setCopiedRelayCode(true);
+                          setTimeout(() => setCopiedRelayCode(false), 2000);
+                        }}
+                        className="mx-auto py-2 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text)] flex items-center gap-1.5 cursor-pointer"
+                      >
+                        {copiedRelayCode ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                        <span>{copiedRelayCode ? "Copied!" : "Copy Code"}</span>
+                      </button>
+                      <p className="text-xs text-[var(--text-muted)]">
+                        Receiver enters PIN {formatRoomCode(roomCode || "")}, then this relay code.
+                      </p>
+                    </div>
+                  )}
+
+                  {relayError && (
+                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs">
+                      {relayError}
+                    </div>
+                  )}
+                </div>
+              )}
           </div>
 
           {/* STEP 2: PAIRING METHOD & LIVE QR / PIN */}
@@ -376,7 +507,14 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
             {/* LIVE SCANNABLE QR CODE & ROOM PIN DISPLAY */}
             {roomCode ? (
               <div className="pt-2 flex flex-col items-center space-y-4">
-                <QRCodeDisplay code={roomCode} />
+                <QRCodeDisplay
+                  code={roomCode}
+                  url={
+                    relayCode && roomCode
+                      ? `${typeof window !== "undefined" && window.location.origin ? window.location.origin : "https://quicksend.vercel.app"}/?room=${roomCode}#rc=${relayCode}`
+                      : undefined
+                  }
+                />
 
                 {/* Status Pill */}
                 <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-[var(--surface)] border border-[var(--border-hairline)] text-xs font-mono text-[var(--text)] shadow-xs">
@@ -533,12 +671,22 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
 
       {/* Live Transfer & Acceptance Modal */}
       <TransferModal
-        isOpen={isModalOpen}
+        isOpen={isModalOpen || Boolean(relayPayload)}
         progress={enrichedProgress}
         roomCode={roomCode || inputCode}
         onAccept={acceptIncomingTransfer}
         onReject={rejectIncomingTransfer}
         onClose={handleReset}
+        onRelay={() => {
+          if (roomCode) {
+            startRelayUpload(roomCode, selectedPayload.files, selectedPayload.text);
+          }
+        }}
+        isRelayAvailable={Boolean(relayStatus?.available)}
+        relayPayload={relayPayload}
+        onDownloadRelay={(code) => downloadRelay(relayPayload!, code, roomCode || inputCode)}
+        isDownloadingRelay={isDownloadingRelay}
+        relayError={relayError}
       />
     </div>
   );
