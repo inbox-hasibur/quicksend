@@ -10,11 +10,11 @@
     <a href="https://webrtc.org"><img src="https://img.shields.io/badge/WebRTC-Encrypted%20P2P-F36523?style=flat-square&logo=webrtc" alt="WebRTC Encrypted" /></a>
   </p>
 
-  <h3>The Zero-Login, Ephemeral Peer-to-Peer Transfer Engine for Web &amp; Mobile.</h3>
+  <h3>Instant, Zero-Login File &amp; Text Sharing Between Any Device.</h3>
 
   <p>
-    Transfer files of any size, directories, code snippets, or clipboard text between devices in seconds.<br />
-    Direct browser-to-browser transfer across any network, local Wi-Fi, offline hotspot, Bluetooth, and air-gapped camera scan.
+    Transfer files of any size, folders, code snippets, or clipboard text directly between your phone, PC, and laptop.<br />
+    No accounts. No apps to install. No cloud uploads.
   </p>
 
   <p>
@@ -32,35 +32,34 @@
 
 ---
 
-## ⚡ What is QuickSend?
+## ⚡ Why QuickSend? (Problem & Solution)
 
-QuickSend lets you beam files and text between phones, laptops, and PCs instantly in your web browser. No accounts, no apps to install, and no files uploaded to cloud servers.
-
-Whether you're in a university lab, sharing a video with a friend, or transferring code between workstations, QuickSend adapts to your environment with 6 fast transfer channels.
+- **The Problem:** Moving a file, photo, or link between a phone and a computer (especially on public university or office PCs) is a pain. You usually have to log into personal accounts (WhatsApp, Google Drive, email) on untrusted computers, hit file size upload caps, or download clunky apps.
+- **The Solution:** QuickSend runs 100% in your web browser. Just open the website on both devices, scan a QR code or enter a 6-digit PIN, and beam files directly peer-to-peer. Data streams straight between browsers at full local or internet speed — without ever touching a server.
 
 ---
 
 ## ✨ Key Features
 
-- ⚡ **Direct Peer-to-Peer:** Data transfers directly from device to device without an intermediary server.
-- 🔒 **Zero Server Storage:** Your files never touch a cloud server and are never saved in any database.
-- 🔓 **No Accounts or Logins:** Start transferring instantly upon opening the page. No emails, phone numbers, or passwords.
-- 📦 **Files & Text of Any Size:** Send photos, large videos, folders, code snippets, or clipboard text with streaming disk downloads.
-- ⏱️ **Instant Time Estimates:** Automatic badges display estimated transfer time before and during transfers.
-- 📱 **Works Offline (PWA):** Installable web app that runs offline using mobile hotspots, camera QR streams, or cables.
+- ⚡ **Direct Device-to-Device:** Files beam straight from browser to browser with no middleman server.
+- 🔒 **Zero Cloud Storage:** Your files never touch a cloud drive and are never saved in any database.
+- 🔓 **No Accounts or Logins:** Start sharing the second you open the page. No emails, phone numbers, or passwords.
+- 📦 **Files & Text of Any Size:** Send photos, large videos, folders, code snippets, or clipboard text.
+- ⏱️ **Live Speed & Time Estimates:** See real-time transfer speed (MB/s) and estimated time remaining.
+- 📱 **Works Everywhere & Offline:** Runs on iOS, Android, Windows, macOS, and Linux — even offline without internet.
 
 ---
 
 ## 📡 6 Transfer Channels
 
-| Channel | Method | How It Works |
+| Channel | Best For | How to Connect |
 | :--- | :--- | :--- |
-| **🌐 Via Internet** | 6-Digit PIN, Mobile #, or QR Code | Fast remote transfers across different networks and cellular data. |
-| **📡 Same Wi-Fi** | Local Radar Discovery | Finds and beams files to other devices connected to the same Wi-Fi router. |
-| **📶 Wi-Fi Hotspot** | Mobile Hotspot QR Scan | Connects devices directly through a phone's portable hotspot with no internet. |
-| **🔵 Bluetooth** | System Share Sheet | Quick handoff via native Bluetooth, Quick Share, or AirDrop. |
-| **📷 Via Camera Scan** | Animated QR Code Stream | 100% air-gapped transfer by scanning animated QR codes with a camera. |
-| **🔌 Via Cable** | Direct Cable Link | Maximum line speed transfer over direct USB-C, Ethernet, or USB tethering. |
+| **🌐 Via Internet** | Sharing across different networks & mobile data | 6-Digit PIN, phone number, or QR code |
+| **📡 Same Wi-Fi** | Fast local sharing on home or office Wi-Fi | Auto radar discovery & 1-tap beam |
+| **📶 Wi-Fi Hotspot** | Offline sharing with no internet | Scan mobile hotspot QR to join & transfer |
+| **🔵 Bluetooth** | Quick nearby handoff | Native Quick Share, AirDrop, or Bluetooth |
+| **📷 Camera Scan** | 100% air-gapped security (no network needed) | Stream files as animated QR codes via camera |
+| **🔌 Via Cable** | Ultra-fast transfers (1–10 Gbps) | Direct USB-C, Ethernet, or USB tethering cable |
 
 ---
 
@@ -84,9 +83,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🔒 Privacy & Security
 
-- **Direct Memory & Disk:** Transferred chunks flow straight to local memory or disk without server storage.
+- **Direct Memory & Disk:** Transferred chunks stream straight to your local disk or memory without server storage.
 - **End-to-End Encrypted:** WebRTC transfers are encrypted end-to-end between browsers.
-- **Air-Gapped Optical Mode:** Mode 5 uses pure light (screen to camera) for isolated environments.
+- **Air-Gapped Optical Mode:** Mode 5 uses pure visual light (screen to camera) for isolated environments.
 - **Zero Tracking:** No tracking cookies, user profiling, or third-party ads.
 
 ---

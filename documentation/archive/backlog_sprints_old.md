@@ -615,3 +615,12 @@
   - All 40 test suites, 251 tests passing with 100% pass rate.
   - ESLint 9 checks passing with zero warnings or errors.
   - Next.js Turbopack production build verified cleanly (`npm run build`).
+
+### Fix 2 (2026-11-17): Skimmable README & Clear Problem-Solution Value Proposition
+- [x] Restructured `README.md` for fast visual skimming and human-centric clarity:
+  - Added concise **Why QuickSend? (Problem & Solution)** section addressing untrusted public computers, login fatigue, file size caps, and cloud storage risks.
+  - Replaced technical jargon with plain English across Key Features, 6-Channel Overview, and Privacy sections.
+  - Verified absence of obsolete `Architecture & How It Works` diagrams.
+- [x] Build & Verification:
+  - ESLint 9 checks passing with zero warnings or errors.
+  - Next.js Turbopack production build verified cleanly (`npm run build`).
