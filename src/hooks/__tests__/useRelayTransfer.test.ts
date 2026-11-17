@@ -7,9 +7,13 @@ import { useRelayTransfer } from "../useRelayTransfer";
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockUpload = vi.fn();
-vi.mock("@vercel/blob/client", () => ({
-  upload: (...args: unknown[]) => mockUpload(...args),
-}));
+vi.mock("@/lib/upstashBlob", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/upstashBlob")>();
+  return {
+    ...actual,
+    upload: (...args: unknown[]) => mockUpload(...args),
+  };
+});
 
 function RelayConsumer({
   onHook,

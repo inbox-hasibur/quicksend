@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { signalStore } from "@/lib/signalStore";
 import { isValidRoomCode, normalizeRoomCode } from "@/lib/codeGenerator";
 import { clientIp, hitLimit } from "@/lib/rateLimit";
+import { isAllowedRelayUrl } from "@/lib/upstashBlob";
 
 const MAX_FILES = 5;
 const MAX_FILE_BYTES = 52428816; // 50MB + 16 bytes AES-GCM tag
@@ -87,28 +88,16 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Invalid url or pathname" }, { status: 400 });
       }
 
-      try {
-        const parsedUrl = new URL(item.url);
-        if (parsedUrl.protocol !== "https:") {
-          return NextResponse.json({ error: "URL must be HTTPS" }, { status: 400 });
-        }
-        if (!parsedUrl.hostname.endsWith(".blob.vercel-storage.com")) {
-          return NextResponse.json({ error: "Forbidden storage host" }, { status: 400 });
-        }
-        if (
-          !parsedUrl.pathname.startsWith(expectedPrefixClean) &&
-          !parsedUrl.pathname.startsWith(expectedPrefixRaw)
-        ) {
-          return NextResponse.json({ error: "Invalid blob pathname" }, { status: 400 });
-        }
-        if (
-          !item.pathname.startsWith(expectedPrefixClean) &&
-          !item.pathname.startsWith(expectedPrefixRaw)
-        ) {
-          return NextResponse.json({ error: "Invalid pathname match" }, { status: 400 });
-        }
-      } catch {
-        return NextResponse.json({ error: "Malformed item URL" }, { status: 400 });
+      if (!isAllowedRelayUrl(item.url, roomCode)) {
+        return NextResponse.json({ error: "Forbidden storage host" }, { status: 400 });
+      }
+
+      const cleanItemPath = item.pathname.startsWith("/") ? item.pathname : `/${item.pathname}`;
+      if (
+        !cleanItemPath.startsWith(expectedPrefixClean) &&
+        !cleanItemPath.startsWith(expectedPrefixRaw)
+      ) {
+        return NextResponse.json({ error: "Invalid pathname match" }, { status: 400 });
       }
     }
 

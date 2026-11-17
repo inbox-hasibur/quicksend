@@ -4,26 +4,40 @@ import { GET } from "../cleanup/route";
 const mockList = vi.fn();
 const mockDel = vi.fn();
 
-vi.mock("@vercel/blob", () => ({
-  list: (...args: unknown[]) => mockList(...args),
-  del: (...args: unknown[]) => mockDel(...args),
+vi.mock("@upstash/blob", () => ({
+  Bucket: class MockBucket {
+    list(...args: unknown[]) {
+      return mockList(...args);
+    }
+    del(...args: unknown[]) {
+      return mockDel(...args);
+    }
+  },
 }));
 
-describe("GET /api/relay/cleanup", () => {
-  const originalToken = process.env.BLOB_READ_WRITE_TOKEN;
+describe("GET /api/relay/cleanup (@upstash/blob)", () => {
+  const originalUrl = process.env.UPSTASH_BLOB_URL;
+  const originalToken = process.env.UPSTASH_BLOB_TOKEN;
   const originalCronSecret = process.env.CRON_SECRET;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test";
+    process.env.UPSTASH_BLOB_URL = "https://my-bucket.blob.upstash.io";
+    process.env.UPSTASH_BLOB_TOKEN = "upstash_token_mock";
     delete process.env.CRON_SECRET;
   });
 
   afterEach(() => {
-    if (originalToken !== undefined) {
-      process.env.BLOB_READ_WRITE_TOKEN = originalToken;
+    if (originalUrl !== undefined) {
+      process.env.UPSTASH_BLOB_URL = originalUrl;
     } else {
-      delete process.env.BLOB_READ_WRITE_TOKEN;
+      delete process.env.UPSTASH_BLOB_URL;
+    }
+
+    if (originalToken !== undefined) {
+      process.env.UPSTASH_BLOB_TOKEN = originalToken;
+    } else {
+      delete process.env.UPSTASH_BLOB_TOKEN;
     }
 
     if (originalCronSecret !== undefined) {
@@ -33,8 +47,8 @@ describe("GET /api/relay/cleanup", () => {
     }
   });
 
-  it("returns {scanned: 0, deleted: 0} when BLOB_READ_WRITE_TOKEN is missing", async () => {
-    delete process.env.BLOB_READ_WRITE_TOKEN;
+  it("returns {scanned: 0, deleted: 0} when UPSTASH_BLOB_TOKEN or UPSTASH_BLOB_URL is missing", async () => {
+    delete process.env.UPSTASH_BLOB_TOKEN;
 
     const req = new Request("http://localhost/api/relay/cleanup");
     const res = await GET(req);
@@ -60,7 +74,7 @@ describe("GET /api/relay/cleanup", () => {
     expect(resWrongAuth.status).toBe(401);
 
     // Request with correct bearer
-    mockList.mockResolvedValueOnce({ blobs: [], hasMore: false });
+    mockList.mockResolvedValueOnce({ blobs: [], cursor: undefined });
     const reqCorrect = new Request("http://localhost/api/relay/cleanup", {
       headers: { authorization: "Bearer super_secret_cron_key" },
     });
@@ -77,17 +91,21 @@ describe("GET /api/relay/cleanup", () => {
     mockList.mockResolvedValueOnce({
       blobs: [
         {
-          url: "https://store.blob.vercel-storage.com/relay/room1/old.enc",
-          pathname: "relay/room1/old.enc",
+          path: "relay/room1/old.enc",
+          url: "https://my-bucket.blob.upstash.io/relay/room1/old.enc",
+          size: 100,
+          etag: "etag1",
           uploadedAt: staleTime,
         },
         {
-          url: "https://store.blob.vercel-storage.com/relay/room2/fresh.enc",
-          pathname: "relay/room2/fresh.enc",
+          path: "relay/room2/fresh.enc",
+          url: "https://my-bucket.blob.upstash.io/relay/room2/fresh.enc",
+          size: 200,
+          etag: "etag2",
           uploadedAt: freshTime,
         },
       ],
-      hasMore: false,
+      cursor: undefined,
     });
 
     const req = new Request("http://localhost/api/relay/cleanup");
@@ -97,8 +115,6 @@ describe("GET /api/relay/cleanup", () => {
 
     expect(data).toEqual({ scanned: 2, deleted: 1 });
     expect(mockDel).toHaveBeenCalledTimes(1);
-    expect(mockDel).toHaveBeenCalledWith([
-      "https://store.blob.vercel-storage.com/relay/room1/old.enc",
-    ]);
+    expect(mockDel).toHaveBeenCalledWith("relay/room1/old.enc");
   });
 });

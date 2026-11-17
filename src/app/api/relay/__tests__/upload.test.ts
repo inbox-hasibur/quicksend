@@ -2,43 +2,56 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { POST } from "../upload/route";
 import { signalStore } from "@/lib/signalStore";
 
-let capturedTokenOptions: Record<string, unknown> | null = null;
+let capturedSignedUploadOptions: Record<string, unknown> | null = null;
+const mockSignedUploadUrl = vi.fn(async (pathname: string, opts: Record<string, unknown>) => {
+  capturedSignedUploadOptions = { pathname, ...opts };
+  return {
+    url: `https://my-bucket.blob.upstash.io/${pathname}?token=mock_sig`,
+    headers: { "content-type": "application/octet-stream" },
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
+  };
+});
+const mockPublicUrl = vi.fn(async (pathname: string) => `https://my-bucket.blob.upstash.io/${pathname}`);
 
-vi.mock("@vercel/blob/client", () => ({
-  handleUpload: vi.fn(async (opts) => {
-    const res = await opts.onBeforeGenerateToken(
-      opts.body.payload.pathname,
-      opts.body.payload.clientPayload,
-      opts.body.payload.multipart
-    );
-    capturedTokenOptions = res;
-    return {
-      type: "blob.generate-client-token",
-      clientToken: "mocked_client_token",
-    };
-  }),
+vi.mock("@upstash/blob", () => ({
+  Bucket: class MockBucket {
+    signedUploadUrl(...args: [string, Record<string, unknown>]) {
+      return mockSignedUploadUrl(...args);
+    }
+    publicUrl(...args: [string]) {
+      return mockPublicUrl(...args);
+    }
+  },
 }));
 
-describe("POST /api/relay/upload", () => {
-  const originalToken = process.env.BLOB_READ_WRITE_TOKEN;
+describe("POST /api/relay/upload (@upstash/blob)", () => {
+  const originalUrl = process.env.UPSTASH_BLOB_URL;
+  const originalToken = process.env.UPSTASH_BLOB_TOKEN;
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    capturedTokenOptions = null;
+    capturedSignedUploadOptions = null;
     await signalStore.clear?.();
-    process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test";
+    process.env.UPSTASH_BLOB_URL = "https://my-bucket.blob.upstash.io";
+    process.env.UPSTASH_BLOB_TOKEN = "upstash_token_mock";
   });
 
   afterEach(() => {
-    if (originalToken !== undefined) {
-      process.env.BLOB_READ_WRITE_TOKEN = originalToken;
+    if (originalUrl !== undefined) {
+      process.env.UPSTASH_BLOB_URL = originalUrl;
     } else {
-      delete process.env.BLOB_READ_WRITE_TOKEN;
+      delete process.env.UPSTASH_BLOB_URL;
+    }
+
+    if (originalToken !== undefined) {
+      process.env.UPSTASH_BLOB_TOKEN = originalToken;
+    } else {
+      delete process.env.UPSTASH_BLOB_TOKEN;
     }
   });
 
-  it("returns 503 when BLOB_READ_WRITE_TOKEN is missing", async () => {
-    delete process.env.BLOB_READ_WRITE_TOKEN;
+  it("returns 503 when UPSTASH_BLOB_TOKEN or UPSTASH_BLOB_URL is missing", async () => {
+    delete process.env.UPSTASH_BLOB_TOKEN;
 
     const req = new Request("http://localhost/api/relay/upload", {
       method: "POST",
@@ -51,7 +64,7 @@ describe("POST /api/relay/upload", () => {
     expect(data.error).toBe("Relay not configured");
   });
 
-  it("returns client token with exact options (application/octet-stream, size plus 16, random suffix)", async () => {
+  it("returns signed upload url with exact options (application/octet-stream, size plus 16)", async () => {
     const roomCode = "128745";
     const size = 1048576; // 1 MB
     const pathname = `relay/${roomCode}/file.enc`;
@@ -72,13 +85,12 @@ describe("POST /api/relay/upload", () => {
     const res = await POST(req);
     expect(res.status).toBe(200);
     const data = await res.json();
-    expect(data.clientToken).toBe("mocked_client_token");
+    expect(data.url).toContain("https://my-bucket.blob.upstash.io/relay/128745/file.enc");
 
-    expect(capturedTokenOptions).toBeDefined();
-    expect(capturedTokenOptions?.allowedContentTypes).toEqual(["application/octet-stream"]);
-    expect(capturedTokenOptions?.maximumSizeInBytes).toBe(size + 16);
-    expect(capturedTokenOptions?.addRandomSuffix).toBe(true);
-    expect(typeof capturedTokenOptions?.validUntil).toBe("number");
+    expect(capturedSignedUploadOptions).toBeDefined();
+    expect(capturedSignedUploadOptions?.contentType).toBe("application/octet-stream");
+    expect(capturedSignedUploadOptions?.size).toBe(size + 16);
+    expect(capturedSignedUploadOptions?.expiresIn).toBe("10m");
   });
 
   it("rejects bad pathname not matching pattern", async () => {

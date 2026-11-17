@@ -29,7 +29,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS 3.4 (Glassmorphic dark/light design system)"]
-        BlobPkg["@vercel/blob (Vercel Blob Client & Serverless SDK)"]
+        BlobPkg["@upstash/blob (Upstash Blob Server & Client SDK)"]
         Vitest["Vitest 5.1 + happy-dom (289 Passing Tests across 46 Suites)"]
     end
 
@@ -104,6 +104,7 @@ flowchart TD
         ModeAvail["modeAvailability.ts (isModeAvailable, getModeStatus, getAllModesStatus)"]
         SigClient["signalingClient.ts (SignalingClient: Room & Signal Polling Engine)"]
         SignalStore["signalStore.ts (Dual-Mode: Upstash Redis REST + Memory TTL)"]
+        UpstashBlob["upstashBlob.ts (Upstash Blob Client Initializer & URL Validator)"]
         RelayCrypto["relayCrypto.ts (Client AES-GCM 256 Cryptography)"]
         RateLimit["rateLimit.ts (Serverless Sliding-Window Rate Limiter)"]
         Ultrasonic["ultrasonicStream.ts (Frequency Shift Keying FSK Codec)"]
@@ -289,23 +290,23 @@ flowchart TD
 - **Exports:** `GET(): Promise<NextResponse>`, `_resetTurnCacheForTest(): void`.
 
 #### `src/app/api/relay/status/route.ts`
-- **Purpose:** Ephemeral encrypted cloud relay availability endpoint (`GET`). Returns `{ available, maxFileBytes, maxFiles, ttlMinutes }` based on `BLOB_READ_WRITE_TOKEN` with `Cache-Control: no-store`.
+- **Purpose:** Ephemeral encrypted cloud relay availability endpoint (`GET`). Returns `{ available, maxFileBytes, maxFiles, ttlMinutes }` based on `isUpstashBlobConfigured()` with `Cache-Control: no-store`.
 - **Exports:** `GET(): Promise<NextResponse>`.
 
 #### `src/app/api/relay/attach/route.ts`
-- **Purpose:** Encrypted relay attachment endpoint (`GET`, `POST`). Validates room codes, ensures URLs belong to `.blob.vercel-storage.com` with path `/relay/<roomCode>/`, bounds file size to 50MB and items to 5. Stores relay metadata (salt, items, IVs, optional encrypted text) in `signalStore` without server-side key exposure. Rate-limited to 30 req/min per IP.
+- **Purpose:** Encrypted relay attachment endpoint (`GET`, `POST`). Validates room codes, validates blob URLs with `isAllowedRelayUrl()`, bounds file size to 50MB and items to 5. Stores relay metadata (salt, items, IVs, optional encrypted text) in `signalStore` without server-side key exposure. Rate-limited to 30 req/min per IP.
 - **Exports:** `GET(request: Request): Promise<NextResponse>`, `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/complete/route.ts`
-- **Purpose:** Relay completion & cleanup endpoint (`POST`). Idempotently purges verified blob URLs from `@vercel/blob` via `del()` using ONLY URLs found in the verified store (ignoring request body URLs) and clears room relay state. Rate-limited to 30 req/min per IP.
+- **Purpose:** Relay completion & cleanup endpoint (`POST`). Idempotently purges verified blob URLs/paths from `@upstash/blob` via `bucket.del()` using ONLY targets found in the verified store (ignoring request body URLs) and clears room relay state. Rate-limited to 30 req/min per IP.
 - **Exports:** `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/upload/route.ts`
-- **Purpose:** Secure Vercel Blob client upload token generator (`POST`) using `handleUpload`. Enforces room code and strict pathname format (`^relay/<roomCode>/[A-Za-z0-9._-]{1,80}$`), client IP rate limiting (6 tokens/hr), and daily upload budget (600 MB/day).
+- **Purpose:** Secure Upstash Blob presigned upload URL generator (`POST`) via `bucket.signedUploadUrl()`. Enforces room code and strict pathname format (`^relay/<roomCode>/[A-Za-z0-9._-]{1,80}$`), client IP rate limiting (6 tokens/hr), and daily upload budget (600 MB/day).
 - **Exports:** `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/cleanup/route.ts`
-- **Purpose:** Automated cron cleanup endpoint (`GET`). Authenticates via `CRON_SECRET` bearer token, pages through `@vercel/blob` objects with prefix `relay/`, and purges blobs older than 30 minutes via `del()`.
+- **Purpose:** Automated cron cleanup endpoint (`GET`). Authenticates via `CRON_SECRET` bearer token, pages through `@upstash/blob` objects with prefix `relay/`, and purges blobs older than 30 minutes via `bucket.del()`.
 - **Exports:** `GET(request: Request): Promise<NextResponse>`.
 
 ---
@@ -529,6 +530,10 @@ flowchart TD
 #### `src/lib/diskStream.ts`
 - **Purpose:** Large-file streaming layer leveraging File System Access API (`showSaveFilePicker`) for browser files > 100MB, streaming chunks directly to user disk to prevent tab memory exhaustion while safely falling back to in-memory Blob reassembly when unsupported (Safari, Firefox, small files).
 - **Exports:** `DISK_STREAM_THRESHOLD`, `isFileSystemAccessSupported`, `createDiskStreamWriter`.
+
+#### `src/lib/upstashBlob.ts`
+- **Purpose:** Upstash Blob SDK integration wrapper for encrypted cloud relay. Handles bucket initialization, environment variable validation (`UPSTASH_BLOB_URL`, `UPSTASH_BLOB_TOKEN`), storage URL hostname verification (`isAllowedRelayUrl`), and client-side direct upload execution.
+- **Exports:** `isUpstashBlobConfigured`, `getUpstashBucketName`, `getUpstashBucket`, `isAllowedRelayUrl`, `upload`, `UploadOptions`, `PutBlobResult`.
 
 #### `src/lib/relayCrypto.ts`
 - **Purpose:** Zero-knowledge client-side cryptography module for encrypted cloud relay transfers. Generates 8-character base-32 formatted relay codes (`XXXX-XXXX`), 16-byte random salts, derives non-extractable AES-GCM 256 keys via PBKDF2 (SHA-256, 200,000 iterations), and performs authenticated symmetric encryption/decryption with random 12-byte IVs.

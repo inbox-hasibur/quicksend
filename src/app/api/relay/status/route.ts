@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { isUpstashBlobConfigured } from "@/lib/upstashBlob";
 
 export async function GET() {
-  const available = Boolean(process.env.BLOB_READ_WRITE_TOKEN);
+  const available = isUpstashBlobConfigured();
 
   return NextResponse.json(
     {

@@ -4,30 +4,44 @@ import { GET as getAttach, POST as postAttach } from "../attach/route";
 import { POST as postComplete } from "../complete/route";
 import { signalStore } from "@/lib/signalStore";
 
-const mockDel = vi.fn();
-vi.mock("@vercel/blob", () => ({
-  del: (...args: unknown[]) => mockDel(...args),
+const mockDel = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@upstash/blob", () => ({
+  Bucket: class MockBucket {
+    async del(...args: unknown[]) {
+      return mockDel(...args);
+    }
+  },
 }));
 
-describe("Relay API Routes", () => {
-  const originalEnv = process.env.BLOB_READ_WRITE_TOKEN;
+describe("Relay API Routes (@upstash/blob)", () => {
+  const originalUrl = process.env.UPSTASH_BLOB_URL;
+  const originalToken = process.env.UPSTASH_BLOB_TOKEN;
 
   beforeEach(async () => {
     vi.clearAllMocks();
     await signalStore.clear?.();
+    process.env.UPSTASH_BLOB_URL = "https://my-bucket.blob.upstash.io";
+    process.env.UPSTASH_BLOB_TOKEN = "upstash_token_mock";
   });
 
   afterEach(() => {
-    if (originalEnv !== undefined) {
-      process.env.BLOB_READ_WRITE_TOKEN = originalEnv;
+    if (originalUrl !== undefined) {
+      process.env.UPSTASH_BLOB_URL = originalUrl;
     } else {
-      delete process.env.BLOB_READ_WRITE_TOKEN;
+      delete process.env.UPSTASH_BLOB_URL;
+    }
+
+    if (originalToken !== undefined) {
+      process.env.UPSTASH_BLOB_TOKEN = originalToken;
+    } else {
+      delete process.env.UPSTASH_BLOB_TOKEN;
     }
   });
 
   describe("GET /api/relay/status", () => {
-    it("returns available: false when BLOB_READ_WRITE_TOKEN is unset", async () => {
-      delete process.env.BLOB_READ_WRITE_TOKEN;
+    it("returns available: false when UPSTASH_BLOB_TOKEN or UPSTASH_BLOB_URL is unset", async () => {
+      delete process.env.UPSTASH_BLOB_TOKEN;
       const res = await getStatus();
       const data = await res.json();
 
@@ -39,8 +53,7 @@ describe("Relay API Routes", () => {
       expect(res.headers.get("Cache-Control")).toBe("no-store");
     });
 
-    it("returns available: true when BLOB_READ_WRITE_TOKEN is set", async () => {
-      process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_test_token";
+    it("returns available: true when UPSTASH_BLOB credentials are set", async () => {
       const res = await getStatus();
       const data = await res.json();
 
@@ -83,7 +96,7 @@ describe("Relay API Routes", () => {
           salt: "c2FsdF9leGFtcGxlXzE2",
           items: [
             {
-              url: "https://store.blob.vercel-storage.com/other/path/test.enc",
+              url: "https://my-bucket.blob.upstash.io/other/path/test.enc",
               pathname: "/other/path/test.enc",
               name: "test.txt",
               size: 100,
@@ -97,12 +110,12 @@ describe("Relay API Routes", () => {
       const res = await postAttach(req);
       expect(res.status).toBe(400);
       const data = await res.json();
-      expect(data.error).toMatch(/Invalid blob pathname/i);
+      expect(data.error).toMatch(/Forbidden storage host/i);
     });
 
     it("creates a missing room and stores relay data", async () => {
       const roomCode = "654321";
-      const validUrl = `https://my-store.blob.vercel-storage.com/relay/${roomCode}/file.enc`;
+      const validUrl = `https://my-bucket.blob.upstash.io/relay/${roomCode}/file.enc`;
       const validPath = `/relay/${roomCode}/file.enc`;
 
       const req = new Request("http://localhost/api/relay/attach", {
@@ -171,9 +184,9 @@ describe("Relay API Routes", () => {
   });
 
   describe("POST /api/relay/complete", () => {
-    it("calls del() with stored URLs only and ignores request body URLs", async () => {
+    it("calls del() with stored URLs/paths only and ignores request body URLs", async () => {
       const roomCode = "777888";
-      const storedUrl = `https://store.blob.vercel-storage.com/relay/${roomCode}/secret.enc`;
+      const storedUrl = `https://my-bucket.blob.upstash.io/relay/${roomCode}/secret.enc`;
 
       // Pre-seed room with relay
       await signalStore.createRoom(roomCode);
@@ -203,7 +216,7 @@ describe("Relay API Routes", () => {
         method: "POST",
         body: JSON.stringify({
           roomCode,
-          urls: ["https://store.blob.vercel-storage.com/malicious/target.enc"],
+          urls: ["https://my-bucket.blob.upstash.io/malicious/target.enc"],
         }),
       });
 
@@ -212,9 +225,9 @@ describe("Relay API Routes", () => {
       const data = await res.json();
       expect(data.deleted).toBe(1);
 
-      // Verify del was called ONLY with storedUrl
+      // Verify del was called ONLY with stored path
       expect(mockDel).toHaveBeenCalledTimes(1);
-      expect(mockDel).toHaveBeenCalledWith([storedUrl]);
+      expect(mockDel).toHaveBeenCalledWith(`relay/${roomCode}/secret.enc`);
 
       // Verify room relay was cleared in store
       const updatedRoom = await signalStore.getRoom(roomCode, "code");

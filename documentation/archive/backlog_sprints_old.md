@@ -687,3 +687,27 @@
   - 46 test suites, 289/289 tests passing (100% pass rate).
   - ESLint 9: 0 warnings, 0 errors.
   - Turbopack production build verified cleanly (`npm run build`).
+
+### Fix 6 (2026-11-18): Migration from @vercel/blob to @upstash/blob
+- [x] Package Migration & Upstash Client Wrapper (`package.json`, `src/lib/upstashBlob.ts`):
+  - Completely uninstalled `@vercel/blob` and installed `@upstash/blob`.
+  - Created `src/lib/upstashBlob.ts` exporting:
+    - `isUpstashBlobConfigured()`: checks presence of `UPSTASH_BLOB_URL` and `UPSTASH_BLOB_TOKEN`.
+    - `getUpstashBucketName()`: returns configured bucket or fallback `"quicksend-relay"`.
+    - `getUpstashBucket()`: returns initialized `Bucket` instance from `@upstash/blob`.
+    - `isAllowedRelayUrl()`: verifies HTTPS protocol, valid Upstash domain (`.upstash.io`, `.upstash-blob.com` or configured host), and room path matching.
+    - `upload()`: direct browser upload helper using Upstash signed upload URLs.
+- [x] Serverless Route Handlers Migration (`src/app/api/relay/`):
+  - `GET /api/relay/status`: returns `{ available: isUpstashBlobConfigured(), maxFileBytes: 52428800, maxFiles: 5, ttlMinutes: 15 }` with `no-store` cache.
+  - `POST /api/relay/upload`: 503 fallback when unconfigured, generates presigned upload URLs via `bucket.signedUploadUrl()` with 10m TTL, validates room code, 1..50MB size bounds, pathname regex, 6/hr per IP rate limit, and 600MB daily budget.
+  - `POST & GET /api/relay/attach`: validates each blob URL with `isAllowedRelayUrl()`, bounds size to 52428816 bytes, enforces max 5 files and 30 req/min rate limit.
+  - `POST /api/relay/complete`: deletes only stored blob targets via `bucket.del()` and idempotently clears room relay state.
+  - `GET /api/relay/cleanup`: verifies `CRON_SECRET` bearer token when configured, scans blobs via `bucket.list({ prefix: "relay/" })`, and purges blobs older than 30 minutes.
+- [x] Security Policy & Service Worker Hardening (`vercel.json`, `public/sw.js`):
+  - Updated CSP `connect-src` in `vercel.json` to allow `https://*.upstash.io` and `https://*.upstash-blob.com`, removing `@vercel/blob` endpoints.
+  - Incremented PWA cache version to `quicksend-v5` in `public/sw.js`.
+- [x] Automated Vitest Suites Migration:
+  - Updated `route.test.ts`, `upload.test.ts`, `cleanup.test.ts`, and `useRelayTransfer.test.ts` to mock `@upstash/blob`.
+  - 46 test suites, 289/289 tests passing (100% pass rate).
+  - ESLint 9: 0 warnings, 0 errors.
+  - Turbopack production build verified cleanly (`npm run build`).

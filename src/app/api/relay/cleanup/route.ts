@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { list, del } from "@vercel/blob";
+import { getUpstashBucket, isUpstashBlobConfigured } from "@/lib/upstashBlob";
 
 const STALE_THRESHOLD_MS = 30 * 60 * 1000; // 30 minutes
 
 export async function GET(request: Request) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isUpstashBlobConfigured()) {
     return NextResponse.json({ scanned: 0, deleted: 0 });
   }
 
@@ -17,33 +17,34 @@ export async function GET(request: Request) {
   }
 
   try {
+    const bucket = getUpstashBucket();
     let cursor: string | undefined = undefined;
     let scanned = 0;
     let deleted = 0;
     const cutoff = Date.now() - STALE_THRESHOLD_MS;
 
     do {
-      const response: Awaited<ReturnType<typeof list>> = await list({
+      const page = await bucket.list({
         prefix: "relay/",
         limit: 100,
         cursor,
       });
 
-      const staleUrls: string[] = [];
-      for (const blob of response.blobs) {
+      const stalePaths: string[] = [];
+      for (const blob of page.blobs) {
         scanned++;
         const uploadedTime = new Date(blob.uploadedAt).getTime();
         if (uploadedTime < cutoff) {
-          staleUrls.push(blob.url);
+          stalePaths.push(blob.path);
         }
       }
 
-      if (staleUrls.length > 0) {
-        await del(staleUrls);
-        deleted += staleUrls.length;
+      if (stalePaths.length > 0) {
+        await bucket.del(stalePaths.length === 1 ? stalePaths[0] : stalePaths);
+        deleted += stalePaths.length;
       }
 
-      cursor = response.hasMore ? response.cursor : undefined;
+      cursor = page.cursor;
     } while (cursor);
 
     return NextResponse.json({ scanned, deleted });

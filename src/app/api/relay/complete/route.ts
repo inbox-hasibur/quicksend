@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { del } from "@vercel/blob";
 import { signalStore } from "@/lib/signalStore";
 import { isValidRoomCode, normalizeRoomCode } from "@/lib/codeGenerator";
 import { clientIp, hitLimit } from "@/lib/rateLimit";
+import { getUpstashBucket, isUpstashBlobConfigured } from "@/lib/upstashBlob";
 
 export async function POST(request: Request) {
   try {
@@ -25,14 +25,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ deleted: 0 });
     }
 
-    // Only delete URLs found in the verified store
-    const urlsToDelete = (room.relay.items || [])
-      .map((item) => item.url)
-      .filter((url) => typeof url === "string" && url.length > 0);
+    // Only delete items found in the verified store
+    const targetsToDelete: string[] = (room.relay.items || [])
+      .map((item) => {
+        if (item.pathname) return item.pathname.replace(/^\//, "");
+        if (item.url) {
+          try {
+            return new URL(item.url).pathname.replace(/^\//, "");
+          } catch {
+            return item.url;
+          }
+        }
+        return "";
+      })
+      .filter(Boolean);
 
-    if (urlsToDelete.length > 0) {
+    if (targetsToDelete.length > 0 && isUpstashBlobConfigured()) {
       try {
-        await del(urlsToDelete);
+        const bucket = getUpstashBucket();
+        await bucket.del(targetsToDelete.length === 1 ? targetsToDelete[0] : targetsToDelete);
       } catch (blobErr) {
         // Log blob deletion error but continue to clear store
         console.warn("Blob deletion warning:", blobErr);
@@ -44,7 +55,7 @@ export async function POST(request: Request) {
       return r;
     });
 
-    return NextResponse.json({ deleted: urlsToDelete.length });
+    return NextResponse.json({ deleted: targetsToDelete.length });
   } catch (err) {
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Internal error" },

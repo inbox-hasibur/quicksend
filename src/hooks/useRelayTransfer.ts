@@ -11,7 +11,7 @@ import {
   encryptText,
   decryptText,
 } from "@/lib/relayCrypto";
-import { upload } from "@vercel/blob/client";
+import { upload } from "@/lib/upstashBlob";
 import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
 import { normalizeRoomCode } from "@/lib/codeGenerator";
 

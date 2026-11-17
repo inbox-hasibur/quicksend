@@ -1,89 +1,115 @@
 import { NextResponse } from "next/server";
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
 import { isValidRoomCode, normalizeRoomCode } from "@/lib/codeGenerator";
 import { clientIp, hitLimit } from "@/lib/rateLimit";
 import { signalStore } from "@/lib/signalStore";
+import { getUpstashBucket, isUpstashBlobConfigured } from "@/lib/upstashBlob";
 
 const MAX_DAILY_BYTES = 629145600; // 600 MB
 
 export async function POST(request: Request): Promise<NextResponse> {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isUpstashBlobConfigured()) {
     return NextResponse.json({ error: "Relay not configured" }, { status: 503 });
   }
 
-  let body: HandleUploadBody;
+  let body: Record<string, unknown>;
   try {
-    body = (await request.json()) as HandleUploadBody;
+    body = (await request.json()) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
   try {
-    const jsonResponse = await handleUpload({
-      body,
-      request,
-      onBeforeGenerateToken: async (pathname: string, clientPayload: string | null) => {
-        if (!clientPayload) {
-          throw new Error("Missing client payload");
-        }
+    const rawPayloadObj = body?.payload as Record<string, unknown> | undefined;
+    const rawPathname =
+      (typeof body?.pathname === "string" ? body.pathname : undefined) ||
+      (typeof rawPayloadObj?.pathname === "string" ? rawPayloadObj.pathname : undefined) ||
+      (typeof body?.path === "string" ? body.path : undefined);
 
-        let parsed: { roomCode?: unknown; size?: unknown };
-        try {
-          parsed = JSON.parse(clientPayload);
-        } catch {
-          throw new Error("Invalid client payload JSON");
-        }
+    const rawPayload =
+      body?.clientPayload ??
+      rawPayloadObj?.clientPayload;
 
-        const { roomCode, size } = parsed;
+    if (!rawPathname) {
+      throw new Error("Missing pathname");
+    }
 
-        if (!roomCode || typeof roomCode !== "string" || !isValidRoomCode(roomCode)) {
-          throw new Error("Invalid room code");
-        }
+    if (!rawPayload) {
+      throw new Error("Missing client payload");
+    }
 
-        if (typeof size !== "number" || !Number.isInteger(size) || size < 1 || size > 52428800) {
-          throw new Error("Invalid size");
-        }
+    let parsed: { roomCode?: unknown; size?: unknown };
+    if (typeof rawPayload === "string") {
+      try {
+        parsed = JSON.parse(rawPayload);
+      } catch {
+        throw new Error("Invalid client payload JSON");
+      }
+    } else if (typeof rawPayload === "object" && rawPayload !== null) {
+      parsed = rawPayload as { roomCode?: unknown; size?: unknown };
+    } else {
+      throw new Error("Invalid client payload format");
+    }
 
-        const cleanPathname = pathname.startsWith("/") ? pathname.slice(1) : pathname;
-        const escapedRaw = roomCode.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
-        const cleanCode = normalizeRoomCode(roomCode);
-        const escapedClean = cleanCode.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+    const { roomCode, size } = parsed;
 
-        const regexRaw = new RegExp(`^relay/${escapedRaw}/[A-Za-z0-9._-]{1,80}$`);
-        const regexClean = new RegExp(`^relay/${escapedClean}/[A-Za-z0-9._-]{1,80}$`);
+    if (!roomCode || typeof roomCode !== "string" || !isValidRoomCode(roomCode)) {
+      throw new Error("Invalid room code");
+    }
 
-        if (!regexRaw.test(cleanPathname) && !regexClean.test(cleanPathname)) {
-          throw new Error("Invalid pathname");
-        }
+    if (typeof size !== "number" || !Number.isInteger(size) || size < 1 || size > 52428800) {
+      throw new Error("Invalid size");
+    }
 
-        const ip = clientIp(request);
-        const isLimited = await hitLimit(`ratelimit:relay:token:${ip}`, 6, 3600);
-        if (isLimited) {
-          throw new Error("Too many uploads");
-        }
+    const cleanPathname = rawPathname.startsWith("/") ? rawPathname.slice(1) : rawPathname;
+    const escapedRaw = roomCode.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
+    const cleanCode = normalizeRoomCode(roomCode);
+    const escapedClean = cleanCode.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 
-        const today = new Date().toISOString().slice(0, 10);
-        const budgetKey = `relay-bytes:${today}`;
-        const currentRaw = await signalStore.getKey(budgetKey);
-        const currentBytes = currentRaw ? Number.parseInt(currentRaw, 10) || 0 : 0;
-        const newTotal = currentBytes + size;
+    const regexRaw = new RegExp(`^relay/${escapedRaw}/[A-Za-z0-9._-]{1,80}$`);
+    const regexClean = new RegExp(`^relay/${escapedClean}/[A-Za-z0-9._-]{1,80}$`);
 
-        if (newTotal > MAX_DAILY_BYTES) {
-          throw new Error("Relay daily limit reached");
-        }
+    if (!regexRaw.test(cleanPathname) && !regexClean.test(cleanPathname)) {
+      throw new Error("Invalid pathname");
+    }
 
-        await signalStore.setKey(budgetKey, String(newTotal), 86400);
+    const ip = clientIp(request);
+    const isLimited = await hitLimit(`ratelimit:relay:token:${ip}`, 6, 3600);
+    if (isLimited) {
+      throw new Error("Too many uploads");
+    }
 
-        return {
-          allowedContentTypes: ["application/octet-stream"],
-          maximumSizeInBytes: size + 16,
-          addRandomSuffix: true,
-          validUntil: Date.now() + 10 * 60 * 1000,
-        };
-      },
+    const today = new Date().toISOString().slice(0, 10);
+    const budgetKey = `relay-bytes:${today}`;
+    const currentRaw = await signalStore.getKey(budgetKey);
+    const currentBytes = currentRaw ? Number.parseInt(currentRaw, 10) || 0 : 0;
+    const newTotal = currentBytes + size;
+
+    if (newTotal > MAX_DAILY_BYTES) {
+      throw new Error("Relay daily limit reached");
+    }
+
+    await signalStore.setKey(budgetKey, String(newTotal), 86400);
+
+    const bucket = getUpstashBucket();
+    const signed = await bucket.signedUploadUrl(cleanPathname, {
+      contentType: "application/octet-stream",
+      size: size + 16,
+      expiresIn: "10m",
     });
 
-    return NextResponse.json(jsonResponse);
+    const publicUrl =
+      (await bucket.publicUrl(cleanPathname)) ||
+      signed.url.split("?")[0];
+
+    return NextResponse.json({
+      url: signed.url,
+      uploadUrl: signed.url,
+      publicUrl,
+      headers: signed.headers,
+      expiresAt: signed.expiresAt,
+      clientToken: signed.url,
+      type: "blob.generate-client-token",
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Upload error" },
