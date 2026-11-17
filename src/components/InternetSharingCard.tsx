@@ -17,6 +17,7 @@ import { QRCodeDisplay } from "@/components/QRCodeDisplay";
 import { QRScannerModal } from "@/components/QRScannerModal";
 import { TransferModal } from "@/components/TransferModal";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
 import { getPayloadBytes } from "@/lib/transferEstimate";
@@ -42,7 +43,20 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
   });
   const [isConnecting, setIsConnecting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [hasTurn, setHasTurn] = useState<boolean | null>(null);
   const hasAutoConnectedRef = useRef(false);
+
+  // Check /api/turn once when Mode 1 opens to detect TURN relay availability
+  useEffect(() => {
+    fetch("/api/turn")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && typeof data.hasTurn === "boolean") {
+          setHasTurn(data.hasTurn);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const {
     role: rtcRole,
@@ -57,6 +71,8 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     acceptIncomingTransfer,
     rejectIncomingTransfer,
     cleanup,
+    diagnostics,
+    debugLog,
   } = useWebRTC("internet");
 
   // Enrich sender progress with selected payload metadata so it never displays "0 Bytes"
@@ -236,6 +252,14 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
         <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
           <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
           <span>{errorMsg}</span>
+        </div>
+      )}
+
+      {/* Subtle TURN Relay Notice */}
+      {hasTurn === false && (
+        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400 text-xs">
+          <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+          <span>TURN relay not configured — works on same Wi-Fi; 4G mobile data may require TURN.</span>
         </div>
       )}
 
@@ -493,6 +517,12 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
           )}
         </div>
       )}
+
+      {/* Real-time Connection Diagnostics */}
+      <ConnectionDiagnostics
+        diagnostics={diagnostics}
+        debugLog={debugLog}
+      />
 
       {/* QR Scanner Camera Modal */}
       <QRScannerModal

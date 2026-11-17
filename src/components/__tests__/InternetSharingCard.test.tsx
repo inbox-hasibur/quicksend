@@ -38,6 +38,16 @@ vi.mock("@/hooks/useWebRTC", () => {
         cleanup: vi.fn().mockImplementation(() => {
           setRoomCode("");
         }),
+        diagnostics: {
+          iceState: "new",
+          gatheringState: "new",
+          signalingState: "stable",
+          channelState: "closed",
+          candidateCounts: { host: 0, srflx: 0, relay: 0 },
+          selectedPair: null,
+          lastError: null,
+        },
+        debugLog: [],
       };
     },
   };
@@ -48,6 +58,15 @@ describe("InternetSharingCard Component", () => {
   let root: Root;
 
   beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
+      if (typeof url === "string" && url.includes("/api/turn")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ hasTurn: true, iceServers: [] }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    }));
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -58,6 +77,7 @@ describe("InternetSharingCard Component", () => {
       root.unmount();
     });
     container.remove();
+    vi.unstubAllGlobals();
   });
 
   it("should render Send view by default with Dropzone, Pairing Methods, and Live QR/PIN", async () => {
@@ -122,5 +142,29 @@ describe("InternetSharingCard Component", () => {
     const phoneInput = container.querySelector("input[placeholder*='01712345678']");
     expect(phoneInput).toBeDefined();
     expect(container.textContent).toContain("Set Number");
+  });
+
+  it("should render ConnectionDiagnostics and display TURN warning when hasTurn is false", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/api/turn")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ hasTurn: false, iceServers: [] }),
+        });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) });
+    }));
+
+    await act(async () => {
+      root.render(<InternetSharingCard />);
+    });
+
+    // Connection diagnostics details element rendered
+    expect(container.textContent).toContain("Connection details");
+
+    // TURN warning notice rendered
+    expect(container.textContent).toContain("TURN relay not configured — works on same Wi-Fi; 4G mobile data may require TURN.");
+
+    vi.unstubAllGlobals();
   });
 });

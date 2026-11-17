@@ -1,6 +1,6 @@
-# QuickSend: Archived Sprints (Sprint 1 to Sprint 27)
+# QuickSend: Development & Fix Log (Archived Sprints & Maintenance)
 
-> **Archive Notice:** This file contains the complete, detailed historical task checklists and verification gates for Sprints 1 through 27. For active and recent sprint details (Sprint 28 onwards), see [backlog.md](../backlog.md).
+> **Archive Notice:** This file contains the complete, detailed historical task checklists and verification gates for all historical engineering iterations (Sprints 1 through 33) and subsequent maintenance fixes. For the clean major milestone sprint roadmap, see [backlog.md](../backlog.md).
 
 ---
 
@@ -510,3 +510,108 @@
   - Passing tests: 228 passed across 36 test suites (100% pass rate).
   - ESLint 9 / React 19 compiler lint checks passing with zero warnings or errors.
   - Clean Turbopack production build verified (`npm run build`).
+
+### Sprint 28: Radar and Direct Connect Component Deduplication
+- [x] RadarPanel Extraction:
+  - Created reusable `src/components/RadarPanel.tsx` extracting repeated radar concentric rings, radar sweep animation, center node identity avatar, discovered peer radial layout, status pulses, and empty state messaging.
+  - Replaced duplicate radar JSX in `src/components/SameNetworkCard.tsx` (reduced from 578 to 437 lines) and `src/components/HotspotAssistantCard.tsx` (reduced from 715 to 525 lines).
+- [x] DirectConnectPanel Extraction:
+  - Created reusable `src/components/DirectConnectPanel.tsx` extracting local device PIN display, 1-click clipboard copy, Show QR button, peer PIN input, connect button, and scan QR camera button.
+  - Normalized typed PIN input by removing spaces and hyphens before executing connection callbacks.
+  - Replaced duplicate PIN/QR connection blocks in `SameNetworkCard.tsx`, `HotspotAssistantCard.tsx`, and `CableTransferCard.tsx` (reduced from 469 to 397 lines).
+- [x] Unified "Can't see your device?" Fallback:
+  - Consolidated duplicate fallback sections in `SameNetworkCard.tsx` and `HotspotAssistantCard.tsx` into a single collapsed `<details>` titled "Can't see your device?", offering two distinct options: "Use a nearby code" and "Connect with PIN or QR".
+- [x] Verification & Automated Tests:
+  - Added test suite `src/components/__tests__/RadarPanel.test.tsx` verifying empty/active radar renders, avatar switching, and peer beaming callbacks.
+  - Added test suite `src/components/__tests__/DirectConnectPanel.test.tsx` verifying formatted PIN rendering, copy functionality, and whitespace/hyphen normalization.
+  - Updated `src/components/__tests__/HotspotAssistantCard.test.tsx` to align with the unified fallback structure.
+  - All 38 test files, 235 tests passing with 100% pass rate.
+  - ESLint 9 checks passing with zero warnings or errors.
+  - Production build passing cleanly (`npm run build`).
+
+### Sprint 29: Documentation Streamlining and Backlog Archive
+- [x] Streamlined documentation: moved historical Sprints 1–22 checklists into `documentation/archive/backlog_sprints_old.md` with an index table in `backlog.md`.
+- [x] Regenerated exact ASCII repository file tree in `about_project.md` from `git ls-files` (dropping `package-lock.json`).
+- [x] Updated `codebase_map.md` with complete 38-suite test coverage (235 tests), refreshed timestamps, and ensured full 1:1 file parity with the repository.
+- [x] Updated `AGENTS.md` documentation sync rule for lean, targeted updates.
+
+### Sprint 30: Sender QR Visibility and Smart ICE Watchdog Hardening
+- [x] Sender QR/PIN Non-blocking Display:
+  - Kept sender QR and 6-digit PIN fully visible and unblurred in `InternetSharingCard.tsx` while waiting for peer connection.
+  - Replaced blocking modal during passive waiting with an inline status indicator (`"Waiting for receiver to connect..."`).
+  - Restricted `TransferModal.tsx` trigger on the sender side to active handshake/transfer states (`waiting-acceptance`, `transferring`, `completed`, `error`).
+  - Added clean connecting state in `TransferModal.tsx` displaying `"Connecting to sender..."` with room PIN instead of `"File Payload 0 Bytes"`.
+- [x] Smart ICE Watchdog & Dual-Transport Arbitration:
+  - Preserved indefinite passive waiting with zero forced timeout before peer handshake.
+  - Implemented 15s ICE handshake watchdog in `useWebRTC.ts` triggering automatic `restartIce()` at 7s when ICE is stuck in `checking`.
+  - Surfaced descriptive error message advising user of 4G/firewall block and suggesting alternative channels (Same Wi-Fi, Hotspot, TURN relay).
+  - Ensured cleanup state properly resets across new sessions to prevent dropped ICE events.
+- [x] Verification & Automated Tests:
+  - Updated `src/components/__tests__/TransferModal.test.tsx` and `src/hooks/__tests__/useWebRTC.test.ts`.
+  - All 38 test files, 238 tests passing (100% pass rate).
+  - ESLint 9 checks passing with zero warnings or errors.
+  - Production build passing cleanly with Turbopack (`npm run build`).
+
+### Sprint 31: Global Dark/Light Theme Contrast Fix and Privacy Reassurance Copy Removal
+- [x] Global Semantic Color Token Migration (`src/app/globals.css`, `src/components/*`):
+  - Added semantic theme tokens in `globals.css` for `--surface-muted` and `--shadow-card` across light and dark modes.
+  - Audited all components and modals across the application to replace non-existent or hardcoded classes (such as `dark:bg-neutral-850`, `dark:bg-neutral-750`, `bg-neutral-900 ... dark:bg-white`) with unified CSS variables (`var(--accent)`, `var(--accent-hover)`, `var(--bg)`, `var(--surface)`, `var(--surface-subtle)`, `var(--surface-muted)`, `var(--border-hairline)`, `var(--text)`, `var(--text-muted)`).
+  - Fixed dark mode contrast defect in `TransferModal.tsx` preventing white text on light boxes in dark theme.
+  - Standardized interactive action buttons across all channel cards (`DirectConnectPanel`, `SameNetworkCard`, `HotspotAssistantCard`, `CableTransferCard`, `NearbyShareCard`, `CameraSender`, `CameraReceiver`, `ReceiverCompleteView`, `ReceiverProgressView`, `UltrasonicCard`) to use high-contrast `--accent` tokens.
+- [x] Reassurance & Privacy Copy Removal:
+  - Removed redundant `"Zero server uploads — files stay on your device until direct P2P transfer"` and other duplicate reassurance banners from `Dropzone.tsx`, `InternetSharingCard.tsx`, and `README.md`.
+  - Cleaned up `README.md` hero badges (removed duplicate test and platform clutter, kept core technology and live links).
+- [x] Verification & Automated Tests:
+  - All 38 test suites, 238 tests passing with 100% pass rate.
+  - ESLint 9 checks passing with 0 errors and 0 warnings.
+  - Production build passing cleanly with Turbopack (`npm run build`).
+
+### Sprint 32: Mode 1 Code + QR Streamlining and README Visual Simplification
+- [x] Mode 1 Always-Available Code + QR (`src/components/InternetSharingCard.tsx`):
+  - Removed separate `"Code | QR"` pairing format toggle, retaining only the clean top `Send | Receive` role switcher.
+  - In `Send` view: always displays the Pairing Key selector (`Auto PIN` | `Mobile No.` | `Keyword`) alongside the live scannable `QRCodeDisplay` and 6-digit Room PIN so receivers can connect immediately via camera or manual typing.
+  - In `Receive` view: always provides the prominent "Scan Sender's QR Code" camera button and the Room Code / PIN input with Connect button together on the same screen.
+  - Auto-initializes `startSender()` on mount for instant session creation without requiring payload selection first.
+- [x] README Simplification (`README.md`):
+  - Removed dense technical jargon (`DTLS/SCTP`, `RFC 1918`, `FNV-1a`, `NAT traversal`) and the heavy architecture sequence diagram.
+  - Kept hero showcase, badges, preview screenshot, crisp plain-English features list, 6-channel summary table, short local setup steps, and license.
+- [x] Verification & Unit Testing (`src/components/__tests__/InternetSharingCard.test.tsx`):
+  - Added test suite covering Send view defaults, live QR/PIN rendering, mobile key input switching, and Receive view dual scan/input controls.
+  - Passing tests: 241 tests passing across 39 suites (100% pass rate).
+  - ESLint 9 checks passing with 0 errors and 0 warnings.
+  - Turbopack production build verified cleanly (`npm run build`).
+
+### Sprint 33: Dynamic TURN Relay Credentials & CGNAT / 4G Resilient Connectivity
+- [x] Server-Side TURN Relay Route (`src/app/api/turn/route.ts`):
+  - Created `GET /api/turn` route returning `{ iceServers: RTCIceServer[], hasTurn: boolean }`.
+  - Integrated public STUN pool with optional ephemeral TURN credentials from Metered (`METERED_TURN_DOMAIN` and `METERED_TURN_API_KEY`) and static TURN environment variables (`NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USERNAME`, `NEXT_PUBLIC_TURN_CREDENTIAL`).
+  - Added 10-minute in-memory server cache and safe STUN-only fallback on network failures without exposing secret API keys.
+- [x] Dynamic ICE Fetching & Client Integration (`src/lib/iceConfig.ts`, `src/hooks/useWebRTC.ts`):
+  - Added `fetchIceConfig(mode)` in `src/lib/iceConfig.ts` with 2-second timeout, 5-minute client cache, and synchronous local fallback.
+  - Wired `fetchIceConfig(mode)` in `useWebRTC.ts` before creating `RTCPeerConnection` and initializing PeerJS for both sender and receiver roles.
+- [x] Automated Tests & Verification (`src/app/api/turn/__tests__/route.test.ts`, `src/lib/__tests__/iceConfig.test.ts`):
+  - Added unit tests verifying STUN defaults, Metered API fetching, credential hiding, caching, and fallback behavior.
+  - Added `fetchIceConfig` tests verifying offline bypass, dynamic server retrieval, and network error resilience.
+  - 248 tests passing across 40 test suites (100% pass rate).
+  - ESLint 9 checks passing with 0 errors and 0 warnings.
+  - Turbopack production build verified cleanly (`npm run build`).
+
+---
+
+## Maintenance & Fixes Log
+
+### Fix 1 (2026-11-17): PeerJS Watchdog, 15s Signaling Timeout & Mode 1 Diagnostics
+- [x] Fix PeerJS Watchdog & Signaling Timeout (`src/hooks/useWebRTC.ts`):
+  - In PeerJS (`peer.connect(...)`), `conn.on("open")` only fires after full WebRTC ICE/DTLS negotiation succeeds.
+  - Attached explicit 12-second Peer/Signaling Watchdog and 15-second overall receiver dialing timeout aborting cleanly when neither PeerJS nor `/api/signal` opens the data channel.
+  - Wired 15-second ICE state watchdog to PeerJS's internal `conn.peerConnection` on both sender and receiver to capture live ICE states and candidate counts (`host`, `srflx`, `relay`).
+  - Differentiated timeout error messages in `TransferModal`: `"Room not found / Sender offline"` when room does not exist vs `"Blocked by 4G mobile network or firewall — TURN relay required"` when signaling was exchanged but NAT traversal failed.
+- [x] Show Diagnostics & Relay Telemetry in Mode 1 (`src/components/InternetSharingCard.tsx`):
+  - Rendered `<ConnectionDiagnostics />` at the bottom of `InternetSharingCard.tsx` for both Send and Receive views (including during connecting).
+  - Queried `/api/turn` on mount: displayed a subtle single-line amber notice when `hasTurn` is `false` (`"TURN relay not configured — works on same Wi-Fi; 4G mobile data may require TURN."`).
+- [x] Verification & Automated Tests:
+  - Added unit tests in `src/hooks/__tests__/useWebRTC.test.ts` for room not found and 4G firewall block timeouts.
+  - Added unit tests in `src/components/__tests__/InternetSharingCard.test.tsx` verifying diagnostics and TURN notice.
+  - All 40 test suites, 251 tests passing with 100% pass rate.
+  - ESLint 9 checks passing with zero warnings or errors.
+  - Next.js Turbopack production build verified cleanly (`npm run build`).

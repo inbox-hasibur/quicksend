@@ -1,6 +1,6 @@
 # QuickSend: Codebase Map & Dependency Graph
 
-> **Last Updated:** Sprint 33 Complete (Dynamic TURN Relay Credentials & CGNAT Mobile Data Traversal)
+> **Last Updated:** Major Milestone Sprints Roadmap & Fix 1 Complete (PeerJS 15s Watchdog & Mode 1 Diagnostics)
 > **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Module Path Alias:** `@/*` -> `./src/*`
 
@@ -29,7 +29,7 @@ flowchart TD
         QRGen["qrcode.react (QRCodeSVG Generator)"]
         QRScan["html5-qrcode (Html5Qrcode Camera Scanner)"]
         Tailwind["Tailwind CSS 3.4 (Glassmorphic dark/light design system)"]
-        Vitest["Vitest 5.1 + happy-dom (248 Passing Tests across 40 Suites)"]
+        Vitest["Vitest 5.1 + happy-dom (251 Passing Tests across 40 Suites)"]
     end
 
     subgraph App_Routes["src/app/ (App Router & Route Handlers)"]
@@ -276,7 +276,7 @@ flowchart TD
 - **Exports:** `ModeSelector(): JSX.Element`
 
 #### `src/components/InternetSharingCard.tsx`
-- **Purpose:** Mode 1 Interactive Controller (Via Internet). Manages Format (`PIN / Mobile / Keyword` or `QR Code`) and Role (`Send` or `Receive`). Offers flexible sender strategies (Auto 6-digit PIN, memorized Mobile Number, or Custom Keyword), dynamic room code lookup, dropzone payload selection, peer connection status, transfer modal trigger, and collapsible ConnectionDiagnostics.
+- **Purpose:** Mode 1 Interactive Controller (Via Internet). Provides co-located scannable QR code and 6-digit PIN across both Send and Receive screens, flexible sender pairing strategies (Auto PIN, Mobile Number, Custom Keyword), real-time `<ConnectionDiagnostics />` telemetry, and dynamic `/api/turn` warning banner.
 - **Exports:** `InternetSharingCard({ initialRoomCode }: InternetSharingCardProps): JSX.Element`
 
 #### `src/components/SameNetworkCard.tsx`
@@ -389,8 +389,8 @@ flowchart TD
 ### 3.3 Custom Hooks (`src/hooks/`)
 
 #### `src/hooks/useWebRTC.ts`
-- **Purpose:** Complete WebRTC peer connection and DataChannel manager. Orchestrates signaling exchange, candidate queuing, 64KB binary chunk slicing with buffer backpressure via `waitForDrain`, transfer progress calculation, receiver file/text reassembly, persistent connection retention (no premature 10s ICE timeout kills), automated one-shot `pc.restartIce()`, resilient PeerJS broker IDs (`qs-v2-`) with 1.5s silent retry on `peer-unavailable`, transport isolation (`activeTransportRef`), live diagnostics metrics collection (ICE, gathering, signaling, channel, candidate counts, selected pair), and 40-entry debug log ring buffer.
-- **Exports:** `useWebRTC(mode): { role, roomId, roomCode, isConnected, progress, pendingHeader, startSender, startReceiver, sendFiles, sendText, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup, debugLog, diagnostics }`, `waitForDrain`, `DrainableChannel`, `WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`.
+- **Purpose:** Complete WebRTC peer connection and DataChannel manager. Orchestrates signaling exchange, candidate queuing, binary chunk slicing with buffer backpressure via `waitForDrain`, dynamic TURN fetching via `fetchIceConfig`, 12-second Peer/Signaling watchdog, 15-second receiver dial timeout with clear room not found vs 4G firewall error differentiation, automated one-shot `pc.restartIce()`, PeerJS internal `conn.peerConnection` ICE tracking, transport isolation (`activeTransportRef`), live diagnostics metrics collection (ICE, gathering, signaling, channel, candidate counts, selected pair), and 40-entry debug log ring buffer.
+- **Exports:** `useWebRTC(mode): { role, roomId, roomCode, isConnected, progress, pendingHeader, brokerNotice, startSender, startReceiver, sendFiles, sendText, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup, debugLog, diagnostics }`, `waitForDrain`, `DrainableChannel`, `WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`, `FIREWALL_BLOCKED_MESSAGE`, `ROOM_NOT_FOUND_MESSAGE`.
 
 #### `src/hooks/useLocalDiscovery.ts`
 - **Purpose:** Local network peer discovery via `/api/discover`. Manages peer heartbeat polling, dynamic avatar conflict resolution, incoming beam handling, optional 4-digit pairing code for cross-IP / CGNAT discovery, and exposes detailed poll status (`DiscoveryStatus` with `groupLabel` and `ipFamily`).
@@ -543,7 +543,7 @@ flowchart TD
 
 ---
 
-### 3.8 Automated Vitest Test Suites (40 Test Suites, 248 Passing Tests)
+### 3.8 Automated Vitest Test Suites (40 Test Suites, 251 Passing Tests)
 
 | Test Suite Path | Target Module | Verified Coverage & Capabilities |
 | :--- | :--- | :--- |
@@ -557,7 +557,7 @@ flowchart TD
 | `src/components/__tests__/DirectConnectPanel.test.tsx` | `DirectConnectPanel.tsx` | Formatted PIN display, clipboard copy, input whitespace/hyphen normalization, and camera QR trigger. |
 | `src/components/__tests__/FileTypeBadge.test.tsx` | `FileTypeBadge.tsx` | Color-coded file chips across document, image, video, audio, archive, and code extensions. |
 | `src/components/__tests__/HotspotAssistantCard.test.tsx` | `HotspotAssistantCard.tsx` | Mode 3 Wi-Fi hotspot setup, Wi-Fi QR generator, peer radar, and unified fallback details. |
-| `src/components/__tests__/InternetSharingCard.test.tsx` | `InternetSharingCard.tsx` | Send/Receive views, live QR and PIN co-location, Auto PIN/Mobile/Keyword pairing modes, and payload selection. |
+| `src/components/__tests__/InternetSharingCard.test.tsx` | `InternetSharingCard.tsx` | Send/Receive views, live QR and PIN co-location, Auto PIN/Mobile/Keyword pairing modes, ConnectionDiagnostics rendering, and TURN warning notice. |
 | `src/components/__tests__/NearbyShareCard.test.tsx` | `NearbyShareCard.tsx` | Mode 4 Bluetooth guidance, Web Share API handoff, history logging, and BLE GATT scanner. |
 | `src/components/__tests__/RadarPanel.test.tsx` | `RadarPanel.tsx` | Concentric radar rings, center identity node, avatar modal callback, peer radial layout, and beam triggering. |
 | `src/components/__tests__/SegmentedControl.test.tsx` | `SegmentedControl.tsx` | Pill track rendering, option selection state, keyboard navigation, and custom class names. |
@@ -571,7 +571,7 @@ flowchart TD
 | `src/hooks/__tests__/useQuadScanner.test.ts` | `useQuadScanner.ts` | Multi-quadrant scanner initialization, layout rotation, canvas recycling, and track cleanup. |
 | `src/hooks/__tests__/useTheme.test.tsx` | `useTheme.ts` | Dark/light theme state toggling, class application to document root, and localStorage persistence. |
 | `src/hooks/__tests__/useTransferHistory.test.ts` | `useTransferHistory.ts` | Transfer history logging, drawer state management, session persistence, and re-download links. |
-| `src/hooks/__tests__/useWebRTC.test.ts` | `useWebRTC.ts` | WebRTC connection setup, data channel messaging, chunk pipeline streaming, and cancellation. |
+| `src/hooks/__tests__/useWebRTC.test.ts` | `useWebRTC.ts` | WebRTC connection setup, 12s/15s receiver dial timeouts, PeerJS conn.peerConnection ICE watchdog, buffer draining, and room/firewall diagnostics. |
 | `src/lib/__tests__/base45.test.ts` | `base45.ts` | Base45 alphanumeric encoding and decoding round-trip with arbitrary binary buffers. |
 | `src/lib/__tests__/chunker.test.ts` | `chunker.ts` | Binary Blob chunking into 64KB packets, packet header framing, and EOF flags. |
 | `src/lib/__tests__/codeGenerator.test.ts` | `codeGenerator.ts` | 6-digit numeric room code and PIN generation, uniqueness, and format compliance. |

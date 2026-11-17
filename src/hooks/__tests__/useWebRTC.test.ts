@@ -267,10 +267,73 @@ describe("useWebRTC hook", () => {
 
     expect(currentHook.progress.status).toBe("error");
     expect(currentHook.progress.errorMessage).toContain(
-      "Direct connection blocked by 4G/mobile network or campus firewall"
+      "Blocked by 4G mobile network or firewall — TURN relay required"
     );
 
     // Clean up
+    await act(async () => {
+      currentHook.cleanup();
+    });
+    expect(currentHook.progress.status).toBe("idle");
+  });
+
+  it("aborts cleanly with 'Room not found / Sender offline' when receiver dials non-existent room", async () => {
+    vi.useFakeTimers();
+
+    await act(async () => {
+      root.render(React.createElement(HookTester));
+    });
+
+    await act(async () => {
+      currentHook.startReceiver("999999");
+    });
+
+    expect(currentHook.progress.status).toBe("connecting");
+
+    // Advance 15s timeout
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+
+    expect(currentHook.progress.status).toBe("error");
+    expect(currentHook.progress.errorMessage).toContain("Room not found / Sender offline");
+
+    await act(async () => {
+      currentHook.cleanup();
+    });
+    expect(currentHook.progress.status).toBe("idle");
+  });
+
+  it("aborts cleanly with 'Blocked by 4G mobile network or firewall' when receiver receives signal but connection never opens", async () => {
+    vi.useFakeTimers();
+
+    await act(async () => {
+      root.render(React.createElement(HookTester));
+    });
+
+    await act(async () => {
+      currentHook.startReceiver("123456");
+    });
+
+    const activePc = mockPcs.find((p) => typeof p.oniceconnectionstatechange === "function") || mockPcs[0];
+    expect(activePc).toBeDefined();
+
+    // Signal received and ICE checking begins
+    await act(async () => {
+      activePc.iceConnectionState = "checking";
+      activePc.oniceconnectionstatechange?.();
+    });
+
+    expect(currentHook.progress.status).toBe("connecting");
+
+    // Advance to 15s
+    await act(async () => {
+      vi.advanceTimersByTime(15000);
+    });
+
+    expect(currentHook.progress.status).toBe("error");
+    expect(currentHook.progress.errorMessage).toContain("Blocked by 4G mobile network or firewall — TURN relay required");
+
     await act(async () => {
       currentHook.cleanup();
     });

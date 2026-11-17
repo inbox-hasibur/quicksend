@@ -30,7 +30,7 @@ All AI coding assistants and autonomous agents (Antigravity, Cursor, Claude Code
 ---
 
 ## 2. Mandatory Post-Execution Documentation Sync
-After every task: update only the affected entries in documentation/codebase_map.md, add one short Sprint entry to documentation/backlog.md. Update about_project.md only when product behavior or the file tree changes. Then commit and push.
+After every task: update only the affected entries in `documentation/codebase_map.md`. For bugfixes, refactors, and minor tweaks, append a brief dated/numbered entry under the **Maintenance & Fixes Log** inside `documentation/archive/backlog_sprints_old.md` — NEVER create new micro-sprint entries (e.g., Sprint 34, 35...) in `documentation/backlog.md` unless a brand-new major feature milestone is explicitly requested. Update `about_project.md` only when product behavior or the file tree changes. Then commit and push.
 
 ---
 

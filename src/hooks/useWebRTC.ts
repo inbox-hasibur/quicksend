@@ -36,6 +36,7 @@ const BUFFER_THRESHOLD = 512 * 1024; // 512 KB backpressure threshold for smooth
 interface PeerJsConnection {
   open?: boolean;
   dataChannel?: RTCDataChannel;
+  peerConnection?: RTCPeerConnection;
   on: (event: string, callback: (...args: unknown[]) => void) => void;
   send: (data: unknown) => void;
   close: () => void;
@@ -75,7 +76,10 @@ export interface DebugLogEntry {
 }
 
 export const FIREWALL_BLOCKED_MESSAGE =
-  "Direct connection blocked by 4G/mobile network or campus firewall. Try Same Wi-Fi, Hotspot, or configure a TURN relay.";
+  "Blocked by 4G mobile network or firewall — TURN relay required";
+
+export const ROOM_NOT_FOUND_MESSAGE =
+  "Room not found / Sender offline";
 
 export interface DrainableChannel {
   bufferedAmount: number;
@@ -276,6 +280,10 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const hasRestartedIceRef = useRef<boolean>(false);
   const iceRestartTimerRef = useRef<NodeJS.Timeout | null>(null);
   const iceWatchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const receiverSignalingWatchdogTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const receiverDialTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasSignalingActivityRef = useRef<boolean>(false);
+  const roomNotFoundRef = useRef<boolean>(false);
 
   const clearIceTimeout = useCallback(() => {
     if (iceTimerRef.current) {
@@ -292,6 +300,17 @@ export function useWebRTC(mode: TransferMode = "internet") {
     if (iceWatchdogTimerRef.current) {
       clearTimeout(iceWatchdogTimerRef.current);
       iceWatchdogTimerRef.current = null;
+    }
+  }, []);
+
+  const clearReceiverWatchdogs = useCallback(() => {
+    if (receiverSignalingWatchdogTimerRef.current) {
+      clearTimeout(receiverSignalingWatchdogTimerRef.current);
+      receiverSignalingWatchdogTimerRef.current = null;
+    }
+    if (receiverDialTimeoutRef.current) {
+      clearTimeout(receiverDialTimeoutRef.current);
+      receiverDialTimeoutRef.current = null;
     }
   }, []);
 
@@ -376,6 +395,73 @@ export function useWebRTC(mode: TransferMode = "internet") {
     [addLog, clearHandshakeWatchdog]
   );
 
+  // Wire PeerJS's internal RTCPeerConnection to 15s ICE watchdog and live diagnostics
+  const wirePeerJsPeerConnection = useCallback(
+    (pc: RTCPeerConnection | undefined | null, currentRole: PeerRole) => {
+      if (!pc) return;
+      try {
+        const updateIce = () => {
+          const state = pc.iceConnectionState;
+          addLog(`PeerJS internal ICE state: ${state}`);
+          setDiagnostics((d) => ({ ...d, iceState: state }));
+          if (state === "checking") {
+            hasSignalingActivityRef.current = true;
+            startHandshakeWatchdog(currentRole);
+          } else if (state === "connected" || state === "completed") {
+            clearHandshakeWatchdog();
+            clearReceiverWatchdogs();
+          } else if (state === "failed") {
+            clearHandshakeWatchdog();
+            clearReceiverWatchdogs();
+            setDiagnostics((d) => ({
+              ...d,
+              iceState: "failed",
+              lastError: FIREWALL_BLOCKED_MESSAGE,
+            }));
+            setProgress((prev) => {
+              if (
+                prev.status === "completed" ||
+                prev.status === "idle" ||
+                prev.progressPercentage >= 100
+              ) {
+                return prev;
+              }
+              return {
+                ...prev,
+                status: "error",
+                errorMessage: FIREWALL_BLOCKED_MESSAGE,
+              };
+            });
+          }
+        };
+
+        pc.addEventListener("iceconnectionstatechange", updateIce);
+        pc.addEventListener("icecandidate", (e) => {
+          if (e.candidate) {
+            hasSignalingActivityRef.current = true;
+            const type = e.candidate.type as keyof CandidateCounts;
+            if (type && type in { host: 1, srflx: 1, relay: 1 }) {
+              setDiagnostics((d) => ({
+                ...d,
+                candidateCounts: {
+                  ...d.candidateCounts,
+                  [type]: (d.candidateCounts[type] || 0) + 1,
+                },
+              }));
+            }
+          }
+        });
+
+        if (pc.iceConnectionState) {
+          updateIce();
+        }
+      } catch (err) {
+        console.debug("Failed to wire PeerJS internal peerConnection:", err);
+      }
+    },
+    [addLog, startHandshakeWatchdog, clearHandshakeWatchdog, clearReceiverWatchdogs]
+  );
+
   const startIceTimeout = useCallback(() => {
     clearIceTimeout();
     // Passive listening waiting states remain open indefinitely with NO timeout
@@ -447,8 +533,11 @@ export function useWebRTC(mode: TransferMode = "internet") {
     sessionGenRef.current++;
     isCleaningUpRef.current = true;
     hasRestartedIceRef.current = false;
+    hasSignalingActivityRef.current = false;
+    roomNotFoundRef.current = false;
     clearIceTimeout();
     clearHandshakeWatchdog();
+    clearReceiverWatchdogs();
     setBrokerNotice(null);
     activeTransportRef.current = null;
     isConnectedRef.current = false;
@@ -546,7 +635,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     setTimeout(() => {
       isCleaningUpRef.current = false;
     }, 50);
-  }, [clearIceTimeout, clearHandshakeWatchdog]);
+  }, [clearIceTimeout, clearHandshakeWatchdog, clearReceiverWatchdogs]);
 
   useEffect(() => {
     return () => {
@@ -776,6 +865,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         setDiagnostics((d) => ({ ...d, channelState: "open" }));
         clearHandshakeWatchdog();
         clearIceTimeout();
+        clearReceiverWatchdogs();
         if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
           return;
         }
@@ -825,7 +915,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
         handleIncomingData(event.data);
       };
     },
-    [clearIceTimeout, clearHandshakeWatchdog, handleIncomingData, addLog]
+    [clearIceTimeout, clearHandshakeWatchdog, clearReceiverWatchdogs, handleIncomingData, addLog]
   );
 
   // Setup Peer Connection
@@ -870,9 +960,11 @@ export function useWebRTC(mode: TransferMode = "internet") {
         addLog(`ICE state: ${state}`);
         setDiagnostics((d) => ({ ...d, iceState: state }));
         if (state === "checking") {
+          hasSignalingActivityRef.current = true;
           startHandshakeWatchdog(currentRole);
         } else if (state === "connected" || state === "completed") {
           clearHandshakeWatchdog();
+          clearReceiverWatchdogs();
           checkSelectedPair(pc);
         }
         // If PeerJS is active or connected, ignore raw WebRTC ICE failures
@@ -1005,7 +1097,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       return pc;
     },
-    [mode, setupDataChannel, clearIceTimeout, clearHandshakeWatchdog, startHandshakeWatchdog, addLog, checkSelectedPair]
+    [mode, setupDataChannel, clearIceTimeout, clearHandshakeWatchdog, clearReceiverWatchdogs, startHandshakeWatchdog, addLog, checkSelectedPair]
   );
 
   // Process incoming signaling messages
@@ -1015,6 +1107,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
       if (activeTransportRef.current === "peerjs" && isConnectedRef.current) {
         return;
       }
+      hasSignalingActivityRef.current = true;
       const pc = pcRef.current;
 
       switch (message.type) {
@@ -1189,6 +1282,19 @@ export function useWebRTC(mode: TransferMode = "internet") {
             peer.on("connection", (rawConn: unknown) => {
               const conn = rawConn as PeerJsConnection;
               dataConnRef.current = conn;
+              hasSignalingActivityRef.current = true;
+
+              if (conn.peerConnection) {
+                wirePeerJsPeerConnection(conn.peerConnection, "sender");
+              } else {
+                const checkPc = setInterval(() => {
+                  if (conn.peerConnection) {
+                    clearInterval(checkPc);
+                    wirePeerJsPeerConnection(conn.peerConnection, "sender");
+                  }
+                }, 100);
+                setTimeout(() => clearInterval(checkPc), 2000);
+              }
 
               const handleOpen = () => {
                 if (sessionGenRef.current !== currentSession) return;
@@ -1202,6 +1308,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
                 }
                 clearIceTimeout();
                 clearHandshakeWatchdog();
+                clearReceiverWatchdogs();
                 activeTransportRef.current = "peerjs";
                 if (conn.dataChannel) {
                   dcRef.current = conn.dataChannel;
@@ -1278,7 +1385,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
 
       return { roomId: newRoomId, code: generatedCode };
     },
-    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, clearHandshakeWatchdog, mode, addLog]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, clearHandshakeWatchdog, clearReceiverWatchdogs, wirePeerJsPeerConnection, mode, addLog]
   );
 
   // Receiver joins a session with dual PeerJS cloud broker + signaling fallback
@@ -1312,6 +1419,76 @@ export function useWebRTC(mode: TransferMode = "internet") {
       addLog("Receiver started");
 
       startIceTimeout();
+      hasSignalingActivityRef.current = false;
+      roomNotFoundRef.current = false;
+      clearReceiverWatchdogs();
+
+      // 12-second Peer/Signaling Watchdog
+      receiverSignalingWatchdogTimerRef.current = setTimeout(() => {
+        if (sessionGenRef.current !== currentSession || isConnectedRef.current) return;
+        if (!hasSignalingActivityRef.current || roomNotFoundRef.current) {
+          addLog("12s signaling watchdog: room not found or sender offline");
+        }
+      }, 12000);
+
+      // 15-second Receiver Dial Timeout: aborts cleanly if neither PeerJS nor /api/signal opened data channel
+      receiverDialTimeoutRef.current = setTimeout(() => {
+        if (sessionGenRef.current !== currentSession || isConnectedRef.current) return;
+        addLog("15s receiver dial timeout: aborting connection attempt");
+        clearHandshakeWatchdog();
+        clearReceiverWatchdogs();
+        isConnectedRef.current = false;
+        setIsConnected(false);
+
+        const isFirewallBlocked = hasSignalingActivityRef.current && !roomNotFoundRef.current;
+        const errMsg = isFirewallBlocked ? FIREWALL_BLOCKED_MESSAGE : ROOM_NOT_FOUND_MESSAGE;
+
+        setDiagnostics((d) => ({
+          ...d,
+          iceState: isFirewallBlocked ? "failed" : "closed",
+          lastError: errMsg,
+        }));
+
+        setProgress((prev) => {
+          if (
+            prev.status === "completed" ||
+            prev.status === "idle" ||
+            prev.progressPercentage >= 100
+          ) {
+            return prev;
+          }
+          return {
+            ...prev,
+            status: "error",
+            errorMessage: errMsg,
+          };
+        });
+
+        if (pcRef.current) {
+          try {
+            pcRef.current.close();
+          } catch {
+            // Ignore
+          }
+          pcRef.current = null;
+        }
+        if (dataConnRef.current) {
+          try {
+            dataConnRef.current.close();
+          } catch {
+            // Ignore
+          }
+          dataConnRef.current = null;
+        }
+        if (peerInstanceRef.current) {
+          try {
+            peerInstanceRef.current.destroy();
+          } catch {
+            // Ignore
+          }
+          peerInstanceRef.current = null;
+        }
+      }, 15000);
 
       // Dynamically fetch ICE config with TURN servers on 4G/CGNAT
       const dynamicConfig = await fetchIceConfig(mode);
@@ -1343,6 +1520,18 @@ export function useWebRTC(mode: TransferMode = "internet") {
                 const conn = peer.connect(targetId, { reliable: true, serialization: "raw" });
                 dataConnRef.current = conn;
 
+                if (conn.peerConnection) {
+                  wirePeerJsPeerConnection(conn.peerConnection, "receiver");
+                } else {
+                  const checkPc = setInterval(() => {
+                    if (conn.peerConnection) {
+                      clearInterval(checkPc);
+                      wirePeerJsPeerConnection(conn.peerConnection, "receiver");
+                    }
+                  }, 100);
+                  setTimeout(() => clearInterval(checkPc), 2000);
+                }
+
                 const handleOpen = () => {
                   if (sessionGenRef.current !== currentSession) return;
                   if (retryTimer) {
@@ -1359,6 +1548,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
                   }
                   clearIceTimeout();
                   clearHandshakeWatchdog();
+                  clearReceiverWatchdogs();
                   activeTransportRef.current = "peerjs";
                   if (conn.dataChannel) {
                     dcRef.current = conn.dataChannel;
@@ -1433,17 +1623,29 @@ export function useWebRTC(mode: TransferMode = "internet") {
         .joinRoom(cleanCode)
         .then(({ roomId: sigRoomId, code: sigCode }) => {
           if (sessionGenRef.current !== currentSession || !sigCode || isConnectedRef.current) return;
+          hasSignalingActivityRef.current = true;
           setRoomId(sigRoomId);
           setRoomCode(sigCode);
           signalingRef.current.startPolling((msg) => {
             if (sessionGenRef.current === currentSession) {
+              hasSignalingActivityRef.current = true;
               handleSignalMessage(msg, "receiver");
             }
           });
         })
-        .catch(() => {});
+        .catch((err) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          addLog(`HTTP signaling join notice: ${msg}`);
+          if (
+            msg.toLowerCase().includes("not found") ||
+            msg.toLowerCase().includes("expired") ||
+            msg.toLowerCase().includes("404")
+          ) {
+            roomNotFoundRef.current = true;
+          }
+        });
     },
-    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, clearHandshakeWatchdog, mode, addLog]
+    [cleanup, createPeerConnection, handleSignalMessage, handleIncomingData, startIceTimeout, clearIceTimeout, clearHandshakeWatchdog, clearReceiverWatchdogs, wirePeerJsPeerConnection, mode, addLog]
   );
 
   // Sequential Multi-File Batch Queue Sender

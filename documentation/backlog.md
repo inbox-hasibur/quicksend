@@ -1,4 +1,4 @@
-# QuickSend: Product Backlog & Sprint Roadmap
+# QuickSend: Product Backlog & Major Milestone Roadmap
 
 > **Target Deployment:** [quicksend.vercel.app](https://quicksend.vercel.app)  
 > **Status Legend:** `[x]` Completed | `[ ]` Pending
@@ -7,197 +7,125 @@
 
 ## Section 1: Complete Feature List
 
-### 1. Zero-Login Core Interface & 4-Mode Home Hub
+### 1. Zero-Login Core Interface & 6-Channel Option Grid
 - **Zero-Login Experience:** No accounts, passwords, email verifications, or authentication barriers.
-- **Compact 4-Mode Option Tiles:** Clean, uncluttered option tiles (`rounded-3xl` with squircle icons and arrow indicators) replacing bulky subscription-like cards.
-- **Dedicated Step Workspace Navigation:** Tapping any mode smoothly transitions into a focused workspace view with an "← All Modes" back pill.
-- **Segmented Control Pill Styling:** Modern segmented pill toggles (`rounded-full` controls for `Send | Receive`, `Files | Text`, and pairing strategies) inspired by modern mobile apps.
-- **Adaptive Responsive Design:** Mobile-first layout optimized for smartphones, tablets, lab desktop monitors, and widescreen displays.
-- **Dark / Light Theme Support:** Soft, warm neutral tones (`#F8F9FB` light, `#0B0C10` dark) with gentle neumorphic-style shadows.
-- **Device & Connection Status Pill:** Real-time indicator displaying network state (Online / Offline / Local Only) and active device profile.
+- **6-Channel Option Tiles:** Clean, uncluttered option tiles (`rounded-3xl` with squircle icons and arrow indicators) in a responsive grid.
+- **Dedicated Focused Workspace:** Selecting any channel smoothly transitions into its dedicated workspace with an "← All Channels" return pill.
+- **Segmented Control Pill Styling:** Modern segmented pill toggles (`Send | Receive`, `Files | Text`, pairing strategies).
+- **Responsive Layout:** Mobile-first design optimized for smartphones, tablets, laptops, and lab desktop monitors.
+- **Theme System:** Semantic theme tokens for light and dark modes with high-contrast surfaces.
 
-### 2. Mode 1: Internet Sharing (PIN, Mobile Number, Custom Keyword & QR)
-- **Format Selection:** User selects **Code Entry** (PIN, Mobile Number, or Custom Keyword) or **QR Code** (dynamic URL).
-- **Flexible Pairing Key Support:**
-  - *Auto 6-digit PIN:* Fast random numeric PIN for immediate single-session sharing.
-  - *Mobile Number:* Use sender's memorized phone number (no need to memorize a new PIN).
-  - *Custom Keyword / Secret:* Type a familiar unique secret phrase (e.g., `HR998877`).
-  - *4–20 Character Length:* Receiver input accepts any valid PIN, phone number, or custom keyword without rigid length restrictions.
-- **Action Selection:** User chooses **Send** (upload files/paste text, generate room code/QR) or **Receive** (enter room code or scan QR with camera).
-- **Dynamic Scannable QR Code:** Instantly generated QR code containing the direct URL to the ephemeral session room.
-- **Camera QR Scanner:** Built-in mobile and desktop camera scanner utilizing `html5-qrcode`.
-- **WebRTC Signaling Relay:** Ephemeral session signaling exchange via lightweight serverless signaling channel.
-- **RTCDataChannel File & Text Streaming:** Direct encrypted browser-to-browser data transfer using DTLS/SCTP.
-- **NAT Traversal:** Public Google STUN servers with fallback timeout guidance for restrictive symmetric enterprise firewalls.
+### 2. Mode 1: Via Internet (6-Digit PIN, Mobile #, Custom Keyword & QR)
+- **Co-Located QR & PIN:** Simultaneous scannable QR code and 6-digit PIN on both Send and Receive views.
+- **Flexible Pairing Keys:** Auto 6-digit random PIN, memorized phone number, or custom unique keyword (4–20 characters).
+- **Dual Signaling Transport:** Low-latency PeerJS WebSocket cloud broker (`0.peerjs.com`) with concurrent `/api/signal` REST fallback.
+- **Dynamic TURN Relay:** Automatic `/api/turn` credential injection for CGNAT mobile data (4G/5G) and enterprise firewall traversal.
+- **Smart Connection Watchdog:** 12-second signaling and 15-second ICE watchdog distinguishing room availability from firewall blocks.
 
-### 3. Mode 2: Same Network Wi-Fi P2P (Interactive Radar & LAN Transfer)
-- **Local Wi-Fi Radar & Auto-Discovery:** Automated device discovery across peers sharing the same Wi-Fi router via `/api/discover`.
-- **Tactile Radar Interface:** Interactive 360-degree sweep radar showing this device in the center and nearby devices floating on orbits.
-- **1-Click Beaming:** Select files in dropzone and tap any discovered peer on the radar to transfer immediately over WebRTC.
-- **Host Candidate Prioritization:** Direct internal IP-to-IP connection routing (RFC 1918 addresses) to bypass internet WAN bandwidth caps.
-- **No-Internet LAN Fallback:** Direct 6-digit PIN connect and camera optical QR SDP handshake fallback when router client isolation is active.
+### 3. Mode 2: Same Wi-Fi (Subnet Radar & 1-Tap Beaming)
+- **Automatic Subnet Discovery:** Zero-config peer discovery via `/api/discover` grouping devices by local Wi-Fi router.
+- **Interactive 360° Radar:** Visual radar ring animation rendering identity avatars and nearby device nodes in orbit.
+- **1-Tap Beaming:** Beam selected files directly to any discovered peer with one tap.
+- **Direct IP-to-IP Data Channel:** Host candidate prioritization routing transfers over local LAN to bypass internet WAN bandwidth limits.
+- **Nearby PIN / QR Fallback:** Collapsible 4-digit code and direct PIN/QR entry when router client isolation is active.
 
-### 4. Mode 5: Via Camera (Air-Gapped Optical Data Stream)
-- **Zero-Network Optical Transfer:** Transfer files and text with no Wi-Fi, no Bluetooth, and no internet.
-- **Visual QR Streaming:** Slices files into sequenced compact QR frames (`QS1|...`) playing at configurable speeds (Slow 500ms, Normal 320ms, Fast 220ms).
-- **Camera Frame Collector:** `Html5Qrcode` camera viewfinder with real-time chunk matrix and out-of-order reassembly.
-- **Auto Download & Integrity Check:** Assembles Blob, validates data, auto-triggers download, and saves to session history.
+### 4. Mode 3: Wi-Fi Hotspot (Direct AP Transfer)
+- **Guided Offline AP Workflow:** Step-by-step assistant for turning on portable mobile hotspot with 1-tap Android settings shortcuts.
+- **Standardized Wi-Fi QR:** Generates `WIFI:T:WPA;S:<SSID>;P:<Password>;;` QR codes readable natively by iOS and Android cameras.
+- **Offline PWA Operation:** Fully functional cached PWA shell transferring over local hotspot Wi-Fi without active internet.
+- **Hotspot Radar & Direct Connect:** Unified peer radar and direct PIN/QR connection panels.
 
-### 5. Mode 3: Wi-Fi + Hotspot Offline Transfer Interface
-- **Transfer Interface Model:** Guided offline workflow operating without requiring browser-hosted HTTP/WebSocket servers.
-- **Sender Hotspot Setup:** Step-by-step assistant guiding the user through creating a mobile or laptop Wi-Fi hotspot, including Android settings deep-links (`intent:#Intent;action=android.settings.WIRELESS_SETTINGS;end`).
-- **Wi-Fi QR Join Credential Generator:** Generates standardized `WIFI:T:WPA;S:<SSID>;P:<Password>;;` QR codes readable natively by iOS and Android camera apps for instant auto-joining.
-- **Receiver Wi-Fi Assistant:** Guidance and Android Wi-Fi settings shortcuts to connect to the sender's hotspot.
-- **Offline Optical QR-WebRTC Handshake:** Optical signaling method enabling two offline devices to exchange WebRTC SDP offers/answers via camera-scanned QR codes while running from the cached PWA shell.
-- **Direct Hotspot Subnet P2P:** Streams files and text over the local hotspot network without internet.
+### 5. Mode 4: Bluetooth (Direct Radio & Native Share)
+- **Browser-Honest Architecture:** Transparently respects browser sandbox limits (GATT Central only, cannot act as BLE Peripheral/Server).
+- **Native OS Share Sheet Integration:** Direct handoff via `navigator.share` with file payloads to Quick Share, Nearby Share, AirDrop, or Bluetooth.
+- **Hardware GATT Client:** Optional Web Bluetooth client connecting to external BLE sensors and microcontrollers.
+- **System Settings Deep-Links:** Quick launch shortcuts to device Bluetooth settings.
 
-### 5. Mode 4: Bluetooth Interface (Nearby / WebShare / BLE)
-- **Honest Architectural Adaptation:** Respects the browser security boundary where browsers can only act as GATT Centrals (Clients) and cannot act as BLE Peripherals/Servers.
-- **Multi-Tiered Sharing Strategy:**
-  1. *Capability Detection:* Checks `'bluetooth' in navigator` and `'share' in navigator`.
-  2. *Native OS Web Share:* Triggers native OS Share Sheet with files (`navigator.share`) for proximity handoff via Android Quick Share / Nearby Share, Windows Bluetooth File Transfer, or Apple AirDrop.
-  3. *Android Bluetooth Settings Deep-Link:* Quick launch shortcut (`intent:#Intent;action=android.settings.BLUETOOTH_SETTINGS;end`) to prepare receiving devices.
-  4. *GATT Client Interface:* Connects to external BLE peripheral hardware (microcontrollers, loggers) to read/write characteristic data streams.
+### 6. Mode 5: Via Camera Scan (100% Air-Gapped Optical Data Stream)
+- **Zero-Radio Optical Transfer:** Transmits data strictly via visual light (screen-to-camera) with zero electromagnetic emissions.
+- **High-Density QR Streaming:** Slices payloads into sequenced Base45 frames (`QS2:...`) playing at configurable speeds and density.
+- **XOR Parity Loss Recovery:** Interleaved parity packets (`QP2:...`) reconstructing dropped camera frames without re-transmission.
+- **Multi-Layout Viewfinder:** Supports 1x1, 2x2, and 2x3 QR layouts with automatic single-stream camera scanner and instant save/download.
 
-### 6. Offline PWA & Adaptive Degradation
-- **Progressive Web App (PWA):** Installable on Android, iOS, Windows, macOS, and Linux with `src/app/manifest.ts`.
-- **Service Worker Offline Cache:** Offline availability for the application shell, UI components, icons, and client-side QR tools.
-- **Real-Time Connectivity Monitor:** Global network listener (`navigator.onLine`, `online`/`offline` events) powering UI state.
-- **Dynamic Auto Grey-Out:** Automatically disables and greys out internet-dependent modes (Mode 1) when disconnected from the internet, while highlighting offline-capable modes (Mode 2 offline, Mode 3, Mode 4).
+### 7. Mode 6: Via Cable (Direct USB-C / Ethernet / Tethering)
+- **Maximum Line-Speed Transfer:** Transmits at 1–10 Gbps over direct USB-C, Ethernet crossover, or USB tethering cables.
+- **Android USB Tethering Shortcut:** 1-tap deep link to Android tethering configuration settings.
+- **Direct Connect Panel:** Local PIN display, Show QR button, peer PIN input, and camera QR scanning.
+- **Experimental Ultrasonic Data Stream:** Acoustic Frequency Shift Keying (FSK) converting text into high-frequency sound tones (18–20 kHz).
 
-### 7. Input Handling & Clipboard Utilities
-- **Drag-and-Drop Dropzone:** Multi-file drag-and-drop target with visual hover states and size/MIME validation.
-- **Text & Link Paste Area:** Dedicated text area for quick snippet, code, and link transmission.
-- **One-Click Clipboard Copy:** Instant copy button on received text snippets with feedback toast.
-- **Direct File Downloader:** Immediate, zero-cloud download triggering using in-memory `Blob` URLs.
+### 8. Progressive Web App (PWA) & Offline Shell
+- **Installable PWA:** Full manifest configuration (`src/app/manifest.ts`) with custom icons and standalone display mode.
+- **Service Worker Caching:** Public service worker (`public/sw.js`) caching core assets, fonts, icons, and client logic with strict `/api/*` bypass.
+- **Real-Time Network Status:** Real-time online/offline event listener dynamically adapting mode availability.
 
-### 8. Transfer Progress, Verification & Session History
-- **Real-Time Transfer Metrics:** Streaming progress bar, transfer rate (MB/s), elapsed time, and estimated time remaining (ETA).
-- **Integrity Verification:** Optional SHA-256 checksum calculation to verify bit-perfect data integrity between peers.
-- **Ephemeral Session History:** In-memory session log recording transferred items during the active session (cleared on tab close).
-- **Graceful Error Recovery:** Clear diagnostics for interrupted connections, dropped peers, or declined transfers.
+### 9. File Pipeline, Streaming Disk Writer & Ephemeral History
+- **Direct Disk Streaming:** Integrates File System Access API (`window.showSaveFilePicker`) for large files (> 100MB) to prevent tab memory crashes.
+- **SCTP Backpressure Management:** 16 KB chunking with buffer drain regulation for smooth multi-megabyte transfers.
+- **Bit-Perfect Checksums:** Optional SHA-256 integrity verification with visual verified badge.
+- **Ephemeral Session History:** Session drawer tracking transfers during active tab lifecycle with 1-click re-download or text copy.
 
 ---
 
-## Section 2: Sprint-wise Breakdown
+## Section 2: Major Milestone Sprints Roadmap
 
-### Historical Sprints Archive (Sprint 1 – Sprint 27)
-Detailed task checklists and verification records for Sprints 1 through 27 have been moved to [documentation/archive/backlog_sprints_old.md](archive/backlog_sprints_old.md).
+### Sprint 1: Foundation & Offline PWA Shell
+- [x] Scaffolded Next.js 16 (App Router, TypeScript, Tailwind CSS, ESLint) project structure.
+- [x] Implemented PWA readiness with `src/app/manifest.ts` and offline Service Worker (`public/sw.js`).
+- [x] Created `useNetworkStatus` hook and dynamic mode availability logic.
+- [x] Established automated Vitest testing environment with happy-dom.
 
-| Sprint | Title | Summary |
-| :--- | :--- | :--- |
-| **Sprint 1** | Foundation & Offline PWA Shell | Initialized Next.js 16 structure, PWA manifest, service worker caching, and theme tokens. |
-| **Sprint 2** | Core UI & Mode 1 Internet Sharing | Built WebRTC P2P data channels, 6-digit signaling rooms, chunker, and file transfer modal. |
-| **Sprint 3** | Mode 2 Same Network & Mode 3 Wi-Fi/Hotspot Offline P2P | Added subnet IP discovery, Wi-Fi QR code generator, and direct LAN WebRTC connections. |
-| **Sprint 4** | Mode 4 Bluetooth, Polish & Vercel Deployment | Integrated Web Share API fallback, initial Bluetooth card, and production deployment on Vercel. |
-| **Sprint 9** | Camera Scanner Hardening & Optical Stream Polish | Hardened optical QR stream frame rate, camera scanning lifecycle, and chunk reassembly. |
-| **Sprint 10** | Hotspot Radar Engine & Streamlined Honest Bluetooth Share | Implemented radar peer UI for hotspot mode and honest Bluetooth guidance. |
-| **Sprint 11** | Tab Title, Via Cable Mode & Ultrasonic Sound Data Transfer | Added Mode 6 USB/Ethernet cable card and experimental acoustic sound data transfer. |
-| **Sprint 12** | Optical Camera Scan Hardening & Error Boundary Crash Guard | Hardened camera viewfinder cleanup and error boundaries against scanner crashes. |
-| **Sprint 13** | Universal Transfer Time Estimation & Channel Estimate Badges | Added transfer time estimation math and channel speed badges across modes. |
-| **Sprint 14** | Isolated Html5Qrcode Scanner Lifecycle & DOM Error Protection | Encapsulated HTML5 QR scanner lifecycle to prevent DOM element race conditions. |
-| **Sprint 15** | Optical Camera Preview Fix, Size Expansion & Diagnostics Line | Fixed camera preview aspect ratio, expanded scan viewfinder, and added debug stats. |
-| **Sprint 16** | Optical Parity Frames, Typed Recovery Codes & 2x2 Grid Scanning | Introduced XOR parity frames for loss recovery and prototype multi-QR grid scanning. |
-| **Sprint 17** | Base45 QR Alphanumeric Mode, Multi-Layout Grid Engine & Word Recovery Codes | Added compact Base45 encoding, BIP-39 style word recovery codes, and 1x1/2x2 layouts. |
-| **Sprint 18** | Mobile Portrait 2x3 Grid Layout & Default 2x2 Large Density | Added 2x3 vertical layout for mobile screens and adjusted density settings. |
-| **Sprint 19** | WebRTC Connection Diagnostics & Subnet Group Masking | Added real-time ICE diagnostics panel and subnet hash grouping for local discovery. |
-| **Sprint 20** | Cross-IP Nearby Pairing Codes & WebRTC Send Path Hardening | Implemented 4-digit nearby pairing codes and hardened WebRTC chunk send pipelines. |
-| **Sprint 21** | Honest Bluetooth Mode Reorganization & Radar Navigation | Restructured Bluetooth mode to prioritize OS share sheets (Quick Share / AirDrop). |
-| **Sprint 22** | Nearby Pair Redesign & Cross-Group PIN Allocation | Added unique 4-digit PIN allocation and peer beam requests for cross-group discovery. |
-| **Sprint 23** | Core Navigation Reset & Transfer Cancellation | Added header home reset, removed 10s ICE kill, and added universal transfer cancellation. |
-| **Sprint 24** | Optical Camera Stream Reliability | Set single QR default, auto-detection scanner, and end-to-end file receive/download actions. |
-| **Sprint 25** | Bluetooth Channel Restoration | Restored Bluetooth channel name/tile, removed PIN clutter, and built clean OS share flow. |
-| **Sprint 26** | Dead File, Dead Code & Asset Elimination | Pruned unused assets, dead exports, unreferenced components, and extraneous React imports. |
-| **Sprint 27** | Camera Stream Card Component Modularization | Split 1,217-line card into CameraSender, CameraReceiver, and presentation views. |
+### Sprint 2: Core UI & Mode 1 Internet Sharing
+- [x] Built core responsive home interface with squircle channel option cards.
+- [x] Implemented Mode 1 WebRTC data channels with 64KB/16KB chunking and progress modal.
+- [x] Built ephemeral signaling API (`/api/signal`) and 6-digit room code generation.
+- [x] Integrated `qrcode.react` generator and `html5-qrcode` camera scanner.
+
+### Sprint 3: Mode 2 Same Wi-Fi Radar & Mode 3 Hotspot P2P
+- [x] Implemented subnet discovery route (`/api/discover`) with host candidate prioritization.
+- [x] Built interactive 360° device radar with animal identity avatars (Fox, Dolphin, Lion).
+- [x] Created Mode 3 Wi-Fi hotspot setup guide and `WIFI:T:WPA;S:...` QR join generator.
+- [x] Implemented offline camera-to-camera optical signaling for air-gapped handshakes.
+
+### Sprint 4: Mode 4 Bluetooth & Native Share
+- [x] Built honest multi-tiered Bluetooth sharing architecture respecting browser sandbox limits.
+- [x] Integrated Web Share API (`navigator.share` with files) for Quick Share / AirDrop / Bluetooth handoff.
+- [x] Added Web Bluetooth GATT Client interface for external peripheral hardware.
+- [x] Added OS Bluetooth settings deep-links and ephemeral transfer history drawer.
+
+### Sprint 5: Mode 5 Optical Camera Stream & Parity
+- [x] Engineered pure visual optical data stream slicing files into sequenced QR frames (`QS1`/`QS2`).
+- [x] Implemented Base45 alphanumeric encoding and BIP-39 style word recovery codes.
+- [x] Implemented XOR parity stride engine for lost frame recovery without radio transmission.
+- [x] Built multi-layout camera receiver (1x1, 2x2, 2x3) with memory-safe offscreen canvas recycling.
+
+### Sprint 6: Mode 6 Cable & Experimental Ultrasonic
+- [x] Built Mode 6 direct cable link interface for USB-C, Ethernet, and USB tethering.
+- [x] Added Android USB tethering quick-launch configuration shortcuts.
+- [x] Implemented experimental Frequency Shift Keying (FSK) acoustic data transfer (18–20 kHz).
+- [x] Added real-time Web Audio API spectrum canvas visualization and nibble modulation.
+
+### Sprint 7: Tactile UI Overhaul & Theme System
+- [x] Established unified soft-glass tactile design system with semantic CSS variables.
+- [x] Implemented interactive Dark/Light theme switching (`useTheme.ts`) with anti-FOUC script.
+- [x] Extracted shared components: `SegmentedControl`, `RadarPanel`, `DirectConnectPanel`, and `FileTypeBadge`.
+- [x] Modularized 1,200-line camera coordinator into `CameraSender`, `CameraReceiver`, and presentation views.
+
+### Sprint 8: Production Signaling, Multi-File Queue & TURN Support
+- [x] Hardened WebRTC signaling with Upstash Redis REST mode and memory fallback.
+- [x] Implemented sequential multi-file batch queue and large-file streaming disk writer (>100MB).
+- [x] Added SHA-256 file integrity calculation with verified visual badge.
+- [x] Built server-side `/api/turn` route supporting public STUN pool, Metered.ca ephemeral TURN credentials, and static TURN env vars.
+
+### Sprint 9: Stabilization, Diagnostics & Polish
+- [x] Streamlined Mode 1: co-located live scannable QR code and PIN entry on both Send and Receive screens.
+- [x] Fixed PeerJS receiver signaling timeout: added 12s signaling watchdog, 15s overall dial timeout, and internal `conn.peerConnection` ICE tracking.
+- [x] Differentiated timeout diagnostics inside `TransferModal` (`"Room not found / Sender offline"` vs `"Blocked by 4G mobile network or firewall — TURN relay required"`).
+- [x] Rendered `<ConnectionDiagnostics />` at bottom of Mode 1 and added subtle TURN availability notice.
+- [x] Removed clutter copy and ensured 100% theme contrast consistency across all modals and cards.
 
 ---
 
-### Sprint 28: Radar and Direct Connect Component Deduplication
-  - ESLint 9 / React 19 compiler lint checks passing with zero warnings or errors.
-  - Clean Turbopack production build verified (`npm run build`).
+## Historical Sprints & Maintenance Archive
 
-### Sprint 28: Radar and Direct Connect Component Deduplication
-- [x] RadarPanel Extraction:
-  - Created reusable `src/components/RadarPanel.tsx` extracting repeated radar concentric rings, radar sweep animation, center node identity avatar, discovered peer radial layout, status pulses, and empty state messaging.
-  - Replaced duplicate radar JSX in `src/components/SameNetworkCard.tsx` (reduced from 578 to 437 lines) and `src/components/HotspotAssistantCard.tsx` (reduced from 715 to 525 lines).
-- [x] DirectConnectPanel Extraction:
-  - Created reusable `src/components/DirectConnectPanel.tsx` extracting local device PIN display, 1-click clipboard copy, Show QR button, peer PIN input, connect button, and scan QR camera button.
-  - Normalized typed PIN input by removing spaces and hyphens before executing connection callbacks.
-  - Replaced duplicate PIN/QR connection blocks in `SameNetworkCard.tsx`, `HotspotAssistantCard.tsx`, and `CableTransferCard.tsx` (reduced from 469 to 397 lines).
-- [x] Unified "Can't see your device?" Fallback:
-  - Consolidated duplicate fallback sections in `SameNetworkCard.tsx` and `HotspotAssistantCard.tsx` into a single collapsed `<details>` titled "Can't see your device?", offering two distinct options: "Use a nearby code" and "Connect with PIN or QR".
-- [x] Verification & Automated Tests:
-  - Added test suite `src/components/__tests__/RadarPanel.test.tsx` verifying empty/active radar renders, avatar switching, and peer beaming callbacks.
-  - Added test suite `src/components/__tests__/DirectConnectPanel.test.tsx` verifying formatted PIN rendering, copy functionality, and whitespace/hyphen normalization.
-  - Updated `src/components/__tests__/HotspotAssistantCard.test.tsx` to align with the unified fallback structure.
-  - All 38 test files, 235 tests passing with 100% pass rate.
-  - ESLint 9 checks passing with zero warnings or errors.
-  - Production build passing cleanly (`npm run build`).
-
-### Sprint 29: Documentation Streamlining and Backlog Archive
-- [x] Streamlined documentation: moved historical Sprints 1–22 checklists into `documentation/archive/backlog_sprints_old.md` with an index table in `backlog.md`.
-- [x] Regenerated exact ASCII repository file tree in `about_project.md` from `git ls-files` (dropping `package-lock.json`).
-- [x] Updated `codebase_map.md` with complete 38-suite test coverage (235 tests), refreshed timestamps, and ensured full 1:1 file parity with the repository.
-- [x] Updated `AGENTS.md` documentation sync rule for lean, targeted updates.
-
-### Sprint 30: Sender QR Visibility and Smart ICE Watchdog Hardening
-- [x] Sender QR/PIN Non-blocking Display:
-  - Kept sender QR and 6-digit PIN fully visible and unblurred in `InternetSharingCard.tsx` while waiting for peer connection.
-  - Replaced blocking modal during passive waiting with an inline status indicator (`"Waiting for receiver to connect..."`).
-  - Restricted `TransferModal.tsx` trigger on the sender side to active handshake/transfer states (`waiting-acceptance`, `transferring`, `completed`, `error`).
-  - Added clean connecting state in `TransferModal.tsx` displaying `"Connecting to sender..."` with room PIN instead of `"File Payload 0 Bytes"`.
-- [x] Smart ICE Watchdog & Dual-Transport Arbitration:
-  - Preserved indefinite passive waiting with zero forced timeout before peer handshake.
-  - Implemented 15s ICE handshake watchdog in `useWebRTC.ts` triggering automatic `restartIce()` at 7s when ICE is stuck in `checking`.
-  - Surfaced descriptive error message advising user of 4G/firewall block and suggesting alternative channels (Same Wi-Fi, Hotspot, TURN relay).
-  - Ensured cleanup state properly resets across new sessions to prevent dropped ICE events.
-- [x] Verification & Automated Tests:
-  - Updated `src/components/__tests__/TransferModal.test.tsx` and `src/hooks/__tests__/useWebRTC.test.ts`.
-  - All 38 test files, 238 tests passing (100% pass rate).
-  - ESLint 9 checks passing with zero warnings or errors.
-  - Production build passing cleanly with Turbopack (`npm run build`).
-
-### Sprint 31: Global Dark/Light Theme Contrast Fix and Privacy Reassurance Copy Removal
-- [x] Global Semantic Color Token Migration (`src/app/globals.css`, `src/components/*`):
-  - Added semantic theme tokens in `globals.css` for `--surface-muted` and `--shadow-card` across light and dark modes.
-  - Audited all components and modals across the application to replace non-existent or hardcoded classes (such as `dark:bg-neutral-850`, `dark:bg-neutral-750`, `bg-neutral-900 ... dark:bg-white`) with unified CSS variables (`var(--accent)`, `var(--accent-hover)`, `var(--bg)`, `var(--surface)`, `var(--surface-subtle)`, `var(--surface-muted)`, `var(--border-hairline)`, `var(--text)`, `var(--text-muted)`).
-  - Fixed dark mode contrast defect in `TransferModal.tsx` preventing white text on light boxes in dark theme.
-  - Standardized interactive action buttons across all channel cards (`DirectConnectPanel`, `SameNetworkCard`, `HotspotAssistantCard`, `CableTransferCard`, `NearbyShareCard`, `CameraSender`, `CameraReceiver`, `ReceiverCompleteView`, `ReceiverProgressView`, `UltrasonicCard`) to use high-contrast `--accent` tokens.
-- [x] Reassurance & Privacy Copy Removal:
-  - Removed redundant `"Zero server uploads — files stay on your device until direct P2P transfer"` and other duplicate reassurance banners from `Dropzone.tsx`, `InternetSharingCard.tsx`, and `README.md`.
-  - Cleaned up `README.md` hero badges (removed duplicate test and platform clutter, kept core technology and live links).
-- [x] Verification & Automated Tests:
-  - All 38 test suites, 238 tests passing with 100% pass rate.
-  - ESLint 9 checks passing with 0 errors and 0 warnings.
-  - Production build passing cleanly with Turbopack (`npm run build`).
-
-### Sprint 32: Mode 1 Code + QR Streamlining and README Visual Simplification
-- [x] Mode 1 Always-Available Code + QR (`src/components/InternetSharingCard.tsx`):
-  - Removed separate `"Code | QR"` pairing format toggle, retaining only the clean top `Send | Receive` role switcher.
-  - In `Send` view: always displays the Pairing Key selector (`Auto PIN` | `Mobile No.` | `Keyword`) alongside the live scannable `QRCodeDisplay` and 6-digit Room PIN so receivers can connect immediately via camera or manual typing.
-  - In `Receive` view: always provides the prominent "Scan Sender's QR Code" camera button and the Room Code / PIN input with Connect button together on the same screen.
-  - Auto-initializes `startSender()` on mount for instant session creation without requiring payload selection first.
-- [x] README Simplification (`README.md`):
-  - Removed dense technical jargon (`DTLS/SCTP`, `RFC 1918`, `FNV-1a`, `NAT traversal`) and the heavy architecture sequence diagram.
-  - Kept hero showcase, badges, preview screenshot, crisp plain-English features list, 6-channel summary table, short local setup steps, and license.
-- [x] Verification & Unit Testing (`src/components/__tests__/InternetSharingCard.test.tsx`):
-  - Added test suite covering Send view defaults, live QR/PIN rendering, mobile key input switching, and Receive view dual scan/input controls.
-  - Passing tests: 241 tests passing across 39 suites (100% pass rate).
-  - ESLint 9 checks passing with 0 errors and 0 warnings.
-  - Turbopack production build verified cleanly (`npm run build`).
-
-### Sprint 33: Dynamic TURN Relay Credentials & CGNAT / 4G Resilient Connectivity
-- [x] Server-Side TURN Relay Route (`src/app/api/turn/route.ts`):
-  - Created `GET /api/turn` route returning `{ iceServers: RTCIceServer[], hasTurn: boolean }`.
-  - Integrated public STUN pool with optional ephemeral TURN credentials from Metered (`METERED_TURN_DOMAIN` and `METERED_TURN_API_KEY`) and static TURN environment variables (`NEXT_PUBLIC_TURN_URL`, `NEXT_PUBLIC_TURN_USERNAME`, `NEXT_PUBLIC_TURN_CREDENTIAL`).
-  - Added 10-minute in-memory server cache and safe STUN-only fallback on network failures without exposing secret API keys.
-- [x] Dynamic ICE Fetching & Client Integration (`src/lib/iceConfig.ts`, `src/hooks/useWebRTC.ts`):
-  - Added `fetchIceConfig(mode)` in `src/lib/iceConfig.ts` with 2-second timeout, 5-minute client cache, and synchronous local fallback.
-  - Wired `fetchIceConfig(mode)` in `useWebRTC.ts` before creating `RTCPeerConnection` and initializing PeerJS for both sender and receiver roles.
-- [x] Automated Tests & Verification (`src/app/api/turn/__tests__/route.test.ts`, `src/lib/__tests__/iceConfig.test.ts`):
-  - Added unit tests verifying STUN defaults, Metered API fetching, credential hiding, caching, and fallback behavior.
-  - Added `fetchIceConfig` tests verifying offline bypass, dynamic server retrieval, and network error resilience.
-  - 248 tests passing across 40 test suites (100% pass rate).
-  - ESLint 9 checks passing with 0 errors and 0 warnings.
-  - Turbopack production build verified cleanly (`npm run build`).
-
+For the complete, granular step-by-step checklist of historical engineering iterations (Sprints 1 through 33) and subsequent dated bugfix entries, see:
+👉 [**documentation/archive/backlog_sprints_old.md**](archive/backlog_sprints_old.md)
