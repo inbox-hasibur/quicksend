@@ -729,26 +729,9 @@
   - Handled case-insensitive prefix matching in `/api/relay/attach` and `isAllowedRelayUrl`.
   - Updated `src/lib/upstashBlob.ts` `upload()` to forward all signed headers and provide clear Network/CORS and HTTP error diagnostics.
 
-### Fix 9 (2026-11-18): Mode 1 Streamlining (Unified Single-Screen QR + OTP Relay Flow)
-- [x] Unified 8-Character Single OTP & Zero-Knowledge Architecture (`src/hooks/useRelayTransfer.ts`):
-  - Sender generates single 8-character OTP (`XXXX-XXXX`). Derives client-side AES-GCM key from full 8 chars while using first 4 chars as room identifier.
-  - Generates QR URL with `#rc=<fullOtp>` hash fragment for instant zero-knowledge reception.
-  - Implemented `receiveByOtp(input)` supporting both URL and direct OTP string inputs with automated decryption.
-- [x] Redesigned Mode 1 UI (`src/components/InternetSharingCard.tsx`):
-  - Removed all WebRTC/PeerJS/TURN technical clutter, tab walls, and diagnostic drawers from Mode 1.
-  - Single-screen layout: Compact Dropzone + Send button, 2-column action row (Left: Scan QR | Right: Auto OTP or Enter OTP), and auto-download on QR scan or URL open.
-  - Updated `src/components/QRScannerModal.tsx` to preserve `#rc=` fragment for automatic 1-scan transfer.
-  - Updated component tests in `src/components/__tests__/InternetSharingCard.test.tsx`.
-
-### Fix 10 (2026-11-18): Fix R2 CSP/CORS, Receiver Fallback Stream & UI Polish
-- [x] Cloudflare R2 CSP & Header Filtering (`vercel.json`, `src/lib/upstashBlob.ts`):
-  - Added `https://*.r2.cloudflarestorage.com` to `connect-src` in `vercel.json` resolving browser `Failed to fetch` CSP errors.
-  - Allowed `*.r2.cloudflarestorage.com` in `isAllowedRelayUrl()`.
-  - Filtered out forbidden browser headers (`content-length`, `host`, etc.) in `upload()` to prevent preflight rejection.
-- [x] Receiver Fallback Streaming Route (`src/app/api/relay/file/route.ts`, `src/hooks/useRelayTransfer.ts`):
-  - Created `GET /api/relay/file` streaming encrypted blobs directly (`new Response(upstream.body)`) when cross-origin CDN fetch fails.
-  - Implemented automatic fallback in `useRelayTransfer.ts` `downloadRelay()`.
-- [x] UI Polish (`src/components/InternetSharingCard.tsx`, `src/hooks/useRelayTransfer.ts`):
-  - Dropzone and controls remain visible on error state with inline dismissible banner.
-  - Added 0-byte file guard warning.
-  - Adjusted bottom row layout with `"OTP: K7M2-9QXA"` placeholder to prevent clipping.
+### Fix 9 (2026-11-19): Restore 6-digit numeric room PIN and decoupled relay code architecture
+- [x] Auto pairing mode restored to 6-digit crypto-random numerical PIN via `generateRoomCode()` in `src/lib/codeGenerator.ts`, formatted as `123-456`.
+- [x] Relay encryption code (`XXXX-XXXX`) decoupled and restricted strictly to client-side encryption key derivation for cloud relay fallback (preserving `#rc=` URL hash fragment).
+- [x] Receiver input in `src/components/InternetSharingCard.tsx` enhanced with `inputMode="numeric"`, `placeholder="123 456"`, non-digit stripping, and automatic submission upon 6-digit completion while retaining Mobile-number and Custom-keyword modes via SegmentedControl and auto-detection.
+- [x] Preserved `/api/relay/file` streaming fallback and R2 domain support in `vercel.json` CSP and `src/lib/upstashBlob.ts`.
+- [x] Added unit tests for 6-digit crypto-random generation and receiver auto-submission in `codeGenerator.test.ts` and `InternetSharingCard.test.tsx`.

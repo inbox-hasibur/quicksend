@@ -69,7 +69,7 @@ export async function upload(
     }
   }
 
-  if (!headers["content-type"] && !headers["Content-Type"]) {
+  if (!headers["Content-Type"] && !headers["content-type"]) {
     headers["Content-Type"] = options?.contentType || "application/octet-stream";
   }
 

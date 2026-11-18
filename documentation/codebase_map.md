@@ -326,7 +326,7 @@ flowchart TD
 - **Exports:** `ModeSelector(): JSX.Element`
 
 #### `src/components/InternetSharingCard.tsx`
-- **Purpose:** Mode 1 Interactive Controller (Via Internet). Ultra-simple, non-technical zero-knowledge transfer UI: compact dropzone, crisp QR code display, unified 2-column row with Scan QR and Auto OTP (XXXX-XXXX), manual OTP input for lab PCs, and automated 1-scan decryption via URL hash fragments (#rc=...).
+- **Purpose:** Mode 1 Interactive Controller (Via Internet). Provides co-located scannable QR code and 6-digit PIN across both Send and Receive screens, flexible sender pairing strategies (Auto PIN, Mobile Number, Custom Keyword), real-time `<ConnectionDiagnostics />` telemetry, dynamic `/api/turn` warning banner, and opt-in "Send via encrypted cloud relay" fallback with client-side encryption and `#rc=` PIN fragment appending.
 - **Exports:** `InternetSharingCard({ initialRoomCode }: InternetSharingCardProps): JSX.Element`
 
 #### `src/components/SameNetworkCard.tsx`
@@ -444,7 +444,7 @@ flowchart TD
 - **Exports:** `useWebRTC(mode): { role, roomId, roomCode, isConnected, progress, pendingHeader, brokerNotice, startSender, startReceiver, sendFiles, sendText, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup, debugLog, diagnostics }`, `waitForDrain`, `DrainableChannel`, `WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`, `FIREWALL_BLOCKED_MESSAGE`, `ROOM_NOT_FOUND_MESSAGE`.
 
 #### `src/hooks/useRelayTransfer.ts`
-- **Purpose:** Client-side encrypted cloud relay controller. Derives AES-GCM 256 keys via PBKDF2 from a unified 8-character OTP (`XXXX-XXXX`) without server key exposure, coordinates direct client uploads via `@upstash/blob` using the first 4 characters as the room identifier, handles instant OTP/QR reception (`receiveByOtp`), downloads and decrypts payloads, and triggers automatic completion cleanup.
+- **Purpose:** Client-side encrypted cloud relay controller. Derives AES-GCM 256 keys via PBKDF2 without server key exposure, encrypts files and text into binary octet streams, coordinates direct client uploads via `@upstash/blob`, handles 4s polling on receiver, downloads and decrypts payloads, and triggers automatic completion cleanup.
 - **Exports:** `useRelayTransfer(): UseRelayTransferReturn`, `UseRelayTransferReturn`, `RelayStatus`, `RelayPayloadData`.
 
 #### `src/hooks/useLocalDiscovery.ts`

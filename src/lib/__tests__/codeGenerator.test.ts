@@ -15,6 +15,10 @@ describe("codeGenerator utilities", () => {
     expect(num).toBeLessThanOrEqual(999999);
   });
 
+  it("should format 123456 to 123-456", () => {
+    expect(formatRoomCode("123456")).toBe("123-456");
+  });
+
   it("should format a 6-digit code with hyphen and preserve mobile numbers or keywords", () => {
     expect(formatRoomCode("834291")).toBe("834-291");
     expect(formatRoomCode("834-291")).toBe("834-291");

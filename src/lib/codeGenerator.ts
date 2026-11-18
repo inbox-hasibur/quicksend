@@ -1,8 +1,15 @@
 /**
- * Generates a random 6-digit numerical room PIN.
+ * Generates a random 6-digit numerical room PIN using crypto-random values.
  */
 export function generateRoomCode(): string {
-  // Generates integer between 100000 and 999999
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    const array = new Uint32Array(1);
+    crypto.getRandomValues(array);
+    // Integer in range [100000, 999999]
+    const randomValue = 100000 + (array[0] % 900000);
+    return randomValue.toString();
+  }
+  // Fallback: generates integer between 100000 and 999999
   const randomValue = Math.floor(100000 + Math.random() * 900000);
   return randomValue.toString();
 }
