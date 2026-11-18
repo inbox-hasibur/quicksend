@@ -71,7 +71,7 @@ describe("InternetSharingCard Component", () => {
     expect(container.textContent).toContain("Scan QR");
     expect(container.textContent).toContain("Receive");
 
-    const otpInput = container.querySelector("input[placeholder*='Enter OTP']");
+    const otpInput = container.querySelector("input[placeholder*='OTP:']");
     expect(otpInput).toBeDefined();
 
     const scanButton = Array.from(container.querySelectorAll("button")).find(

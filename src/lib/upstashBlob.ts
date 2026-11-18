@@ -50,15 +50,27 @@ export async function upload(
     throw new Error("No upload URL returned from relay");
   }
 
-  const headers: Record<string, string> = {
-    "Content-Type": options?.contentType || "application/octet-stream",
-  };
+  const FORBIDDEN_BROWSER_HEADERS = new Set([
+    "content-length",
+    "host",
+    "connection",
+    "keep-alive",
+    "user-agent",
+    "referer",
+    "cookie",
+  ]);
+
+  const headers: Record<string, string> = {};
   if (tokenData.headers) {
     for (const [key, val] of Object.entries(tokenData.headers)) {
-      if (typeof val === "string") {
+      if (typeof val === "string" && !FORBIDDEN_BROWSER_HEADERS.has(key.toLowerCase())) {
         headers[key] = val;
       }
     }
+  }
+
+  if (!headers["content-type"] && !headers["Content-Type"]) {
+    headers["Content-Type"] = options?.contentType || "application/octet-stream";
   }
 
   let putRes: Response;
@@ -139,7 +151,8 @@ export function isAllowedRelayUrl(urlStr: string, roomCode: string): boolean {
     let hostAllowed =
       host.endsWith(".blob.upstash.io") ||
       host.endsWith(".upstash.io") ||
-      host.endsWith(".upstash-blob.com");
+      host.endsWith(".upstash-blob.com") ||
+      host.endsWith(".r2.cloudflarestorage.com");
 
     const configuredBase = process.env.UPSTASH_BLOB_URL?.trim();
     if (configuredBase) {

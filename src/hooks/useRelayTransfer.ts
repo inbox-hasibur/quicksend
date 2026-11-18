@@ -168,6 +168,12 @@ export function useRelayTransfer() {
       }
 
       for (const file of files) {
+        if (file.size === 0) {
+          setError("Selected file is empty (0 Bytes). Please choose a non-empty file.");
+          setRelayState("error");
+          return;
+        }
+
         if (file.size > relayStatus.maxFileBytes) {
           setError(`File "${file.name}" exceeds the 50MB relay limit.`);
           setRelayState("error");
@@ -365,10 +371,22 @@ export function useRelayTransfer() {
         const key = await deriveRelayKey(normalizedCode, payload.salt);
 
         // Fetch & decrypt files
-        for (const item of payload.items) {
-          const res = await fetch(item.url);
-          if (!res.ok) {
-            throw new Error("Failed to download encrypted file");
+        for (let idx = 0; idx < payload.items.length; idx++) {
+          const item = payload.items[idx];
+          let res: Response;
+          try {
+            res = await fetch(item.url);
+            if (!res.ok) {
+              throw new Error(`HTTP ${res.status}`);
+            }
+          } catch {
+            // Automatic fallback to lightweight proxy stream if direct CDN fetch fails (CORS / network)
+            res = await fetch(
+              `/api/relay/file?code=${encodeURIComponent(cleanRoom || targetRoom)}&index=${idx}`
+            );
+            if (!res.ok) {
+              throw new Error("Failed to download encrypted file");
+            }
           }
           const cipherBuffer = await res.arrayBuffer();
           const plainBuffer = await decryptBytes(key, item.iv, cipherBuffer);

@@ -739,3 +739,16 @@
   - Single-screen layout: Compact Dropzone + Send button, 2-column action row (Left: Scan QR | Right: Auto OTP or Enter OTP), and auto-download on QR scan or URL open.
   - Updated `src/components/QRScannerModal.tsx` to preserve `#rc=` fragment for automatic 1-scan transfer.
   - Updated component tests in `src/components/__tests__/InternetSharingCard.test.tsx`.
+
+### Fix 10 (2026-11-18): Fix R2 CSP/CORS, Receiver Fallback Stream & UI Polish
+- [x] Cloudflare R2 CSP & Header Filtering (`vercel.json`, `src/lib/upstashBlob.ts`):
+  - Added `https://*.r2.cloudflarestorage.com` to `connect-src` in `vercel.json` resolving browser `Failed to fetch` CSP errors.
+  - Allowed `*.r2.cloudflarestorage.com` in `isAllowedRelayUrl()`.
+  - Filtered out forbidden browser headers (`content-length`, `host`, etc.) in `upload()` to prevent preflight rejection.
+- [x] Receiver Fallback Streaming Route (`src/app/api/relay/file/route.ts`, `src/hooks/useRelayTransfer.ts`):
+  - Created `GET /api/relay/file` streaming encrypted blobs directly (`new Response(upstream.body)`) when cross-origin CDN fetch fails.
+  - Implemented automatic fallback in `useRelayTransfer.ts` `downloadRelay()`.
+- [x] UI Polish (`src/components/InternetSharingCard.tsx`, `src/hooks/useRelayTransfer.ts`):
+  - Dropzone and controls remain visible on error state with inline dismissible banner.
+  - Added 0-byte file guard warning.
+  - Adjusted bottom row layout with `"OTP: K7M2-9QXA"` placeholder to prevent clipping.

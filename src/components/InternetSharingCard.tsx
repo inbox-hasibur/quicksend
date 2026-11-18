@@ -58,11 +58,12 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     }
   }, [receiveByOtp]);
 
+  const hasEmptyFile = selectedPayload.files.some((f) => f.size === 0);
   const hasOversized = selectedPayload.files.some((f) => f.size > 52428800);
   const hasPayload = selectedPayload.files.length > 0 || Boolean(selectedPayload.text.trim());
 
   const handleSend = async () => {
-    if (!hasPayload || hasOversized) return;
+    if (!hasPayload || hasOversized || hasEmptyFile) return;
     await startRelayUpload(selectedPayload.files, selectedPayload.text);
   };
 
@@ -107,16 +108,18 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
 
   return (
     <div className="w-full max-w-xl mx-auto space-y-4">
-      {/* Global Error Banner */}
+      {/* Global Inline Error Banner: Never replaces the card or controls */}
       {relayError && (
-        <div className="p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-medium flex items-center justify-between gap-2">
+        <div className="p-3.5 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-medium flex items-center justify-between gap-2 shadow-sm">
           <div className="flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
             <span>{relayError}</span>
           </div>
           <button
-            onClick={() => handleReset()}
+            type="button"
+            onClick={handleReset}
             className="p-1 rounded-lg hover:bg-red-500/20 transition-all text-red-500"
+            title="Dismiss error"
           >
             <X className="h-3.5 w-3.5" />
           </button>
@@ -143,6 +146,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
             <p className="text-xs text-[var(--text-muted)]">File downloaded and verified securely</p>
           </div>
           <button
+            type="button"
             onClick={handleReset}
             className="px-5 py-2 rounded-xl bg-[var(--surface-glass)] hover:bg-[var(--border-hairline)] text-xs font-semibold text-[var(--text)] transition-all"
           >
@@ -163,6 +167,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
           {/* 2-Column Row: Left Scan QR | Right Auto OTP */}
           <div className="w-full grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <button
+              type="button"
               onClick={() => setIsScannerOpen(true)}
               className="flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[var(--surface-subtle)] hover:bg-[var(--surface-glass)] border border-[var(--border-hairline)] text-sm font-semibold transition-all active:scale-[0.98] text-[var(--text)]"
             >
@@ -180,6 +185,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                 </span>
               </div>
               <button
+                type="button"
                 onClick={handleCopyOtp}
                 className="p-2 rounded-xl bg-[var(--surface-glass)] hover:bg-[var(--border-hairline)] text-[var(--text-muted)] hover:text-[var(--text)] transition-all"
                 title="Copy OTP"
@@ -194,6 +200,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
           </div>
 
           <button
+            type="button"
             onClick={handleReset}
             className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] underline transition-all pt-1"
           >
@@ -223,6 +230,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
           <div className="flex items-center justify-between text-xs text-[var(--text-muted)]">
             <span>{relayProgress}% completed</span>
             <button
+              type="button"
               onClick={() => cancelRelay()}
               className="text-red-500 hover:underline"
             >
@@ -232,12 +240,19 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
         </div>
       )}
 
-      {/* Idle / Sending State: Dropzone + Send button + 2-Column Row (Scan QR | Enter OTP) */}
-      {!isDownloading && !downloadSuccess && relayState === "idle" && (
+      {/* Idle or Error State: Dropzone + Controls remain ALWAYS visible */}
+      {!isDownloading && !downloadSuccess && (relayState === "idle" || relayState === "error") && (
         <div className="space-y-4">
           {/* Dropzone Card */}
           <div className="p-4 bg-[var(--surface-card)] rounded-3xl border border-[var(--border-hairline)] shadow-sm space-y-3">
             <Dropzone onSelectionChange={setSelectedPayload} />
+
+            {/* 0-Byte Empty file guard notice */}
+            {hasEmptyFile && (
+              <p className="text-xs text-red-500 font-medium text-center">
+                Selected file is empty (0 Bytes). Please choose a non-empty file.
+              </p>
+            )}
 
             {/* Oversized warning notice */}
             {hasOversized && (
@@ -249,8 +264,9 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
             {/* Send Button when payload selected */}
             {hasPayload && (
               <button
+                type="button"
                 onClick={handleSend}
-                disabled={hasOversized}
+                disabled={hasOversized || hasEmptyFile}
                 className="w-full py-3.5 px-5 rounded-2xl bg-[var(--accent)] hover:opacity-90 disabled:opacity-50 text-white font-semibold text-sm transition-all flex items-center justify-center gap-2 shadow-sm active:scale-[0.99]"
               >
                 <Send className="h-4 w-4" />
@@ -261,29 +277,31 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
             )}
           </div>
 
-          {/* Idle / Receive Row: 2-Column Row below Dropzone */}
+          {/* Idle / Receive Row: Responsive unclipped layout */}
           <div className="p-3 bg-[var(--surface-card)] rounded-3xl border border-[var(--border-hairline)] shadow-sm">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-center">
+            <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
               {/* Left Column: Scan QR */}
               <button
+                type="button"
                 onClick={() => setIsScannerOpen(true)}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[var(--surface-subtle)] hover:bg-[var(--surface-glass)] border border-[var(--border-hairline)] text-sm font-semibold transition-all active:scale-[0.98] text-[var(--text)]"
+                className="sm:w-1/3 flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-[var(--surface-subtle)] hover:bg-[var(--surface-glass)] border border-[var(--border-hairline)] text-sm font-semibold transition-all active:scale-[0.98] text-[var(--text)] shrink-0"
               >
                 <Camera className="h-4 w-4 text-[var(--accent)]" />
                 <span>Scan QR</span>
               </button>
 
               {/* Right Column: Enter OTP + Receive Button */}
-              <div className="flex items-center gap-2">
+              <div className="sm:w-2/3 flex items-center gap-2">
                 <input
                   type="text"
                   value={otpInput}
                   onChange={(e) => setOtpInput(e.target.value.toUpperCase())}
                   onKeyDown={(e) => e.key === "Enter" && handleReceive()}
-                  placeholder="Enter OTP (e.g. K7M2-9QXA)"
-                  className="w-full px-3.5 py-3 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-sm font-mono tracking-wider focus:outline-none focus:border-[var(--accent)] text-[var(--text)] placeholder:text-[var(--text-muted)] uppercase"
+                  placeholder="OTP: K7M2-9QXA"
+                  className="w-full min-w-0 px-3.5 py-3 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-sm font-mono tracking-wider focus:outline-none focus:border-[var(--accent)] text-[var(--text)] placeholder:text-[var(--text-muted)] uppercase"
                 />
                 <button
+                  type="button"
                   onClick={handleReceive}
                   disabled={!otpInput.trim() || isDownloading}
                   className="px-4 py-3 rounded-2xl bg-[var(--accent)] hover:opacity-90 disabled:opacity-50 text-white text-sm font-semibold transition-all flex items-center gap-1.5 shrink-0"

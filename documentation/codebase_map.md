@@ -240,7 +240,7 @@ flowchart TD
 | `src/app/api/discover/` | Local subnet peer discovery, IP detection, CGNAT 4-digit pairing PIN, and beaming endpoints. | `src/lib/signalStore`, `src/lib/deviceIdentity` |
 | `src/app/api/health/` | Public health check returning runtime environment, Redis/Memory storage telemetry, and uptime. | `src/lib/signalStore` |
 | `src/app/api/turn/` | Ephemeral TURN credentials resolver querying Metered.ca with in-memory caching and STUN fallback. | `src/lib/iceConfig` |
-| `src/app/api/relay/` | Zero-knowledge encrypted cloud relay routes (`status`, `attach`, `complete`, `upload`, `cleanup`). | `@upstash/blob`, `src/lib/signalStore`, `src/lib/rateLimit` |
+| `src/app/api/relay/` | Zero-knowledge encrypted cloud relay routes (`status`, `attach`, `complete`, `upload`, `file`, `cleanup`). | `@upstash/blob`, `src/lib/signalStore`, `src/lib/rateLimit` |
 | `src/components/` | Presentation & interactive units: 6-channel mode selector, channel controller cards, diagnostic drawer, dropzone, QR displays, modals, badges, and progress indicators. | `lucide-react`, `qrcode.react`, `html5-qrcode`, `src/hooks/`, `src/lib/` |
 | `src/hooks/` | Stateful React lifecycle hooks managing WebRTC connections (`useWebRTC`), subnet discovery (`useLocalDiscovery`), camera scanners (`useQuadScanner`, `useHtml5Scanner`), theme, and history. | `react`, `src/lib/`, browser runtime APIs |
 | `src/lib/` | Pure TypeScript domain libraries: Base45 encoding, word recovery codes, multi-QR grid splitting, optical XOR parity stream, chunking, STUN/TURN ICE config, disk streaming, and transfer estimation. | `src/types/`, `vitest` |
@@ -308,6 +308,10 @@ flowchart TD
 #### `src/app/api/relay/cleanup/route.ts`
 - **Purpose:** Automated cron cleanup endpoint (`GET`). Authenticates via `CRON_SECRET` bearer token, pages through `@upstash/blob` objects with prefix `relay/`, and purges blobs older than 30 minutes via `bucket.del()`.
 - **Exports:** `GET(request: Request): Promise<NextResponse>`.
+
+#### `src/app/api/relay/file/route.ts`
+- **Purpose:** Lightweight fallback streaming endpoint (`GET`). Directly streams encrypted blob payload from Upstash/R2 storage (`new Response(upstream.body)`) when client-side cross-origin fetch hits CORS restrictions on restrictive networks.
+- **Exports:** `GET(request: Request): Promise<Response>`.
 
 ---
 
