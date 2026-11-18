@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { act, useState } from "react";
+import { act } from "react";
 import { createRoot, Root } from "react-dom/client";
 import { InternetSharingCard } from "@/components/InternetSharingCard";
 import Home from "@/app/page";
@@ -19,6 +19,8 @@ const mockRelayHook = {
   relayState: "idle",
   progress: 0,
   relayCode: null as string | null,
+  roomCode: null as string | null,
+  qrUrl: null as string | null,
   error: null as string | null,
   relayPayload: null as RelayPayloadData | null,
   isDownloading: false,
@@ -27,73 +29,28 @@ const mockRelayHook = {
   pollRelay: vi.fn(),
   stopPolling: vi.fn(),
   downloadRelay: vi.fn(),
+  receiveByOtp: vi.fn(),
+  reset: vi.fn(),
 };
 
 vi.mock("@/hooks/useRelayTransfer", () => ({
   useRelayTransfer: () => mockRelayHook,
 }));
 
-vi.mock("@/hooks/useWebRTC", () => {
-  return {
-    useWebRTC: () => {
-      const [roomCode, setRoomCode] = useState("834291");
-      return {
-        role: "sender",
-        roomCode,
-        isConnected: false,
-        progress: {
-          status: "idle",
-          itemType: "file",
-          bytesTransferred: 0,
-          totalBytes: 0,
-          progressPercentage: 0,
-          speedBps: 0,
-        },
-        brokerNotice: null,
-        startSender: vi.fn().mockImplementation((code?: string) => {
-          setRoomCode(code || "834291");
-          return Promise.resolve({ roomId: `room_${code || "834291"}`, code: code || "834291" });
-        }),
-        startReceiver: vi.fn().mockImplementation((code: string) => {
-          setRoomCode(code);
-          return Promise.resolve({ roomId: `room_${code}`, code });
-        }),
-        sendFiles: vi.fn(),
-        sendPayload: vi.fn(),
-        acceptIncomingTransfer: vi.fn(),
-        rejectIncomingTransfer: vi.fn(),
-        cleanup: vi.fn().mockImplementation(() => {
-          setRoomCode("");
-        }),
-        diagnostics: {
-          iceState: "new",
-          gatheringState: "new",
-          signalingState: "stable",
-          channelState: "closed",
-          candidateCounts: { host: 0, srflx: 0, relay: 0 },
-          selectedPair: null,
-          lastError: null,
-        },
-        debugLog: [],
-      };
-    },
-  };
-});
-
 describe("InternetSharingCard Component", () => {
   let container: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
-      if (typeof url === "string" && url.includes("/api/turn")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ hasTurn: true, iceServers: [] }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) });
-    }));
+    mockRelayHook.relayState = "idle";
+    mockRelayHook.relayCode = null;
+    mockRelayHook.roomCode = null;
+    mockRelayHook.qrUrl = null;
+    mockRelayHook.error = null;
+    mockRelayHook.isDownloading = false;
+    mockRelayHook.progress = 0;
+    vi.clearAllMocks();
+
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -104,167 +61,78 @@ describe("InternetSharingCard Component", () => {
       root.unmount();
     });
     container.remove();
-    vi.unstubAllGlobals();
   });
 
-  it("should render Send view by default with Dropzone, Pairing Methods, and Live QR/PIN", async () => {
+  it("should render clean idle view with Dropzone, Scan QR, and Enter OTP input", async () => {
     await act(async () => {
       root.render(<InternetSharingCard />);
     });
 
-    expect(container.textContent).toContain("Send Files or Text");
-    expect(container.textContent).toContain("1. Select Files or Text to Send");
-    expect(container.textContent).toContain("2. Receiver Connects via QR or PIN");
-    expect(container.textContent).toContain("Auto PIN");
-    expect(container.textContent).toContain("Mobile No.");
-    expect(container.textContent).toContain("Keyword");
-    expect(container.textContent).toContain("834-291");
-    expect(container.textContent).toContain("Waiting for receiver to connect");
+    expect(container.textContent).toContain("Scan QR");
+    expect(container.textContent).toContain("Receive");
 
-    // QR Code SVG exists
+    const otpInput = container.querySelector("input[placeholder*='Enter OTP']");
+    expect(otpInput).toBeDefined();
+
+    const scanButton = Array.from(container.querySelectorAll("button")).find(
+      (btn) => btn.textContent?.includes("Scan QR")
+    );
+    expect(scanButton).toBeDefined();
+  });
+
+  it("should display Send button when files are selected and trigger startRelayUpload", async () => {
+    await act(async () => {
+      root.render(<InternetSharingCard />);
+    });
+
+    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
+    if (fileInput) {
+      const file = new File(["dummy content"], "doc.txt", { type: "text/plain" });
+      await act(async () => {
+        Object.defineProperty(fileInput, "files", { value: [file] });
+        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+    }
+
+    const sendBtn = Array.from(container.querySelectorAll("button")).find((b) =>
+      b.textContent?.includes("Send")
+    );
+    expect(sendBtn).toBeDefined();
+
+    await act(async () => {
+      sendBtn?.click();
+    });
+
+    expect(mockRelayHook.startRelayUpload).toHaveBeenCalled();
+  });
+
+  it("shows QR code and Auto OTP display when relayState is ready", async () => {
+    mockRelayHook.relayState = "ready";
+    mockRelayHook.relayCode = "K7M2-9QXA";
+    mockRelayHook.roomCode = "K7M2";
+    mockRelayHook.qrUrl = "https://quicksend.vercel.app/?room=K7M2#rc=K7M29QXA";
+
+    await act(async () => {
+      root.render(<InternetSharingCard />);
+    });
+
+    expect(container.textContent).toContain("K7M2-9QXA");
+    expect(container.textContent).toContain("Auto OTP");
+    expect(container.textContent).toContain("Scan QR");
+    expect(container.textContent).toContain("Send another file");
+
     const qrSvg = container.querySelector("svg");
     expect(qrSvg).toBeDefined();
   });
 
-  it("should switch to Receive view with prominent Scan QR button and PIN input", async () => {
-    await act(async () => {
-      root.render(<InternetSharingCard />);
-    });
-
-    // Find and click the Receive tab in SegmentedControl
-    const receiveBtn = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "Receive"
-    );
-    expect(receiveBtn).toBeDefined();
-
-    await act(async () => {
-      receiveBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-
-    expect(container.textContent).toContain("Receive Files");
-    expect(container.textContent).toContain("Scan Sender's QR Code");
-    expect(container.textContent).toContain("Enter Pairing Code or PIN");
-    expect(container.textContent).toContain("Connect to Sender");
-
-    // Input exists for PIN/Code
-    const pinInput = container.querySelector("input[placeholder*='834-291']");
-    expect(pinInput).toBeDefined();
-  });
-
-  it("should show mobile input when Mobile No. pairing method is selected", async () => {
-    await act(async () => {
-      root.render(<InternetSharingCard />);
-    });
-
-    const mobileBtn = Array.from(container.querySelectorAll("button")).find(
-      (btn) => btn.textContent?.trim() === "Mobile No."
-    );
-    expect(mobileBtn).toBeDefined();
-
-    await act(async () => {
-      mobileBtn?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    });
-
-    expect(container.textContent).toContain("Sender Mobile Number");
-    const phoneInput = container.querySelector("input[placeholder*='01712345678']");
-    expect(phoneInput).toBeDefined();
-    expect(container.textContent).toContain("Set Number");
-  });
-
-  it("should render ConnectionDiagnostics and display TURN warning when hasTurn is false", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => {
-      if (url.includes("/api/turn")) {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({ hasTurn: false, iceServers: [] }),
-        });
-      }
-      return Promise.resolve({ ok: true, json: async () => ({}) });
-    }));
+  it("shows receiving indicator when isDownloading is true", async () => {
+    mockRelayHook.isDownloading = true;
 
     await act(async () => {
       root.render(<InternetSharingCard />);
     });
 
-    // Connection diagnostics details element rendered
-    expect(container.textContent).toContain("Connection details");
-
-    // TURN warning notice rendered without amber classes
-    expect(container.textContent).toContain("TURN relay not configured — works on same Wi-Fi; 4G mobile data may require TURN.");
-    const turnNotice = Array.from(container.querySelectorAll("div")).find((d) =>
-      d.textContent?.includes("TURN relay not configured")
-    );
-    expect(turnNotice).toBeDefined();
-    expect(turnNotice?.className).not.toMatch(/amber/);
-
-    vi.unstubAllGlobals();
-  });
-
-  it("hides relay button when status.available is false", async () => {
-    mockRelayHook.relayStatus = { available: false, maxFileBytes: 52428800, maxFiles: 5, ttlMinutes: 15 };
-
-    await act(async () => {
-      root.render(<InternetSharingCard />);
-    });
-
-    expect(container.textContent).not.toContain("Send via encrypted cloud relay");
-  });
-
-  it("shows consent line when relay button is clicked", async () => {
-    mockRelayHook.relayStatus = { available: true, maxFileBytes: 52428800, maxFiles: 5, ttlMinutes: 15 };
-    mockRelayHook.relayState = "idle";
-
-    await act(async () => {
-      root.render(<InternetSharingCard />);
-    });
-
-    // Simulate file drop or text input in Dropzone
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-    if (fileInput) {
-      const file = new File(["dummy content"], "doc.txt", { type: "text/plain" });
-      await act(async () => {
-        Object.defineProperty(fileInput, "files", { value: [file] });
-        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-    }
-
-    const relayBtn = Array.from(container.querySelectorAll("button")).find((b) =>
-      b.textContent?.includes("Send via encrypted cloud relay")
-    );
-    expect(relayBtn).toBeDefined();
-
-    await act(async () => {
-      relayBtn?.click();
-    });
-
-    expect(container.textContent).toContain(
-      "This uploads an encrypted copy to temporary cloud storage. It is deleted after download or within 24 hours."
-    );
-    expect(container.textContent).toContain("Continue");
-  });
-
-  it("shows relay code in large text when relayState is ready", async () => {
-    mockRelayHook.relayStatus = { available: true, maxFileBytes: 52428800, maxFiles: 5, ttlMinutes: 15 };
-    mockRelayHook.relayState = "ready";
-    mockRelayHook.relayCode = "K7M2-9QXA";
-
-    await act(async () => {
-      root.render(<InternetSharingCard />);
-    });
-
-    // Simulate file selection so relay container is visible
-    const fileInput = container.querySelector('input[type="file"]') as HTMLInputElement;
-    if (fileInput) {
-      const file = new File(["dummy content"], "doc.txt", { type: "text/plain" });
-      await act(async () => {
-        Object.defineProperty(fileInput, "files", { value: [file] });
-        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
-      });
-    }
-
-    expect(container.textContent).toContain("K7M2-9QXA");
-    expect(container.textContent).toContain("Receiver enters PIN 834-291, then this relay code.");
-    expect(container.textContent).toContain("Copy Code");
+    expect(container.textContent).toContain("Receiving & Decrypting...");
   });
 
   it("renders page footer with 'Direct by default' and no 'No Server Storage'", async () => {

@@ -728,3 +728,14 @@
   - Added case-insensitive regex matching for room code path validation (`^relay/<roomCode>/[A-Za-z0-9._-]{1,80}$`, `i`).
   - Handled case-insensitive prefix matching in `/api/relay/attach` and `isAllowedRelayUrl`.
   - Updated `src/lib/upstashBlob.ts` `upload()` to forward all signed headers and provide clear Network/CORS and HTTP error diagnostics.
+
+### Fix 9 (2026-11-18): Mode 1 Streamlining (Unified Single-Screen QR + OTP Relay Flow)
+- [x] Unified 8-Character Single OTP & Zero-Knowledge Architecture (`src/hooks/useRelayTransfer.ts`):
+  - Sender generates single 8-character OTP (`XXXX-XXXX`). Derives client-side AES-GCM key from full 8 chars while using first 4 chars as room identifier.
+  - Generates QR URL with `#rc=<fullOtp>` hash fragment for instant zero-knowledge reception.
+  - Implemented `receiveByOtp(input)` supporting both URL and direct OTP string inputs with automated decryption.
+- [x] Redesigned Mode 1 UI (`src/components/InternetSharingCard.tsx`):
+  - Removed all WebRTC/PeerJS/TURN technical clutter, tab walls, and diagnostic drawers from Mode 1.
+  - Single-screen layout: Compact Dropzone + Send button, 2-column action row (Left: Scan QR | Right: Auto OTP or Enter OTP), and auto-download on QR scan or URL open.
+  - Updated `src/components/QRScannerModal.tsx` to preserve `#rc=` fragment for automatic 1-scan transfer.
+  - Updated component tests in `src/components/__tests__/InternetSharingCard.test.tsx`.

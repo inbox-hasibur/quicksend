@@ -56,7 +56,11 @@ export function QRScannerModal({
       if (isValidRoomCode(clean)) {
         completedRef.current = true;
         await stop();
-        onScanSuccess(clean);
+        if (decodedText.includes("rc=") || decodedText.includes("#rc=")) {
+          onScanSuccess(decodedText);
+        } else {
+          onScanSuccess(clean);
+        }
         onClose();
       }
     },

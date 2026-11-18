@@ -31,24 +31,20 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 +------------------+          +------------------+          +------------------+        +--------------------+  +---------------+
 |      Mode 1      |          |      Mode 2      |          |      Mode 5      |        |       Mode 3       |  |    Mode 4     |
 |     Internet     |          |    Same Wi-Fi    |          |    Via Camera    |        |  Wi-Fi + Hotspot   |  |  Nearby Pair  |
-|   (WebRTC P2P)   |          |  (Live Radar)    |          | (Optical Stream) |        | (Offline Transfer) |  | (4-Digit PIN) |
+| (Encrypted Relay)|          |  (Live Radar)    |          | (Optical Stream) |        | (Offline Transfer) |  | (4-Digit PIN) |
 +------------------+          +------------------+          +------------------+        +--------------------+  +---------------+
 ```
 
 ---
 
-### Mode 1: Share via Internet (Dual WebRTC Transport + PIN / Mobile / QR)
-- **Primary Use Case:** Remote or cross-network P2P transfer between any devices globally when on different networks.
-- **Dual Connection Transport:**
-  1. **Primary Broker:** Real-time PeerJS cloud signaling (`0.peerjs.com`) over WebSockets with zero serverless cold starts.
-  2. **Secondary Fallback:** `/api/signal` REST polling with Upstash Redis or ephemeral memory store.
-  3. **STUN Pool & Seamless ICE:** Expanded Google + Cloudflare STUN pool without aggressive premature timeouts.
-  4. **Dynamic QR Code & Auto-Connect:** QR encodes full URL with `?room=...` query param that auto-selects Internet mode and auto-joins session seamlessly.
-  5. **Flexible Pairing Keys:** 6-digit numeric PIN, mobile phone number, or custom keyword/secret.
-  6. **Sequential Multi-File Batch Queue:** Seamlessly beams multiple files sequentially over an open `RTCDataChannel` without dropping connection.
-  7. **SHA-256 Bit-Perfect Integrity:** Computes and verifies SHA-256 checksums on payloads with `"Verified ✓"` visual confirmation.
-  8. **Large-File Disk Streaming:** File System Access API (`showSaveFilePicker`) for files > 100MB to stream chunks directly to disk.
-  9. **Optional Encrypted Cloud Relay:** Opt-in zero-knowledge fallback when direct WebRTC is blocked by symmetric NAT / 4G CGNAT firewalls. Derives AES-GCM 256 keys purely client-side from an 8-character relay code and random salt; the encryption key is never transmitted or stored on the server. Backed by @upstash/blob ephemeral storage with automatic 30-minute cleanup.
+### Mode 1: Share via Internet (Zero-Knowledge Encrypted Cloud Relay + QR / OTP)
+- **Primary Use Case:** Seamless transfer between any devices globally across networks, 4G/5G mobile carriers, and strict firewalls.
+- **Ultra-Simple Single-Screen Flow:**
+  1. **Zero Setup & Non-Technical:** No complex WebRTC/ICE handshakes, no firewall blockages, and no NAT traversal issues.
+  2. **Client-Side AES-GCM 256 Encryption:** File and text payloads are encrypted client-side with PBKDF2 (SHA-256, 200,000 iterations) using an 8-character single OTP (`XXXX-XXXX`) and random 16-byte salt; the encryption key never touches the server.
+  3. **Unified OTP & Dynamic QR:** The first 4 characters of the OTP form the public room identifier, while the full 8-character OTP is embedded into the QR URL hash (`#rc=...`) for instant 1-scan decryption or typed manually on lab PCs.
+  4. **Ephemeral Upstash Storage:** Temporary encrypted blobs automatically purged immediately upon download completion (or purged by cron after 30 minutes).
+  5. **Direct Receiver Decryption:** Decrypts in-memory directly in the browser and triggers native local file downloads or copies text to the clipboard.
 
 ---
 

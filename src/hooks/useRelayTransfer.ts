@@ -71,6 +71,8 @@ export function useRelayTransfer() {
   const [relayState, setRelayState] = useState<RelayState>("idle");
   const [progress, setProgress] = useState(0);
   const [relayCode, setRelayCode] = useState<string | null>(null);
+  const [roomCode, setRoomCode] = useState<string | null>(null);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [relayPayload, setRelayPayload] = useState<RelayPayloadData | null>(null);
   const [isPolling, setIsPolling] = useState(false);
@@ -104,9 +106,55 @@ export function useRelayTransfer() {
     };
   }, []);
 
+  // Stop polling receiver timer
+  const stopPolling = useCallback(() => {
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
+    setIsPolling(false);
+    pollCountRef.current = 0;
+  }, []);
+
+  // Reset relay state
+  const reset = useCallback(() => {
+    stopPolling();
+    setRelayState("idle");
+    setProgress(0);
+    setRelayCode(null);
+    setRoomCode(null);
+    setQrUrl(null);
+    setError(null);
+    setRelayPayload(null);
+    setIsDownloading(false);
+    activeRoomCodeRef.current = null;
+  }, [stopPolling]);
+
   // SENDER: Upload encrypted payload to temporary cloud relay
+  // Accepts either (files, text) or legacy (roomCode, files, text)
   const startRelayUpload = useCallback(
-    async (roomCode: string, files: File[], text?: string) => {
+    async (
+      filesOrRoom: string | File[],
+      filesOrText?: File[] | string,
+      textArg?: string
+    ) => {
+      let roomCodeInput: string | undefined;
+      let files: File[] = [];
+      let text: string | undefined;
+
+      if (typeof filesOrRoom === "string") {
+        roomCodeInput = filesOrRoom;
+        if (Array.isArray(filesOrText)) {
+          files = filesOrText;
+          text = textArg;
+        }
+      } else if (Array.isArray(filesOrRoom)) {
+        files = filesOrRoom;
+        if (typeof filesOrText === "string") {
+          text = filesOrText;
+        }
+      }
+
       if (!relayStatus?.available) {
         setError("Encrypted cloud relay is not available.");
         setRelayState("error");
@@ -135,13 +183,21 @@ export function useRelayTransfer() {
         setError(null);
         setRelayState("encrypting");
         setProgress(5);
-        activeRoomCodeRef.current = roomCode;
 
+        // Generate ONE 8-character OTP (e.g. K7M2-9QXA)
         const generatedCode = generateRelayCode();
-        const salt = generateSalt();
-        const key = await deriveRelayKey(generatedCode, salt);
+        const normalizedFullOtp = normalizeRelayCode(generatedCode)!;
+        // First 4 characters form the public room code (K7M2)
+        const activeRoom = roomCodeInput
+          ? normalizeRoomCode(roomCodeInput)
+          : normalizedFullOtp.slice(0, 4);
 
-        const cleanRoom = normalizeRoomCode(roomCode);
+        activeRoomCodeRef.current = activeRoom;
+
+        // Derive AES-GCM 256 key from FULL 8-char OTP + random 16-byte salt
+        const salt = generateSalt();
+        const key = await deriveRelayKey(normalizedFullOtp, salt);
+
         const uploadedItems: RelayItemMetadata[] = [];
 
         // Encrypt & upload files
@@ -151,7 +207,7 @@ export function useRelayTransfer() {
           const { iv, cipher } = await encryptBytes(key, rawBuffer);
 
           setRelayState("uploading");
-          const pathname = `relay/${cleanRoom}/${i}.bin`;
+          const pathname = `relay/${activeRoom}/${i}.bin`;
 
           const blobResult = await upload(
             pathname,
@@ -160,7 +216,7 @@ export function useRelayTransfer() {
               access: "public",
               contentType: "application/octet-stream",
               handleUploadUrl: "/api/relay/upload",
-              clientPayload: JSON.stringify({ roomCode: cleanRoom, size: file.size }),
+              clientPayload: JSON.stringify({ roomCode: activeRoom, size: file.size }),
               onUploadProgress: ({ percentage }) => {
                 const step = 100 / (files.length || 1);
                 const overall = Math.round(i * step + (percentage * step) / 100);
@@ -194,7 +250,7 @@ export function useRelayTransfer() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            roomCode: cleanRoom,
+            roomCode: activeRoom,
             salt,
             items: uploadedItems,
             text: encryptedTextPayload,
@@ -206,9 +262,25 @@ export function useRelayTransfer() {
           throw new Error(errData.error || "Failed to attach relay payload");
         }
 
+        const origin =
+          typeof window !== "undefined" &&
+          window.location.hostname !== "localhost" &&
+          window.location.hostname !== "127.0.0.1"
+            ? window.location.origin
+            : "https://quicksend.vercel.app";
+        const computedQrUrl = `${origin}/?room=${activeRoom}#rc=${normalizedFullOtp}`;
+
         setRelayCode(generatedCode);
+        setRoomCode(activeRoom);
+        setQrUrl(computedQrUrl);
         setRelayState("ready");
         setProgress(100);
+
+        return {
+          otp: generatedCode,
+          roomCode: activeRoom,
+          qrUrl: computedQrUrl,
+        };
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to upload to encrypted relay.");
         setRelayState("error");
@@ -232,16 +304,6 @@ export function useRelayTransfer() {
     setRelayCode(null);
     setProgress(0);
     setError(null);
-  }, []);
-
-  // Stop polling receiver timer
-  const stopPolling = useCallback(() => {
-    if (pollTimerRef.current) {
-      clearInterval(pollTimerRef.current);
-      pollTimerRef.current = null;
-    }
-    setIsPolling(false);
-    pollCountRef.current = 0;
   }, []);
 
   // RECEIVER: Poll for relay attachment (every 4s for at most 120s)
@@ -379,11 +441,94 @@ export function useRelayTransfer() {
     []
   );
 
+  // RECEIVER: Receive via OTP string or scanned QR URL (?room=...#rc=...)
+  const receiveByOtp = useCallback(
+    async (input: string) => {
+      if (!input || !input.trim()) {
+        throw new Error("Please enter an OTP or scan a QR code.");
+      }
+
+      setError(null);
+      setIsDownloading(true);
+
+      try {
+        let extractedRoom = "";
+        let extractedOtp = "";
+
+        const trimmed = input.trim();
+
+        // 1. Check if input is a URL or query string with room and rc
+        if (trimmed.includes("room=") || trimmed.includes("rc=")) {
+          const matchRoom = trimmed.match(/[?&]room=([a-zA-Z0-9_-]+)/i);
+          const matchRc = trimmed.match(/[#&?]rc=([a-zA-Z0-9_-]+)/i);
+          if (matchRoom && matchRoom[1]) {
+            extractedRoom = normalizeRoomCode(matchRoom[1]);
+          }
+          if (matchRc && matchRc[1]) {
+            extractedOtp = normalizeRelayCode(matchRc[1]) || matchRc[1].toUpperCase();
+          }
+        }
+
+        // 2. If it's a raw OTP (e.g. "K7M2-9QXA" or "K7M29QXA")
+        if (!extractedOtp) {
+          const clean = normalizeRelayCode(trimmed);
+          if (clean && clean.length === 8) {
+            extractedOtp = clean;
+            if (!extractedRoom) {
+              extractedRoom = clean.slice(0, 4);
+            }
+          } else {
+            const cleanRaw = trimmed.replace(/[^a-zA-Z0-9]/g, "").toUpperCase();
+            if (cleanRaw.length >= 8) {
+              extractedOtp = cleanRaw.slice(0, 8);
+              extractedRoom = extractedOtp.slice(0, 4);
+            } else if (cleanRaw.length >= 4) {
+              extractedRoom = cleanRaw;
+              extractedOtp = cleanRaw;
+            }
+          }
+        }
+
+        if (!extractedRoom && extractedOtp && extractedOtp.length >= 4) {
+          extractedRoom = extractedOtp.slice(0, 4);
+        }
+
+        if (!extractedRoom) {
+          throw new Error("Invalid OTP code. Please check and try again.");
+        }
+
+        activeRoomCodeRef.current = extractedRoom;
+
+        // Fetch relay payload from server
+        const res = await fetch(`/api/relay/attach?code=${encodeURIComponent(extractedRoom)}`);
+        if (!res.ok) {
+          throw new Error("Transfer not found or expired. Check the OTP.");
+        }
+        const data = await res.json();
+        if (!data.relay) {
+          throw new Error("Transfer not found or expired. Check the OTP.");
+        }
+
+        // Download, decrypt and complete
+        await downloadRelay(data.relay, extractedOtp, extractedRoom);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Failed to receive transfer.";
+        setError(msg);
+        throw err;
+      } finally {
+        setIsDownloading(false);
+      }
+    },
+    [downloadRelay]
+  );
+
   return {
     relayStatus,
     relayState,
     progress,
     relayCode,
+    roomCode,
+    qrUrl,
     error,
     relayPayload,
     isPolling,
@@ -393,5 +538,7 @@ export function useRelayTransfer() {
     pollRelay,
     stopPolling,
     downloadRelay,
+    receiveByOtp,
+    reset,
   };
 }
