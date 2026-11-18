@@ -302,7 +302,7 @@ flowchart TD
 - **Exports:** `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/upload/route.ts`
-- **Purpose:** Secure Upstash Blob presigned upload URL generator (`POST`) via `bucket.signedUploadUrl()`. Enforces room code and strict pathname format (`^relay/<roomCode>/[A-Za-z0-9._-]{1,80}$`), client IP rate limiting (6 tokens/hr), and daily upload budget (600 MB/day).
+- **Purpose:** Secure Upstash Blob presigned upload URL generator (`POST`) via `bucket.signedUploadUrl()`. Enforces room code and strict pathname format (`^relay/<roomCode>/[A-Za-z0-9._-]{1,80}$`, case-insensitive), client IP rate limiting (50 tokens/hr), and daily upload budget (600 MB/day).
 - **Exports:** `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/cleanup/route.ts`
@@ -540,7 +540,7 @@ flowchart TD
 - **Exports:** `generateRelayCode`, `normalizeRelayCode`, `generateSalt`, `deriveRelayKey`, `encryptBytes`, `decryptBytes`, `encryptText`, `decryptText`.
 
 #### `src/lib/rateLimit.ts`
-- **Purpose:** Lightweight serverless sliding-window rate limiter utilizing `signalStore` generic key storage with TTL expiration. Extracts client IP via `x-forwarded-for`.
+- **Purpose:** Lightweight serverless rate limiter utilizing `signalStore` generic key storage with TTL preservation (KEEPTTL). Extracts client IP via `x-forwarded-for` and fallback headers.
 - **Exports:** `clientIp(request: Request): string`, `hitLimit(key: string, limit: number, windowSeconds: number): Promise<boolean>`.
 
 #### `src/lib/ultrasonicStream.ts`

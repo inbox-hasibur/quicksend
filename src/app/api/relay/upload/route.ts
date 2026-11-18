@@ -65,15 +65,15 @@ export async function POST(request: Request): Promise<NextResponse> {
     const cleanCode = normalizeRoomCode(roomCode);
     const escapedClean = cleanCode.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&");
 
-    const regexRaw = new RegExp(`^relay/${escapedRaw}/[A-Za-z0-9._-]{1,80}$`);
-    const regexClean = new RegExp(`^relay/${escapedClean}/[A-Za-z0-9._-]{1,80}$`);
+    const regexRaw = new RegExp(`^relay/${escapedRaw}/[A-Za-z0-9._-]{1,80}$`, "i");
+    const regexClean = new RegExp(`^relay/${escapedClean}/[A-Za-z0-9._-]{1,80}$`, "i");
 
     if (!regexRaw.test(cleanPathname) && !regexClean.test(cleanPathname)) {
       throw new Error("Invalid pathname");
     }
 
     const ip = clientIp(request);
-    const isLimited = await hitLimit(`ratelimit:relay:token:${ip}`, 6, 3600);
+    const isLimited = await hitLimit(`ratelimit:relay:token:${ip}`, 50, 3600);
     if (isLimited) {
       throw new Error("Too many uploads");
     }

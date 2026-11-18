@@ -718,3 +718,13 @@
   - `getUpstashBucket()` instantiates via `Bucket.fromEnv()` (with safe fallback) reading official `UPSTASH_BLOB_TOKEN`.
   - `isAllowedRelayUrl()` validates `.blob.upstash.io` and `.upstash.io` hostnames and room paths cleanly.
   - Added `https://*.blob.upstash.io` to CSP `connect-src` in `vercel.json`.
+
+### Fix 8 (2026-11-18): Rate limiting and 4-character room code validation fix
+- [x] Fixed rate limit expiration sliding behavior in `src/lib/rateLimit.ts` and `src/lib/signalStore.ts`:
+  - Preserved existing window TTL on count increments (via Redis `KEEPTTL` and in-memory expiration preservation) avoiding infinite lockouts.
+  - Broadened client IP resolution with `x-real-ip` and `cf-connecting-ip` fallbacks.
+  - Increased upload token limit in `/api/relay/upload` from 6 to 50 uploads per hour per IP.
+- [x] Case-insensitive 4-character room code validation (`src/app/api/relay/upload/route.ts`, `src/app/api/relay/attach/route.ts`, `src/lib/upstashBlob.ts`):
+  - Added case-insensitive regex matching for room code path validation (`^relay/<roomCode>/[A-Za-z0-9._-]{1,80}$`, `i`).
+  - Handled case-insensitive prefix matching in `/api/relay/attach` and `isAllowedRelayUrl`.
+  - Updated `src/lib/upstashBlob.ts` `upload()` to forward all signed headers and provide clear Network/CORS and HTTP error diagnostics.

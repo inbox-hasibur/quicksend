@@ -94,8 +94,8 @@ export async function POST(request: Request) {
 
       const cleanItemPath = item.pathname.startsWith("/") ? item.pathname : `/${item.pathname}`;
       if (
-        !cleanItemPath.startsWith(expectedPrefixClean) &&
-        !cleanItemPath.startsWith(expectedPrefixRaw)
+        !cleanItemPath.toLowerCase().startsWith(expectedPrefixClean.toLowerCase()) &&
+        !cleanItemPath.toLowerCase().startsWith(expectedPrefixRaw.toLowerCase())
       ) {
         return NextResponse.json({ error: "Invalid pathname match" }, { status: 400 });
       }

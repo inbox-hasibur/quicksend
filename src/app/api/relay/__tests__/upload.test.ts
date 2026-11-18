@@ -116,36 +116,20 @@ describe("POST /api/relay/upload (@upstash/blob)", () => {
     expect(data.error).toBe("Invalid pathname");
   });
 
-  it("rejects 7th request from one IP in an hour with 'Too many uploads'", async () => {
+  it("enforces rate limit (50 uploads per hour per IP)", async () => {
     const roomCode = "128745";
     const ip = "192.168.1.55";
 
-    for (let i = 1; i <= 6; i++) {
-      const req = new Request("http://localhost/api/relay/upload", {
-        method: "POST",
-        headers: { "x-forwarded-for": ip },
-        body: JSON.stringify({
-          type: "blob.generate-client-token",
-          payload: {
-            pathname: `relay/${roomCode}/file_${i}.enc`,
-            clientPayload: JSON.stringify({ roomCode, size: 100 }),
-            multipart: false,
-          },
-        }),
-      });
+    // Pre-fill 50 hits
+    await signalStore.setKey(`ratelimit:relay:token:${ip}`, "50", 3600);
 
-      const res = await POST(req);
-      expect(res.status).toBe(200);
-    }
-
-    // 7th request
     const overLimitReq = new Request("http://localhost/api/relay/upload", {
       method: "POST",
       headers: { "x-forwarded-for": ip },
       body: JSON.stringify({
         type: "blob.generate-client-token",
         payload: {
-          pathname: `relay/${roomCode}/file_7.enc`,
+          pathname: `relay/${roomCode}/file_over.enc`,
           clientPayload: JSON.stringify({ roomCode, size: 100 }),
           multipart: false,
         },

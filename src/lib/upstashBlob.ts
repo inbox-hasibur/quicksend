@@ -50,18 +50,35 @@ export async function upload(
     throw new Error("No upload URL returned from relay");
   }
 
-  const headers = tokenData.headers || {
+  const headers: Record<string, string> = {
     "Content-Type": options?.contentType || "application/octet-stream",
   };
+  if (tokenData.headers) {
+    for (const [key, val] of Object.entries(tokenData.headers)) {
+      if (typeof val === "string") {
+        headers[key] = val;
+      }
+    }
+  }
 
-  const putRes = await fetch(uploadUrl, {
-    method: "PUT",
-    headers,
-    body,
-  });
+  let putRes: Response;
+  try {
+    putRes = await fetch(uploadUrl, {
+      method: "PUT",
+      headers,
+      body,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Storage upload failed (Network/CORS error): ${msg}`);
+  }
 
   if (!putRes.ok) {
-    throw new Error("Failed to upload blob to storage");
+    const status = putRes.status;
+    const errText = await putRes.text().catch(() => "");
+    throw new Error(
+      `Failed to upload blob to storage (HTTP ${status}): ${errText || putRes.statusText || "Upload rejected"}`
+    );
   }
 
   if (options?.onUploadProgress) {
@@ -141,8 +158,9 @@ export function isAllowedRelayUrl(urlStr: string, roomCode: string): boolean {
     }
 
     const cleanCode = normalizeRoomCode(roomCode);
-    const hasRawPrefix = parsed.pathname.includes(`/relay/${roomCode}/`);
-    const hasCleanPrefix = parsed.pathname.includes(`/relay/${cleanCode}/`);
+    const pathLower = parsed.pathname.toLowerCase();
+    const hasRawPrefix = pathLower.includes(`/relay/${roomCode.toLowerCase()}/`);
+    const hasCleanPrefix = pathLower.includes(`/relay/${cleanCode.toLowerCase()}/`);
 
     return hasRawPrefix || hasCleanPrefix;
   } catch {

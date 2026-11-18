@@ -411,7 +411,11 @@ export class RedisSignalStore implements SignalStoreAdapter {
     if (ttlSeconds && ttlSeconds > 0) {
       await this.command(["SET", `quicksend:${key}`, value, "EX", ttlSeconds]);
     } else {
-      await this.command(["SET", `quicksend:${key}`, value]);
+      try {
+        await this.command(["SET", `quicksend:${key}`, value, "KEEPTTL"]);
+      } catch {
+        await this.command(["SET", `quicksend:${key}`, value]);
+      }
     }
   }
 
