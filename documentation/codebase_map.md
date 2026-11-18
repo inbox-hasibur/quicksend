@@ -532,7 +532,7 @@ flowchart TD
 - **Exports:** `DISK_STREAM_THRESHOLD`, `isFileSystemAccessSupported`, `createDiskStreamWriter`.
 
 #### `src/lib/upstashBlob.ts`
-- **Purpose:** Upstash Blob SDK integration wrapper for encrypted cloud relay. Handles bucket initialization, environment variable validation (`UPSTASH_BLOB_URL`, `UPSTASH_BLOB_TOKEN`), storage URL hostname verification (`isAllowedRelayUrl`), and client-side direct upload execution.
+- **Purpose:** Upstash Blob SDK integration wrapper for encrypted cloud relay. Handles bucket initialization via Bucket.fromEnv(), environment variable validation (`UPSTASH_BLOB_TOKEN`), storage URL hostname verification (`isAllowedRelayUrl`), and client-side direct upload execution.
 - **Exports:** `isUpstashBlobConfigured`, `getUpstashBucketName`, `getUpstashBucket`, `isAllowedRelayUrl`, `upload`, `UploadOptions`, `PutBlobResult`.
 
 #### `src/lib/relayCrypto.ts`

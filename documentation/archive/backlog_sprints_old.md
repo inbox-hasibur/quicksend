@@ -711,3 +711,10 @@
   - 46 test suites, 289/289 tests passing (100% pass rate).
   - ESLint 9: 0 warnings, 0 errors.
   - Turbopack production build verified cleanly (`npm run build`).
+
+### Fix 7 (2026-11-18): Single UPSTASH_BLOB_TOKEN configuration and CSP refinement
+- [x] Streamlined Upstash Blob configuration in `src/lib/upstashBlob.ts`:
+  - `isUpstashBlobConfigured()` checks exclusively for `UPSTASH_BLOB_TOKEN` without requiring `UPSTASH_BLOB_URL`.
+  - `getUpstashBucket()` instantiates via `Bucket.fromEnv()` (with safe fallback) reading official `UPSTASH_BLOB_TOKEN`.
+  - `isAllowedRelayUrl()` validates `.blob.upstash.io` and `.upstash.io` hostnames and room paths cleanly.
+  - Added `https://*.blob.upstash.io` to CSP `connect-src` in `vercel.json`.

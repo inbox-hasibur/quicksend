@@ -80,10 +80,7 @@ export async function upload(
  * Check if Upstash Blob environment variables are configured.
  */
 export function isUpstashBlobConfigured(): boolean {
-  return Boolean(
-    process.env.UPSTASH_BLOB_URL?.trim() &&
-    process.env.UPSTASH_BLOB_TOKEN?.trim()
-  );
+  return Boolean(process.env.UPSTASH_BLOB_TOKEN?.trim());
 }
 
 /**
@@ -101,6 +98,13 @@ export function getUpstashBucket(): Bucket {
   if (!token) {
     throw new Error("UPSTASH_BLOB_TOKEN is not configured");
   }
+  if (typeof Bucket.fromEnv === "function") {
+    try {
+      return Bucket.fromEnv();
+    } catch {
+      return new Bucket({ token });
+    }
+  }
   return new Bucket({ token });
 }
 
@@ -114,33 +118,26 @@ export function isAllowedRelayUrl(urlStr: string, roomCode: string): boolean {
       return false;
     }
 
+    const host = parsed.hostname.toLowerCase();
+    let hostAllowed =
+      host.endsWith(".blob.upstash.io") ||
+      host.endsWith(".upstash.io") ||
+      host.endsWith(".upstash-blob.com");
+
     const configuredBase = process.env.UPSTASH_BLOB_URL?.trim();
     if (configuredBase) {
       try {
         const confParsed = new URL(configuredBase);
-        const matchesConfigured = parsed.hostname === confParsed.hostname;
-        const matchesSuffix =
-          parsed.hostname.endsWith(".upstash.io") ||
-          parsed.hostname.endsWith(".upstash-blob.com");
-
-        if (!matchesConfigured && !matchesSuffix) {
-          return false;
+        if (host === confParsed.hostname.toLowerCase()) {
+          hostAllowed = true;
         }
       } catch {
-        const matchesSuffix =
-          parsed.hostname.endsWith(".upstash.io") ||
-          parsed.hostname.endsWith(".upstash-blob.com");
-        if (!matchesSuffix) {
-          return false;
-        }
+        // ignore malformed UPSTASH_BLOB_URL
       }
-    } else {
-      const matchesSuffix =
-        parsed.hostname.endsWith(".upstash.io") ||
-        parsed.hostname.endsWith(".upstash-blob.com");
-      if (!matchesSuffix) {
-        return false;
-      }
+    }
+
+    if (!hostAllowed) {
+      return false;
     }
 
     const cleanCode = normalizeRoomCode(roomCode);
