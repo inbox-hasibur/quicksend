@@ -129,3 +129,8 @@
 
 For the complete, granular step-by-step checklist of historical engineering iterations (Sprints 1 through 33) and subsequent dated bugfix entries, see:
 👉 [**documentation/archive/backlog_sprints_old.md**](archive/backlog_sprints_old.md)
+
+---
+
+## Future Backlog / Icebox
+- [ ] Optional Multi-Provider Cloud Relay Fallback (e.g., UploadThing) if Upstash Blob monthly free transfer quota is exceeded.

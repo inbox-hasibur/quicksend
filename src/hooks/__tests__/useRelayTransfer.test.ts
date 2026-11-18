@@ -114,7 +114,7 @@ describe("useRelayTransfer hook", () => {
       createdAt: Date.now(),
       items: [
         {
-          url: "https://store.blob.vercel-storage.com/relay/123/file.bin",
+          url: "https://my-bucket.blob.upstash.io/relay/123/file.bin",
           pathname: "relay/123/file.bin",
           name: "test.txt",
           size: 10,

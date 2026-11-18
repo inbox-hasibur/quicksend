@@ -48,7 +48,7 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
   6. **Sequential Multi-File Batch Queue:** Seamlessly beams multiple files sequentially over an open `RTCDataChannel` without dropping connection.
   7. **SHA-256 Bit-Perfect Integrity:** Computes and verifies SHA-256 checksums on payloads with `"Verified ✓"` visual confirmation.
   8. **Large-File Disk Streaming:** File System Access API (`showSaveFilePicker`) for files > 100MB to stream chunks directly to disk.
-  9. **Optional Encrypted Cloud Relay:** Opt-in zero-knowledge fallback when direct WebRTC is blocked by symmetric NAT / 4G CGNAT firewalls. Derives AES-GCM 256 keys purely client-side from an 8-character relay code and random salt; the encryption key is never transmitted or stored on the server.
+  9. **Optional Encrypted Cloud Relay:** Opt-in zero-knowledge fallback when direct WebRTC is blocked by symmetric NAT / 4G CGNAT firewalls. Derives AES-GCM 256 keys purely client-side from an 8-character relay code and random salt; the encryption key is never transmitted or stored on the server. Backed by @upstash/blob ephemeral storage with automatic 30-minute cleanup.
 
 ---
 
@@ -383,6 +383,7 @@ quicksend/
     │   ├── signalStore.ts
     │   ├── transferEstimate.ts
     │   ├── ultrasonicStream.ts
+    │   ├── upstashBlob.ts
     │   └── wifiQr.ts
     └── types/
         ├── mode.ts
