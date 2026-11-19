@@ -83,6 +83,107 @@ describe("Discovery API Route (/api/discover)", () => {
     expect(computeNetworkId(ip1)).toBe(computeNetworkId(ip2));
   });
 
+  it("should normalize public IPv4 to /24 prefix so peers in an ISP CGNAT pool group together", async () => {
+    const ip1 = "103.187.50.12";
+    const ip2 = "103.187.50.17";
+    expect(computeNetworkId(ip1)).toBe(computeNetworkId(ip2));
+
+    const clientAReq = new Request("http://localhost/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": ip1 },
+      body: JSON.stringify({
+        action: "announce",
+        deviceId: "dev_cgnat_a",
+        name: "CGNAT Peer A",
+        peerId: "qs_dev_cgnat_a",
+      }),
+    });
+    const resA = await POST(clientAReq);
+    const jsonA = await resA.json();
+    expect(jsonA.success).toBe(true);
+
+    const clientBReq = new Request("http://localhost/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": ip2 },
+      body: JSON.stringify({
+        action: "announce",
+        deviceId: "dev_cgnat_b",
+        name: "CGNAT Peer B",
+        peerId: "qs_dev_cgnat_b",
+      }),
+    });
+    const resB = await POST(clientBReq);
+    const jsonB = await resB.json();
+    expect(jsonB.success).toBe(true);
+    expect(jsonB.networkId).toBe(jsonA.networkId);
+    expect(jsonB.peers.some((p: { id: string }) => p.id === "dev_cgnat_a")).toBe(true);
+
+    // Cleanup
+    await POST(
+      new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": ip1 },
+        body: JSON.stringify({ action: "leave", deviceId: "dev_cgnat_a" }),
+      })
+    );
+    await POST(
+      new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": ip2 },
+        body: JSON.stringify({ action: "leave", deviceId: "dev_cgnat_b" }),
+      })
+    );
+  });
+
+  it("should isolate peers on distinct /24 subnets so they do not see each other", async () => {
+    const ipA = "203.0.113.10";
+    const ipB = "192.0.2.20";
+    expect(computeNetworkId(ipA)).not.toBe(computeNetworkId(ipB));
+
+    const clientAReq = new Request("http://localhost/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": ipA },
+      body: JSON.stringify({
+        action: "announce",
+        deviceId: "dev_iso_a",
+        name: "Subnet A Peer",
+        peerId: "qs_dev_iso_a",
+      }),
+    });
+    await POST(clientAReq);
+
+    const clientBReq = new Request("http://localhost/api/discover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-forwarded-for": ipB },
+      body: JSON.stringify({
+        action: "announce",
+        deviceId: "dev_iso_b",
+        name: "Subnet B Peer",
+        peerId: "qs_dev_iso_b",
+      }),
+    });
+    const resB = await POST(clientBReq);
+    const jsonB = await resB.json();
+    expect(jsonB.success).toBe(true);
+    expect(jsonB.peers.some((p: { id: string }) => p.id === "dev_iso_a")).toBe(false);
+
+    // Cleanup
+    await POST(
+      new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": ipA },
+        body: JSON.stringify({ action: "leave", deviceId: "dev_iso_a" }),
+      })
+    );
+    await POST(
+      new Request("http://localhost/api/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-forwarded-for": ipB },
+        body: JSON.stringify({ action: "leave", deviceId: "dev_iso_b" }),
+      })
+    );
+  });
+
   it("should register peer announcement and return other active peers on the same network", async () => {
     const client1Req = new Request("http://localhost/api/discover", {
       method: "POST",

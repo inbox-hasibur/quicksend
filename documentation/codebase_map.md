@@ -284,7 +284,7 @@ flowchart TD
 - **Exports:** `GET(request: Request)`, `POST(request: Request)`
 
 #### `src/app/api/discover/route.ts`
-- **Purpose:** Local network subnet discovery endpoint (`GET`, `POST`). Extracts client IP with `cf-connecting-ip` -> `x-real-ip` -> `x-forwarded-for` priority, groups devices by private subnet or optional 4-digit pairing code (`code:XXXX`) for cross-IP / CGNAT environments, maintains 45-second presence TTL (`PRESENCE_TTL_SECONDS = 45`), sanitizes Upstash REST credentials, ensures concurrent-safe peer saving before returning active peers, and coordinates instant 1-tap beaming requests.
+- **Purpose:** Local network subnet discovery endpoint (`GET`, `POST`). Extracts client IP with `cf-connecting-ip` -> `x-real-ip` -> `x-forwarded-for` priority, groups devices by private subnet (`local-lan`), IPv6 `/64` prefix, public IPv4 `/24` prefix (for ISP CGNAT pool grouping), or optional 4-digit pairing code (`code:XXXX`) for cross-IP environments, maintains 45-second presence TTL (`PRESENCE_TTL_SECONDS = 45`), sanitizes Upstash REST credentials, ensures concurrent-safe peer saving before returning active peers, and coordinates instant 1-tap beaming requests.
 - **Exports:** `GET(request: Request)`, `POST(request: Request)`, `getClientIp(request: Request): string`, `isLocalOrPrivateIp(cleanIp: string): boolean`, `computeNetworkId(rawIp: string): string`, `normalizeIpv6Prefix(cleanIp: string): string`, `getNetworkGroupInfo(rawIp: string)`, `PRESENCE_TTL_SECONDS`, `PEER_EXPIRY_MS`, `REDIS_CONTAINER_TTL_SECONDS`, `DiscoveredPeer`, `IncomingBeamNotice`.
 
 #### `src/app/api/turn/route.ts`

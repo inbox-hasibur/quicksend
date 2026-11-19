@@ -167,10 +167,11 @@ export function computeNetworkId(rawIp: string): string {
     return `v6_${Math.abs(hash).toString(36)}`;
   }
 
-  // Public IPv4 router gateway
+  // Public IPv4 router gateway - normalize to /24 prefix for CGNAT broadband ISP pools
+  const v4Prefix = ip.includes(".") ? ip.split(".").slice(0, 3).join(".") : ip;
   let hash = 0;
-  for (let i = 0; i < ip.length; i++) {
-    hash = (hash << 5) - hash + ip.charCodeAt(i);
+  for (let i = 0; i < v4Prefix.length; i++) {
+    hash = (hash << 5) - hash + v4Prefix.charCodeAt(i);
     hash |= 0;
   }
   return `lan_${Math.abs(hash).toString(36)}`;

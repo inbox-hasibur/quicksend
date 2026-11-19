@@ -982,3 +982,13 @@
   - Maintained 100% identical public return signature and named exports for complete backwards-compatibility with `SameNetworkCard`, `HotspotAssistantCard`, `CableTransferCard`, and existing tests.
   - Reduced monolith complexity by delegating chunk backpressure streaming, diagnostics processing, and PeerJS broker adapters to `src/lib/webrtc/`.
 - [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 9/9 passing tests in `src/hooks/__tests__/useWebRTC.test.ts`.
+
+### Fix 21 (2026-11-19): Public IPv4 /24 prefix normalization for CGNAT broadband ISP discovery
+- [x] Public IPv4 /24 Prefix Normalization (`src/app/api/discover/route.ts`):
+  - Updated `computeNetworkId` to normalize public IPv4 addresses to their `/24` prefix (`parts.slice(0, 3).join(".")`) prior to hashing into `lan_<hash>`.
+  - Enables devices connected to the same Wi-Fi router behind broadband ISPs that rotate final IPv4 octets across a CGNAT pool (e.g. `103.187.x.21` vs `103.187.x.26`) to automatically share the exact same `networkId` and discover each other on the Wi-Fi radar without requiring manual pairing codes.
+  - Kept private/loopback subnets (`local-lan`) and IPv6 `/64` prefix normalization fully intact.
+- [x] Unit Testing & Verification (`src/app/api/discover/__tests__/route.test.ts`):
+  - Added unit test confirming peers sharing an ISP `/24` CGNAT pool (`103.187.50.12` and `103.187.50.17`) compute identical `networkId` and discover each other.
+  - Added unit test verifying cross-network isolation between distinct `/24` subnets (`203.0.113.10` vs `192.0.2.20`).
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 24/24 passing tests in `src/app/api/discover/__tests__/route.test.ts`.
