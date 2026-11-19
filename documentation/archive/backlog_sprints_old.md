@@ -735,3 +735,27 @@
 - [x] Receiver input in `src/components/InternetSharingCard.tsx` enhanced with `inputMode="numeric"`, `placeholder="123 456"`, non-digit stripping, and automatic submission upon 6-digit completion while retaining Mobile-number and Custom-keyword modes via SegmentedControl and auto-detection.
 - [x] Preserved `/api/relay/file` streaming fallback and R2 domain support in `vercel.json` CSP and `src/lib/upstashBlob.ts`.
 - [x] Added unit tests for 6-digit crypto-random generation and receiver auto-submission in `codeGenerator.test.ts` and `InternetSharingCard.test.tsx`.
+
+### Fix 10 (2026-11-19): Chunk-based encrypted cloud relay foundation
+- [x] Defined centralized relay chunk constants in `src/lib/relayLimits.ts`:
+  - `RELAY_CHUNK_BYTES = 4 * 1024 * 1024` (4 MiB chunks).
+  - `RELAY_MAX_FILE_BYTES = 200 * 1024 * 1024` (200 MiB max per file).
+  - `RELAY_MAX_TRANSFER_BYTES = 300 * 1024 * 1024` (300 MiB max per transfer).
+  - `RELAY_MAX_FILES = 5`, `RELAY_MAX_CHUNKS_PER_FILE = 50`, `RELAY_TAG_BYTES = 16`, `RELAY_TTL_MINUTES = 15`.
+- [x] Implemented chunk cryptography in `src/lib/relayCrypto.ts`:
+  - `generateIvPrefix()`: generates 4 crypto-random bytes as base64 string.
+  - `encryptChunk(key, plain, ivPrefixBase64, index, aad)`: deterministic 12-byte IV (4-byte prefix + 8-byte big-endian index) and UTF-8 AAD authenticated encryption.
+  - `decryptChunk(key, cipher, ivPrefixBase64, index, aad)`: authenticated decryption rejecting tampered chunks or mismatched AAD with `Error("Wrong relay code")`. Key is derived once per transfer via PBKDF2.
+- [x] Implemented chunk planning and path management in `src/lib/relayChunks.ts`:
+  - `newRelayId()` (32-character lowercase hex) and `newFileId()` (16-character lowercase hex).
+  - `planChunks(size)`: generates `{ index, start, end }[]` slices for any file size up to 200 MiB.
+  - `chunkPath(roomCode, rid, fileId, index)`: formats canonical storage object path `relay/<roomCode>/<rid>/<fileId>-<index>.bin`.
+  - `chunkAad(fileId, index, count)`: generates `<fileId>:<index>:<count>` authentication data.
+  - `isValidChunkPath(path, roomCode, rid)`: strict regex validating 16-hex fileId, chunk index 0..49, matching roomCode/rid, and rejecting path traversal (`..`).
+  - `cipherSize(plainBytes)`: calculates `plainBytes + RELAY_TAG_BYTES`.
+- [x] Enhanced `SignalingRoomState` in `src/types/signaling.ts`:
+  - Added optional `files` array (`id`, `name`, `size`, `mimeType`, `chunkCount`, `ivPrefix`), `rid`, and `baseUrl` with zero server-side key exposure while retaining backwards compatibility with legacy `items` and `text`.
+- [x] Comprehensive automated test coverage:
+  - Added `src/lib/__tests__/relayChunks.test.ts` covering boundary chunk planning (0, 1, 4 MiB, 4 MiB + 1, 200 MiB), AAD generation, cipher sizing, and strict path validation against traversal and out-of-bounds indices.
+  - Added chunk encryption/decryption tests in `src/lib/__tests__/relayCrypto.test.ts` verifying 3-chunk round-trip, AAD mismatch on chunk swap, wrong code rejection, and IV prefix generation.
+  - Verified 47/47 test files passing (310/310 unit tests), 0 ESLint warnings/errors, and clean Turbopack production build.

@@ -105,7 +105,9 @@ flowchart TD
         SigClient["signalingClient.ts (SignalingClient: Room & Signal Polling Engine)"]
         SignalStore["signalStore.ts (Dual-Mode: Upstash Redis REST + Memory TTL)"]
         UpstashBlob["upstashBlob.ts (Upstash Blob Client Initializer & URL Validator)"]
-        RelayCrypto["relayCrypto.ts (Client AES-GCM 256 Cryptography)"]
+        RelayCrypto["relayCrypto.ts (Client AES-GCM 256 Cryptography & Chunk Crypto)"]
+        RelayLimits["relayLimits.ts (Relay Chunk, File & Transfer Bounds)"]
+        RelayChunks["relayChunks.ts (Chunk Planning, Path Validation & AAD)"]
         RateLimit["rateLimit.ts (Serverless Sliding-Window Rate Limiter)"]
         Ultrasonic["ultrasonicStream.ts (Frequency Shift Keying FSK Codec)"]
     end
@@ -540,8 +542,16 @@ flowchart TD
 - **Exports:** `isUpstashBlobConfigured`, `getUpstashBucketName`, `getUpstashBucket`, `isAllowedRelayUrl`, `upload`, `UploadOptions`, `PutBlobResult`.
 
 #### `src/lib/relayCrypto.ts`
-- **Purpose:** Zero-knowledge client-side cryptography module for encrypted cloud relay transfers. Generates 8-character base-32 formatted relay codes (`XXXX-XXXX`), 16-byte random salts, derives non-extractable AES-GCM 256 keys via PBKDF2 (SHA-256, 200,000 iterations), and performs authenticated symmetric encryption/decryption with random 12-byte IVs.
-- **Exports:** `generateRelayCode`, `normalizeRelayCode`, `generateSalt`, `deriveRelayKey`, `encryptBytes`, `decryptBytes`, `encryptText`, `decryptText`.
+- **Purpose:** Zero-knowledge client-side cryptography module for encrypted cloud relay transfers. Generates 8-character base-32 formatted relay codes (`XXXX-XXXX`), 16-byte random salts, derives non-extractable AES-GCM 256 keys via PBKDF2 (SHA-256, 200,000 iterations), and performs authenticated symmetric encryption/decryption with random 12-byte IVs. Supports chunk-based authenticated encryption (`encryptChunk`, `decryptChunk`) with deterministic 12-byte IVs (4-byte base64 prefix + 8-byte big-endian index) and AAD binding.
+- **Exports:** `generateRelayCode`, `normalizeRelayCode`, `generateSalt`, `generateIvPrefix`, `deriveRelayKey`, `encryptBytes`, `decryptBytes`, `encryptText`, `decryptText`, `encryptChunk`, `decryptChunk`.
+
+#### `src/lib/relayLimits.ts`
+- **Purpose:** Centralized operational constraints for chunk-based encrypted cloud relay shared across client and server routes. Defines chunk sizing, per-file limits, max transfer limits, authentication tag sizes, and storage TTLs.
+- **Exports:** `RELAY_CHUNK_BYTES`, `RELAY_MAX_FILE_BYTES`, `RELAY_MAX_TRANSFER_BYTES`, `RELAY_MAX_FILES`, `RELAY_MAX_CHUNKS_PER_FILE`, `RELAY_TAG_BYTES`, `RELAY_TTL_MINUTES`.
+
+#### `src/lib/relayChunks.ts`
+- **Purpose:** Chunk planning, canonical path construction, and AAD generation for chunk-based encrypted cloud relay objects with strict path traversal validation.
+- **Exports:** `newRelayId`, `newFileId`, `planChunks`, `chunkPath`, `chunkAad`, `isValidChunkPath`, `cipherSize`, `ChunkPlan`.
 
 #### `src/lib/rateLimit.ts`
 - **Purpose:** Lightweight serverless rate limiter utilizing `signalStore` generic key storage with TTL preservation (KEEPTTL). Extracts client IP via `x-forwarded-for` and fallback headers.
@@ -568,7 +578,7 @@ flowchart TD
 - **Exports:** `TransferMode` (`"internet" | "same-network" | "hotspot" | "bluetooth" | "camera" | "cable"`), `TransferRole`, `ModeStatus`, `BrowserCapabilities`.
 
 #### `src/types/signaling.ts`
-- **Purpose:** Domain type definitions for WebRTC ephemeral signaling rooms and message payloads.
+- **Purpose:** Domain type definitions for WebRTC ephemeral signaling rooms, message payloads, and zero-knowledge encrypted cloud relay metadata (`rid`, `baseUrl`, `files`, plus legacy `items` and `text`).
 - **Exports:** `PeerRole` (`"sender" | "receiver"`), `SignalPayloadType` (`"offer" | "answer" | "candidate"`), `SignalMessage`, `SignalingRoomState`.
 
 #### `src/types/transfer.ts`
@@ -655,7 +665,8 @@ flowchart TD
 | `src/lib/__tests__/opticalSdp.test.ts` | `opticalSdp.ts` | SDP session description compression and serialization into scannable QR payloads. |
 | `src/lib/__tests__/quadDecode.test.ts` | `quadDecode.ts` | Canvas quadrant geometry calculation, coordinate slicing, and video frame partitioning. |
 | `src/lib/__tests__/rateLimit.test.ts` | `rateLimit.ts` | Sliding window hit rate counting, window expiration, IP extraction fallback. |
-| `src/lib/__tests__/relayCrypto.test.ts` | `relayCrypto.ts` | PBKDF2 key derivation, AES-GCM 256 encryption/decryption, bit-tampering detection. |
+| `src/lib/__tests__/relayChunks.test.ts` | `relayChunks.ts` | Boundary chunk planning (0, 1, 4MB, 4MB+1, 200MB), AAD generation, cipher sizing, and strict path validation against traversal and out-of-bounds indices. |
+| `src/lib/__tests__/relayCrypto.test.ts` | `relayCrypto.ts` | PBKDF2 key derivation, AES-GCM 256 encryption/decryption, bit-tampering detection, chunk roundtrip, swapped chunk order rejection (AAD mismatch), and IV prefix generation. |
 | `src/lib/__tests__/signalStore.test.ts` | `signalStore.ts` | Memory and Redis signaling store adapters, room creation, TTL expiration, and capacity limits. |
 | `src/lib/__tests__/transferEstimate.test.ts` | `transferEstimate.ts` | Dynamic duration calculation across transfer channels and payload sizes. |
 | `src/lib/__tests__/ultrasonicStream.test.ts` | `ultrasonicStream.ts` | FSK sound nibble encoding, frequency tone mapping, tone classification, and decoding. |

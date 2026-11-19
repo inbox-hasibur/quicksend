@@ -171,3 +171,80 @@ export async function decryptText(
   const plain = await decryptBytes(key, ivBase64, cipher);
   return new TextDecoder().decode(plain);
 }
+
+/**
+ * Generates 4 random bytes encoded as base64 string for chunk IV prefix.
+ */
+export function generateIvPrefix(): string {
+  const c = getCrypto();
+  const bytes = new Uint8Array(4);
+  c.getRandomValues(bytes);
+  return bytesToBase64(bytes);
+}
+
+/**
+ * Builds a 12-byte AES-GCM IV from a 4-byte base64 prefix and 8-byte big-endian chunk index.
+ */
+function buildChunkIv(ivPrefixBase64: string, index: number): Uint8Array {
+  const prefix = base64ToBytes(ivPrefixBase64);
+  if (prefix.length !== 4) {
+    throw new Error("Invalid IV prefix: expected 4 bytes");
+  }
+  const iv = new Uint8Array(12);
+  iv.set(prefix, 0);
+  const view = new DataView(iv.buffer, iv.byteOffset, iv.byteLength);
+  view.setBigUint64(4, BigInt(index), false);
+  return iv;
+}
+
+/**
+ * Encrypts a chunk ArrayBuffer using AES-GCM with deterministic IV and AAD.
+ */
+export async function encryptChunk(
+  key: CryptoKey,
+  plain: ArrayBuffer,
+  ivPrefixBase64: string,
+  index: number,
+  aad: string
+): Promise<ArrayBuffer> {
+  const subtle = getSubtle();
+  const iv = buildChunkIv(ivPrefixBase64, index);
+  const encodedAad = new TextEncoder().encode(aad);
+  return subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv: iv as unknown as BufferSource,
+      additionalData: encodedAad as unknown as BufferSource,
+    },
+    key,
+    plain
+  );
+}
+
+/**
+ * Decrypts a chunk cipher ArrayBuffer using AES-GCM. Throws Error("Wrong relay code") on failure.
+ */
+export async function decryptChunk(
+  key: CryptoKey,
+  cipher: ArrayBuffer,
+  ivPrefixBase64: string,
+  index: number,
+  aad: string
+): Promise<ArrayBuffer> {
+  const subtle = getSubtle();
+  try {
+    const iv = buildChunkIv(ivPrefixBase64, index);
+    const encodedAad = new TextEncoder().encode(aad);
+    return await subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: iv as unknown as BufferSource,
+        additionalData: encodedAad as unknown as BufferSource,
+      },
+      key,
+      cipher
+    );
+  } catch {
+    throw new Error("Wrong relay code");
+  }
+}

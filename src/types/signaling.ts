@@ -31,6 +31,18 @@ export interface SignalingRoomState {
   relay?: {
     salt: string;
     createdAt: number;
+    // Chunk-based relay metadata (no encryption key is stored on server)
+    rid?: string;
+    baseUrl?: string;
+    files?: {
+      id: string;
+      name: string;
+      size: number;
+      mimeType: string;
+      chunkCount: number;
+      ivPrefix: string;
+    }[];
+    // Legacy single-blob relay fields (kept for backward compatibility)
     items: {
       url: string;
       pathname: string;
