@@ -332,8 +332,12 @@ flowchart TD
 - **Exports:** `InternetSharingCard({ initialRoomCode, initialOtp }: InternetSharingCardProps): JSX.Element`
 
 #### `src/components/SameNetworkCard.tsx`
-- **Purpose:** Mode 2 Controller (Same Network Wi-Fi). Automatic local subnet radar with peer cards, visual avatar emojis, 1-tap beam requests, 4-digit pairing PIN backup for CGNAT/cross-IP environments, connected WebRTC transfer (`useWebRTC("same-network")`), and collapsible ConnectionDiagnostics.
+- **Purpose:** Mode 2 Controller (Same Network Wi-Fi). Zero-scroll 2-tab wizard matching Mode 1 simplicity. Send tab features Step 1 (Dropzone payload selection + EstimateBadge + Find Devices action) and Step 2 (live RadarPanel with 1-tap peer beaming, Change Files button, and subtle PIN/QR fallback toggle). Receive tab features live RadarPanel with pulsing device identity awaiting incoming transfers. Technical diagnostics are kept cleanly hidden inside the fallback panel.
 - **Exports:** `SameNetworkCard(): JSX.Element`
+
+#### `src/components/LanDirectFallback.tsx`
+- **Purpose:** Compact fallback and direct connect panel for local network mode. Bridges subnets/CGNAT via 4-digit pairing code, direct 6-digit PIN connect, camera QR scanning, room QR modal, and collapsible advanced WebRTC diagnostics.
+- **Exports:** `LanDirectFallback(props: LanDirectFallbackProps): JSX.Element`, `LanDirectFallbackProps`.
 
 #### `src/components/HotspotAssistantCard.tsx`
 - **Purpose:** Mode 3 Controller (Wi-Fi Hotspot Transfer Engine). Dual-phase transfer architecture combining compact 1-tap Android Hotspot/Wi-Fi settings shortcuts (`ANDROID_INTENTS`), optional collapsible Wi-Fi QR code generator, live Hotspot Radar with 1-tap subnet beaming via `useLocalDiscovery(true)` + `useWebRTC("hotspot")`, collapsible offline 6-digit PIN / QR pairing backup, and collapsible ConnectionDiagnostics.
@@ -640,6 +644,7 @@ flowchart TD
 | `src/components/__tests__/InternetSharingCard.test.tsx` | `InternetSharingCard.tsx` | Send/Receive views, live QR and PIN co-location, Auto PIN/Mobile/Keyword pairing modes, ConnectionDiagnostics rendering, relay consent, and ready PIN. |
 | `src/components/__tests__/NearbyShareCard.test.tsx` | `NearbyShareCard.tsx` | Mode 4 Bluetooth guidance, Web Share API handoff, history logging, and BLE GATT scanner. |
 | `src/components/__tests__/RadarPanel.test.tsx` | `RadarPanel.tsx` | Concentric radar rings, center identity node, avatar modal callback, peer radial layout, and beam triggering. |
+| `src/components/__tests__/SameNetworkCard.test.tsx` | `SameNetworkCard.tsx` | 2-tab step-by-step wizard, Step 1 Dropzone & Find Devices, Step 2 RadarPanel & fallback swap. |
 | `src/components/__tests__/SegmentedControl.test.tsx` | `SegmentedControl.tsx` | Pill track rendering, option selection state, keyboard navigation, and custom class names. |
 | `src/components/__tests__/SpeedIndicator.test.tsx` | `SpeedIndicator.tsx` | Real-time throughput calculations, MB/s rendering, progress percentages, and status colors. |
 | `src/components/__tests__/TransferModal.test.tsx` | `TransferModal.tsx` | Transfer modal prompt, file metadata, progress tracking, transfer cancellation, auto-download, relay error button, and encrypted card. |

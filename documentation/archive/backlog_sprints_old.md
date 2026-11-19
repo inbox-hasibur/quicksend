@@ -959,3 +959,14 @@
   - Extended presence TTL from 15s to 45s (`PRESENCE_TTL_SECONDS = 45`, `PEER_EXPIRY_MS = 45000`, container expiration 120s) to tolerate mobile throttling and tab backgrounding without dropping peers from radar.
   - In `action: "announce"`, ensured peer presence is persisted (`savePeer`) and re-read so concurrent announcers immediately discover each other on initial heartbeat.
 - [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 40/40 passing targeted vitest tests (`src/app/api/discover/__tests__/route.test.ts` & `src/lib/__tests__/signalStore.test.ts`).
+
+### Fix 19 (2026-11-19): Redesign SameNetworkCard to zero-scroll step-by-step wizard
+- [x] Redesigned `src/components/SameNetworkCard.tsx` into a lean 2-tab wizard (268 lines):
+  - **Top Switcher:** Clean `Send | Receive` `SegmentedControl` pill toggle alongside local device identity badge.
+  - **Tab 1 (Send):** Step 1 (Dropzone file/text selector + `EstimateBadge` + primary `"Find Devices →"` button; hides radar, PIN, QR, and diagnostics) and Step 2 (`"← Change files"` pill + live `RadarPanel` with 1-tap peer beaming + single subtle `"Device not showing? Connect with PIN / QR"` toggle).
+  - **Tab 2 (Receive):** Live `RadarPanel` with pulsing local device avatar/identity awaiting incoming transfers + single subtle `"Connect with PIN or Scan QR"` toggle. Automatic incoming beam reception (`incomingBeam` -> `TransferModal`) retained.
+- [x] Extracted modular fallback in `src/components/LanDirectFallback.tsx`:
+  - Contains Option 1 (4-digit nearby subnet/CGNAT pairing code), Option 2 (`DirectConnectPanel` 6-digit PIN & camera QR scanner), room QR modal, and advanced `ConnectionDiagnostics` collapsed inside an accordion details view so regular users are never exposed to WebRTC/ICE jargon.
+- [x] Automated Verification & Quality:
+  - Added test suite `src/components/__tests__/SameNetworkCard.test.tsx` verifying Step 1 Dropzone view, Receive tab radar view, and direct connect fallback swap.
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).
