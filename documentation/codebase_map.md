@@ -446,8 +446,8 @@ flowchart TD
 - **Exports:** `useWebRTC(mode): { role, roomId, roomCode, isConnected, progress, pendingHeader, brokerNotice, startSender, startReceiver, sendFiles, sendText, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup, debugLog, diagnostics }`, `waitForDrain`, `DrainableChannel`, `WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`, `FIREWALL_BLOCKED_MESSAGE`, `ROOM_NOT_FOUND_MESSAGE`.
 
 #### `src/hooks/useRelayTransfer.ts`
-- **Purpose:** Client-side encrypted cloud relay controller. Derives AES-GCM 256 keys via PBKDF2 without server key exposure, encrypts files and text into binary octet streams, coordinates direct client uploads via `@upstash/blob`, handles 4s polling on receiver, downloads and decrypts payloads, and triggers automatic completion cleanup.
-- **Exports:** `useRelayTransfer(): UseRelayTransferReturn`, `UseRelayTransferReturn`, `RelayStatus`, `RelayPayloadData`.
+- **Purpose:** Chunk-based client-side encrypted cloud relay controller. Uploads and downloads files in 4 MiB chunks without holding full files in RAM. Derives AES-GCM 256 keys via PBKDF2 without server key exposure. Handles 32-chunk batching, concurrency 3 PUT uploads with exponential backoff retries (500/1000/2000ms), offline pause/online resume, registration via `/api/relay/attach`, concurrency 2 sequential chunk downloading with direct Upstash bucket fetch and `/api/relay/file` fallback, large-file disk streaming (>100MB) via `diskStream.ts`, progress reporting (`uploadedBytes`, `downloadedBytes`, `totalBytes`, `chunksDone`, `chunksTotal`), and automatic completion cleanup via `/api/relay/complete`.
+- **Exports:** `useRelayTransfer`, `RelayState`, `RelayStatus`, `RelayFileMetadata`, `RelayItemMetadata`, `RelayPayloadData`.
 
 #### `src/hooks/useLocalDiscovery.ts`
 - **Purpose:** Local network peer discovery via `/api/discover`. Manages peer heartbeat polling, dynamic avatar conflict resolution, incoming beam handling, optional 4-digit pairing code for cross-IP / CGNAT discovery, and exposes detailed poll status (`DiscoveryStatus` with `groupLabel` and `ipFamily`).
@@ -543,7 +543,7 @@ flowchart TD
 
 #### `src/lib/relayCrypto.ts`
 - **Purpose:** Zero-knowledge client-side cryptography module for encrypted cloud relay transfers. Generates 8-character base-32 formatted relay codes (`XXXX-XXXX`), 16-byte random salts, derives non-extractable AES-GCM 256 keys via PBKDF2 (SHA-256, 200,000 iterations), and performs authenticated symmetric encryption/decryption with random 12-byte IVs. Supports chunk-based authenticated encryption (`encryptChunk`, `decryptChunk`) with deterministic 12-byte IVs (4-byte base64 prefix + 8-byte big-endian index) and AAD binding.
-- **Exports:** `generateRelayCode`, `normalizeRelayCode`, `generateSalt`, `generateIvPrefix`, `deriveRelayKey`, `encryptBytes`, `decryptBytes`, `encryptText`, `decryptText`, `encryptChunk`, `decryptChunk`.
+- **Exports:** `generateRelayCode`, `normalizeRelayCode`, `generateSalt`, `generateIvPrefix`, `deriveRelayKey`, `encryptText`, `decryptText`, `encryptChunk`, `decryptChunk`.
 
 #### `src/lib/relayLimits.ts`
 - **Purpose:** Centralized operational constraints for chunk-based encrypted cloud relay shared across client and server routes. Defines chunk sizing, per-file limits, max transfer limits, authentication tag sizes, and storage TTLs.
@@ -649,7 +649,7 @@ flowchart TD
 | `src/hooks/__tests__/useHtml5Scanner.test.ts` | `useHtml5Scanner.ts` | Single-stream camera scanner lifecycle, canvas rendering, and robust DOM error cleanup. |
 | `src/hooks/__tests__/useLocalDiscovery.test.tsx` | `useLocalDiscovery.ts` | Subnet discovery polling, peer list diffing, 4-digit PIN registration, and incoming beams. |
 | `src/hooks/__tests__/useQuadScanner.test.ts` | `useQuadScanner.ts` | Multi-quadrant scanner initialization, layout rotation, canvas recycling, and track cleanup. |
-| `src/hooks/__tests__/useRelayTransfer.test.ts` | `useRelayTransfer.ts` | Status fetching, polling cancellation, encrypted download handling, and wrong PIN error guard. |
+| `src/hooks/__tests__/useRelayTransfer.test.ts` | `useRelayTransfer.ts` | Status fetching, polling cancellation, 10 MiB 3-chunk upload, chunk failure retry & backoff, 4-failure error reporting, offline pause/online resume, wrong relay code error guard without calling complete, cancel cleanup, and >100MB disk streaming writer invocation. |
 | `src/hooks/__tests__/useTheme.test.tsx` | `useTheme.ts` | Dark/light theme state toggling, class application to document root, and localStorage persistence. |
 | `src/hooks/__tests__/useTransferHistory.test.ts` | `useTransferHistory.ts` | Transfer history logging, drawer state management, session persistence, and re-download links. |
 | `src/hooks/__tests__/useWebRTC.test.ts` | `useWebRTC.ts` | WebRTC connection setup, 12s/15s receiver dial timeouts, PeerJS conn.peerConnection ICE watchdog, buffer draining, and room/firewall diagnostics. |
@@ -666,7 +666,7 @@ flowchart TD
 | `src/lib/__tests__/quadDecode.test.ts` | `quadDecode.ts` | Canvas quadrant geometry calculation, coordinate slicing, and video frame partitioning. |
 | `src/lib/__tests__/rateLimit.test.ts` | `rateLimit.ts` | Sliding window hit rate counting, window expiration, IP extraction fallback. |
 | `src/lib/__tests__/relayChunks.test.ts` | `relayChunks.ts` | Boundary chunk planning (0, 1, 4MB, 4MB+1, 200MB), AAD generation, cipher sizing, and strict path validation against traversal and out-of-bounds indices. |
-| `src/lib/__tests__/relayCrypto.test.ts` | `relayCrypto.ts` | PBKDF2 key derivation, AES-GCM 256 encryption/decryption, bit-tampering detection, chunk roundtrip, swapped chunk order rejection (AAD mismatch), and IV prefix generation. |
+| `src/lib/__tests__/relayCrypto.test.ts` | `relayCrypto.ts` | PBKDF2 key derivation, AES-GCM 256 text encryption/decryption, bit-tampering detection, chunk roundtrip, swapped chunk order rejection (AAD mismatch), and IV prefix generation. |
 | `src/lib/__tests__/signalStore.test.ts` | `signalStore.ts` | Memory and Redis signaling store adapters, room creation, TTL expiration, and capacity limits. |
 | `src/lib/__tests__/transferEstimate.test.ts` | `transferEstimate.ts` | Dynamic duration calculation across transfer channels and payload sizes. |
 | `src/lib/__tests__/ultrasonicStream.test.ts` | `ultrasonicStream.ts` | FSK sound nibble encoding, frequency tone mapping, tone classification, and decoding. |

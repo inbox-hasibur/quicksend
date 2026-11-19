@@ -5,8 +5,6 @@ import {
   generateSalt,
   generateIvPrefix,
   deriveRelayKey,
-  encryptBytes,
-  decryptBytes,
   encryptText,
   decryptText,
   encryptChunk,
@@ -50,19 +48,6 @@ describe("relayCrypto", () => {
     })();
   });
 
-  it("performs file / byte buffer round trip encryption and decryption", () => {
-    return (async () => {
-      const code = "ABCDEFGH";
-      const salt = generateSalt();
-      const key = await deriveRelayKey(code, salt);
-
-      const fileData = new Uint8Array([1, 2, 3, 4, 5, 255, 254, 0, 128, 64]);
-      const { iv, cipher } = await encryptBytes(key, fileData);
-
-      const decrypted = await decryptBytes(key, iv, cipher);
-      expect(new Uint8Array(decrypted)).toEqual(fileData);
-    })();
-  });
 
   it("throws 'Wrong relay code' when derived with wrong code", () => {
     return (async () => {

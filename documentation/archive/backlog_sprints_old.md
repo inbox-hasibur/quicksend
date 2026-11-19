@@ -784,3 +784,25 @@
 - [x] Updated automated test suites in `upload.test.ts` and `route.test.ts`:
   - Verified rejection of bad paths, bad rids, oversized chunks, >64 chunks, byte limit overruns, chunkCount mismatches, totals > 300 MB, foreign baseUrls, unknown fileIds/indices, SSRF query URL isolation, and idempotent complete deletion.
   - 47 test suites, 317/317 unit tests passing, 0 ESLint warnings/errors, and clean Turbopack build.
+
+### Fix 12 (2026-11-19): Chunked relay transfer client, error reporting, and UI progress
+- [x] Implemented chunked sender and receiver transfer pipeline in `src/hooks/useRelayTransfer.ts`:
+  - **Sender:** Validates file count, per-file limits, and transfer limits against `/api/relay/status`. Generates relay code, salt, and derives PBKDF2 key once. Batches chunk upload URL requests in groups of up to 32 chunks via `POST /api/relay/upload`. Reads and encrypts chunks on-demand via `file.slice()` + `encryptChunk()` with AES-GCM and AAD to maintain low memory usage. Performs PUT uploads with concurrency 3, retrying failed chunks up to 3 times with exponential backoff (500, 1000, 2000 ms). Pauses queue on offline (`navigator.onLine === false`) and resumes on `online` event. Attaches metadata manifest via `POST /api/relay/attach`.
+  - **Receiver:** Derives key once. Downloads chunks in sequential order with concurrency 2, attempting direct bucket fetch via `baseUrl + "/" + chunkPath` first, falling back to `/api/relay/file?code=&f=&i=` on network or CORS errors. Decrypts chunks with `decryptChunk()` (tampering or wrong code immediately halts with `"Wrong relay code"` without triggering `/api/relay/complete`). Automatically activates `diskStream.ts` streaming writer (`createDiskStreamWriter`) for files > 100 MB (`DISK_STREAM_THRESHOLD`) to bypass browser tab RAM limits; smaller files assemble Blob parts and auto-download. Logs transfer history with channel `"internet"`. Triggers `/api/relay/complete` only upon full transfer success.
+  - **Cancellation:** `cancelRelay()` aborts in-flight fetch operations via `AbortController` and issues `POST /api/relay/complete` cleanup.
+  - **State and Metrics:** Exposes `uploadedBytes`, `downloadedBytes`, `totalBytes`, `chunksDone`, `chunksTotal`, and detailed error reporting naming failed step and status code (e.g. `"Upload failed at chunk 7 of 25: HTTP 403"`, `"Could not reach storage (network or CORS)"`, `"Register failed: HTTP 429"`).
+- [x] Enhanced UI components:
+  - `src/components/InternetSharingCard.tsx`: Sender displays live chunk progress (`"Uploading chunk X of Y, A MB of B MB"`), percentage progress bar, and "Cancel" button. Relay consent line displays active file limit (`up to 200 MB per file`) while keeping consent phrasing, relay code display, and `#rc=` fragment intact. Passes download byte metrics to `TransferModal`.
+  - `src/components/TransferModal.tsx`: Receiver displays `"Downloading A MB of B MB"` with matching progress bar during relay decryption/downloading, and renders both chunked `files` and legacy `items` lists.
+- [x] Streamlined cryptography in `src/lib/relayCrypto.ts`:
+  - Refactored `encryptText()` and `decryptText()` to handle AES-GCM directly with 12-byte random IVs.
+  - Safely removed legacy unused `encryptBytes()` and `decryptBytes()` functions and associated tests.
+- [x] Comprehensive test coverage in `src/hooks/__tests__/useRelayTransfer.test.ts`:
+  - Verified 10 MiB file uploads as 3 chunks.
+  - Verified chunk failing twice then succeeding passes with backoff.
+  - Verified chunk failing 4 times reports formatted error text.
+  - Verified offline pauses and online event resumes transfer.
+  - Verified wrong code on first chunk throws `"Wrong relay code"` without calling `/api/relay/complete`.
+  - Verified `cancelRelay()` triggers `/api/relay/complete`.
+  - Verified files over 100 MB invoke `createDiskStreamWriter()`.
+  - Verified all 47 test suites (322/322 unit tests) pass, 0 ESLint warnings/errors, and clean Turbopack build.

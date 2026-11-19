@@ -24,6 +24,7 @@ import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
 import { useWebRTC } from "@/hooks/useWebRTC";
 import { useRelayTransfer } from "@/hooks/useRelayTransfer";
 import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
+import { formatBytes } from "@/lib/chunker";
 import { getPayloadBytes } from "@/lib/transferEstimate";
 import type { TransferRole } from "@/types/mode";
 import type { TransferProgressState } from "@/types/transfer";
@@ -63,6 +64,11 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     relayStatus,
     relayState,
     progress: relayProgress,
+    uploadedBytes,
+    downloadedBytes,
+    totalBytes: relayTotalBytes,
+    chunksDone,
+    chunksTotal,
     relayCode,
     error: relayError,
     relayPayload,
@@ -339,7 +345,8 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                   {showRelayConsent && relayState === "idle" && (
                     <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3 animate-in fade-in">
                       <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                        This uploads an encrypted copy to temporary cloud storage. It is deleted after download or within 24 hours.
+                        This uploads an encrypted copy to temporary cloud storage. It is deleted after download or within 24 hours. (up to{" "}
+                        {formatBytes(relayStatus?.maxFileBytes || 209715200)} per file)
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -365,13 +372,17 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                     </div>
                   )}
 
-                  {(relayState === "encrypting" || relayState === "uploading") && (
-                    <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-2 text-center animate-in fade-in">
+                  {(relayState === "encrypting" || relayState === "uploading" || relayState === "registering") && (
+                    <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3 text-center animate-in fade-in">
                       <div className="flex items-center justify-between text-xs font-medium text-[var(--text)]">
                         <span>
                           {relayState === "encrypting"
                             ? "Encrypting with client key..."
-                            : "Uploading encrypted copy..."}
+                            : relayState === "registering"
+                            ? "Registering encrypted transfer..."
+                            : chunksTotal > 0
+                            ? `Uploading chunk ${Math.min(chunksDone + 1, chunksTotal)} of ${chunksTotal}, ${formatBytes(uploadedBytes)} of ${formatBytes(relayTotalBytes)}`
+                            : `Uploading ${formatBytes(uploadedBytes)} of ${formatBytes(relayTotalBytes)}`}
                         </span>
                         <span className="font-mono">{relayProgress}%</span>
                       </div>
@@ -380,6 +391,15 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                           className="bg-[var(--accent)] h-full transition-all duration-300"
                           style={{ width: `${relayProgress}%` }}
                         />
+                      </div>
+                      <div className="flex justify-end pt-1">
+                        <button
+                          type="button"
+                          onClick={() => cancelRelay(roomCode || undefined)}
+                          className="px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] hover:bg-[var(--surface-muted)] text-[var(--text-muted)] hover:text-[var(--text)] text-xs font-semibold cursor-pointer transition-colors"
+                        >
+                          Cancel
+                        </button>
                       </div>
                     </div>
                   )}
@@ -749,6 +769,9 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
         onDownloadRelay={(code) => downloadRelay(relayPayload!, code, roomCode || inputCode)}
         isDownloadingRelay={isDownloadingRelay}
         relayError={relayError}
+        relayDownloadedBytes={downloadedBytes}
+        relayTotalBytes={relayTotalBytes}
+        relayProgress={relayProgress}
       />
     </div>
   );

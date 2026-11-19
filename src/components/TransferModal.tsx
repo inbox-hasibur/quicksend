@@ -31,12 +31,16 @@ export interface TransferModalProps {
   isRelayAvailable?: boolean;
   relayPayload?: {
     salt: string;
-    items: { name: string; size: number }[];
+    items?: { name: string; size: number }[];
+    files?: { id: string; name: string; size: number; chunkCount: number; ivPrefix: string }[];
     text?: { cipherText: string; iv: string };
   } | null;
   onDownloadRelay?: (relayCode: string) => Promise<void> | void;
   isDownloadingRelay?: boolean;
   relayError?: string | null;
+  relayDownloadedBytes?: number;
+  relayTotalBytes?: number;
+  relayProgress?: number;
 }
 
 export function TransferModal({
@@ -52,6 +56,9 @@ export function TransferModal({
   onDownloadRelay,
   isDownloadingRelay,
   relayError,
+  relayDownloadedBytes,
+  relayTotalBytes,
+  relayProgress,
 }: TransferModalProps) {
   const [copied, setCopied] = useState(false);
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
@@ -424,7 +431,7 @@ export function TransferModal({
 
               {/* Items List */}
               <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                {relayPayload.items.map((item, idx) => (
+                {(relayPayload.files || relayPayload.items || []).map((item, idx) => (
                   <div
                     key={idx}
                     className="flex items-center justify-between text-xs p-2 rounded-lg bg-[var(--surface)] border border-[var(--border-hairline)]"
@@ -466,6 +473,26 @@ export function TransferModal({
               {(localRelayError || relayError) && (
                 <div className="text-[11px] text-red-600 dark:text-red-400 font-medium">
                   {localRelayError || relayError}
+                </div>
+              )}
+
+              {/* Downloading Progress Bar */}
+              {isDownloadingRelay && (
+                <div className="space-y-2 py-1 text-center animate-in fade-in">
+                  <div className="flex items-center justify-between text-xs font-medium text-[var(--text)]">
+                    <span>
+                      {relayTotalBytes && relayTotalBytes > 0
+                        ? `Downloading ${formatBytes(relayDownloadedBytes || 0)} of ${formatBytes(relayTotalBytes)}`
+                        : "Downloading..."}
+                    </span>
+                    <span className="font-mono">{relayProgress || 0}%</span>
+                  </div>
+                  <div className="w-full bg-[var(--surface)] h-2 rounded-full overflow-hidden border border-[var(--border-hairline)]">
+                    <div
+                      className="bg-[var(--accent)] h-full transition-all duration-300"
+                      style={{ width: `${relayProgress || 0}%` }}
+                    />
+                  </div>
                 </div>
               )}
 

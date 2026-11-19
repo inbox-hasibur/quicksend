@@ -111,16 +111,17 @@ export async function deriveRelayKey(
 }
 
 /**
- * Encrypts raw binary buffer using AES-GCM with a random 12-byte IV.
+ * Encrypts a UTF-8 text string using AES-GCM with a random 12-byte IV.
  */
-export async function encryptBytes(
+export async function encryptText(
   key: CryptoKey,
-  data: BufferSource
+  text: string
 ): Promise<{ iv: string; cipher: ArrayBuffer }> {
   const subtle = getSubtle();
   const c = getCrypto();
   const iv = new Uint8Array(12);
   c.getRandomValues(iv);
+  const data = new TextEncoder().encode(text);
   const cipher = await subtle.encrypt(
     { name: "AES-GCM", iv: iv as unknown as BufferSource },
     key,
@@ -130,46 +131,25 @@ export async function encryptBytes(
 }
 
 /**
- * Decrypts raw cipher buffer using AES-GCM and base64 IV. Throws Error("Wrong relay code") on failure.
- */
-export async function decryptBytes(
-  key: CryptoKey,
-  ivBase64: string,
-  cipher: BufferSource
-): Promise<ArrayBuffer> {
-  const subtle = getSubtle();
-  try {
-    const iv = base64ToBytes(ivBase64);
-    return await subtle.decrypt(
-      { name: "AES-GCM", iv: iv as unknown as BufferSource },
-      key,
-      cipher
-    );
-  } catch {
-    throw new Error("Wrong relay code");
-  }
-}
-
-/**
- * Encrypts a UTF-8 text string.
- */
-export async function encryptText(
-  key: CryptoKey,
-  text: string
-): Promise<{ iv: string; cipher: ArrayBuffer }> {
-  return encryptBytes(key, new TextEncoder().encode(text));
-}
-
-/**
- * Decrypts cipher buffer into UTF-8 text string.
+ * Decrypts cipher buffer into UTF-8 text string. Throws Error("Wrong relay code") on failure.
  */
 export async function decryptText(
   key: CryptoKey,
   ivBase64: string,
   cipher: BufferSource
 ): Promise<string> {
-  const plain = await decryptBytes(key, ivBase64, cipher);
-  return new TextDecoder().decode(plain);
+  const subtle = getSubtle();
+  try {
+    const iv = base64ToBytes(ivBase64);
+    const plain = await subtle.decrypt(
+      { name: "AES-GCM", iv: iv as unknown as BufferSource },
+      key,
+      cipher
+    );
+    return new TextDecoder().decode(plain);
+  } catch {
+    throw new Error("Wrong relay code");
+  }
 }
 
 /**
