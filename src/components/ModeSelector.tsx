@@ -27,6 +27,18 @@ import { SpeedIndicator } from "@/components/SpeedIndicator";
 export function ModeSelector() {
   const searchParams = useSearchParams();
   const initialRoomCode = searchParams.get("room") || undefined;
+  const [initialOtp] = useState<string | undefined>(() => {
+    if (typeof window !== "undefined" && window.location.hash) {
+      const match = window.location.hash.match(/#otp=([0-9\s-]+)/i);
+      if (match && match[1]) {
+        const clean = match[1].replace(/[\s-]/g, "");
+        if (/^\d{6}$/.test(clean)) {
+          return clean;
+        }
+      }
+    }
+    return undefined;
+  });
 
   const capabilities = useBrowserCapabilities();
   const modes: ModeStatus[] = getAllModesStatus(capabilities);
@@ -34,7 +46,21 @@ export function ModeSelector() {
   const selectedMode =
     selectedModeOverride === "home"
       ? null
-      : selectedModeOverride || (initialRoomCode ? "internet" : null);
+      : selectedModeOverride || (initialOtp || initialRoomCode ? "internet" : null);
+
+  // Clear consumed #otp= from URL hash on mount
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.hash) {
+      const match = window.location.hash.match(/#otp=([0-9\s-]+)/i);
+      if (match && match[1]) {
+        try {
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+        } catch {
+          // Ignore history manipulation fallback
+        }
+      }
+    }
+  }, []);
 
   const handleSelectMode = (mode: TransferMode | null) => {
     setSelectedModeOverride(mode === null ? "home" : mode);
@@ -228,7 +254,7 @@ export function ModeSelector() {
             {/* Mode Workspace Content */}
             <div>
               {selectedMode === "internet" && (
-                <InternetSharingCard initialRoomCode={initialRoomCode} />
+                <InternetSharingCard initialRoomCode={initialRoomCode} initialOtp={initialOtp} />
               )}
 
               {selectedMode === "same-network" && <SameNetworkCard />}

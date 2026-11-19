@@ -39,6 +39,23 @@ export function QRScannerModal({
         return;
       }
 
+      // Preserve #otp= hash URLs and 6-digit numeric OTPs
+      if (decodedText.includes("#otp=") || decodedText.includes("otp=")) {
+        completedRef.current = true;
+        await stop();
+        onScanSuccess(decodedText);
+        onClose();
+        return;
+      }
+
+      if (/^\d{3}[-\s]?\d{3}$/.test(decodedText.trim())) {
+        completedRef.current = true;
+        await stop();
+        onScanSuccess(decodedText.trim().replace(/[-\s]/g, ""));
+        onClose();
+        return;
+      }
+
       // Check if scanned text contains a room query param (e.g. https://.../?room=834291)
       let extractedCode = "";
       try {

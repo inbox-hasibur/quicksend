@@ -37,18 +37,15 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 
 ---
 
-### Mode 1: Share via Internet (Dual WebRTC Transport + PIN / Mobile / QR)
-- **Primary Use Case:** Remote or cross-network P2P transfer between any devices globally when on different networks.
-- **Dual Connection Transport:**
-  1. **Primary Broker:** Real-time PeerJS cloud signaling (`0.peerjs.com`) over WebSockets with zero serverless cold starts.
-  2. **Secondary Fallback:** `/api/signal` REST polling with Upstash Redis or ephemeral memory store.
-  3. **STUN Pool & Seamless ICE:** Expanded Google + Cloudflare STUN pool without aggressive premature timeouts.
-  4. **Dynamic QR Code & Auto-Connect:** QR encodes full URL with `?room=...` query param that auto-selects Internet mode and auto-joins session seamlessly.
-  5. **Flexible Pairing Keys:** 6-digit numeric PIN, mobile phone number, or custom keyword/secret.
-  6. **Sequential Multi-File Batch Queue:** Seamlessly beams multiple files sequentially over an open `RTCDataChannel` without dropping connection.
-  7. **SHA-256 Bit-Perfect Integrity:** Computes and verifies SHA-256 checksums on payloads with `"Verified ✓"` visual confirmation.
-  8. **Large-File Disk Streaming:** File System Access API (`showSaveFilePicker`) for files > 100MB to stream chunks directly to disk.
-  9. **Optional Encrypted Cloud Relay:** Opt-in zero-knowledge fallback when direct WebRTC is blocked by symmetric NAT / 4G CGNAT firewalls. Derives AES-GCM 256 keys purely client-side from an 8-character relay code and random salt; the encryption key is never transmitted or stored on the server. Backed by @upstash/blob ephemeral storage with automatic 30-minute cleanup.
+### Mode 1: Share via Internet (Zero-Knowledge Cloud Relay + 6-Digit Numeric OTP / QR)
+- **Primary Use Case:** Remote or cross-network transfer between any devices globally when on different networks, with 100% firewall traversal reliability.
+- **Architecture & Workflow:**
+  1. **Clean 2-Tab Step-by-Step Experience:** Pure `Send | Receive` segmented wizard with zero scroll, zero WebRTC/NAT error popups, and no technical jargon.
+  2. **Zero-Knowledge End-to-End Encryption:** Client derives AES-256-GCM keys client-side from a single 6-digit numeric OTP (`482 915`) and random salt. The room code is derived as `SHA-256("qs-room:" + otp6)[0..16]`; the server never sees the plaintext OTP or the decryption key.
+  3. **Chunked Cloud Relay (16 MiB Chunks):** Files up to 750 MB per file (800 MB total transfer) are split into 16 MiB chunks, individually encrypted, and streamed to Upstash Blob storage with live chunk progress.
+  4. **Dynamic QR Code & Auto-Connect:** Sender displays a crisp centered QR code encoding `${origin}/#otp=123456` and a large 6-digit formatted OTP with 1-click Copy OTP and Copy Link.
+  5. **Instant Receiver Flow:** Receiver can scan QR or type the 6-digit OTP (with auto-formatting and instant download on 6 digits). Streams directly to disk via `diskStream.ts` for files > 100 MB.
+  6. **Ephemeral Lifespan & Immediate Cleanup:** Blobs expire in 15 minutes or are instantly purged upon receiver completion via `/api/relay/complete`.
 
 ---
 

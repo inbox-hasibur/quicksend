@@ -1,302 +1,214 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
-  KeyRound,
-  Phone,
-  Sparkles,
-  ArrowRight,
   Camera,
-  RefreshCw,
-  AlertCircle,
-  Users,
-  Lock,
   Copy,
   Check,
+  RotateCcw,
+  Send,
+  ArrowDownToLine,
+  AlertCircle,
+  X,
+  CheckCircle2,
+  Link as LinkIcon,
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Dropzone } from "@/components/Dropzone";
 import { EstimateBadge } from "@/components/EstimateBadge";
-import { QRCodeDisplay } from "@/components/QRCodeDisplay";
 import { QRScannerModal } from "@/components/QRScannerModal";
-import { TransferModal } from "@/components/TransferModal";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import { ConnectionDiagnostics } from "@/components/ConnectionDiagnostics";
-import { useWebRTC } from "@/hooks/useWebRTC";
 import { useRelayTransfer } from "@/hooks/useRelayTransfer";
-import { formatRoomCode, normalizeRoomCode, isValidRoomCode } from "@/lib/codeGenerator";
 import { formatBytes } from "@/lib/chunker";
 import { getPayloadBytes } from "@/lib/transferEstimate";
-import type { TransferRole } from "@/types/mode";
-import type { TransferProgressState } from "@/types/transfer";
+import { RELAY_MAX_FILE_BYTES } from "@/lib/relayLimits";
 
-type KeyStrategy = "auto" | "phone" | "keyword";
-
-interface InternetSharingCardProps {
+export interface InternetSharingCardProps {
   initialRoomCode?: string;
+  initialOtp?: string;
 }
 
-export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProps) {
-  const isInitialReceive = Boolean(initialRoomCode && isValidRoomCode(initialRoomCode));
-  const [role, setRole] = useState<TransferRole>(isInitialReceive ? "receive" : "send");
-  const [keyStrategy, setKeyStrategy] = useState<KeyStrategy>("auto");
-  const [receiverStrategy, setReceiverStrategy] = useState<KeyStrategy>(() => {
-    if (!initialRoomCode) return "auto";
-    const clean = normalizeRoomCode(initialRoomCode);
-    if (/[A-Za-z]/.test(clean)) return "keyword";
-    if (clean.length > 6) return "phone";
-    return "auto";
-  });
-  const [customSenderKey, setCustomSenderKey] = useState("");
-  const [inputCode, setInputCode] = useState(initialRoomCode || "");
+export function InternetSharingCard({ initialRoomCode, initialOtp }: InternetSharingCardProps) {
+  const initialReceive = Boolean(initialOtp || initialRoomCode);
+  const [role, setRole] = useState<"send" | "receive">(initialReceive ? "receive" : "send");
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [selectedPayload, setSelectedPayload] = useState<{ files: File[]; text: string }>({
     files: [],
     text: "",
   });
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [hasTurn, setHasTurn] = useState<boolean | null>(null);
-  const [showRelayConsent, setShowRelayConsent] = useState(false);
-  const [copiedRelayCode, setCopiedRelayCode] = useState(false);
-  const hasAutoConnectedRef = useRef(false);
+  const [inputOtp, setInputOtp] = useState(() => {
+    const raw = initialOtp || initialRoomCode || "";
+    const digits = raw.replace(/\D/g, "").slice(0, 6);
+    return digits.length > 3 ? `${digits.slice(0, 3)} ${digits.slice(3)}` : digits;
+  });
+  const [receiveError, setReceiveError] = useState<string | null>(null);
+  const [completedResult, setCompletedResult] = useState<{ files: string[]; text?: string } | null>(
+    null
+  );
+  const [copiedOtp, setCopiedOtp] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCompletedText, setCopiedCompletedText] = useState(false);
+  const hasAutoReceivedRef = useRef(false);
 
   const {
     relayStatus,
     relayState,
-    progress: relayProgress,
+    progress,
     uploadedBytes,
     downloadedBytes,
-    totalBytes: relayTotalBytes,
+    totalBytes,
     chunksDone,
     chunksTotal,
     relayCode,
+    otpCode,
     qrUrl,
     error: relayError,
-    relayPayload,
-    isDownloading: isDownloadingRelay,
-    startRelayUpload,
+    isDownloading,
+    startRelaySend,
+    receiveByOtp,
     cancelRelay,
-    pollRelay,
-    stopPolling,
-    downloadRelay,
   } = useRelayTransfer();
 
-  // Check /api/turn once when Mode 1 opens to detect TURN relay availability
-  useEffect(() => {
-    fetch("/api/turn")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && typeof data.hasTurn === "boolean") {
-          setHasTurn(data.hasTurn);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const maxFileBytes = relayStatus?.maxFileBytes || RELAY_MAX_FILE_BYTES;
+  const hasOversizedFile = selectedPayload.files.some((f) => f.size > maxFileBytes);
+  const canSend =
+    !hasOversizedFile && (selectedPayload.files.length > 0 || selectedPayload.text.trim().length > 0);
+  const payloadTotalBytes = getPayloadBytes(selectedPayload.files, selectedPayload.text);
 
-  const {
-    role: rtcRole,
-    roomCode,
-    isConnected,
-    progress,
-    brokerNotice,
-    startSender,
-    startReceiver,
-    sendFiles,
-    sendPayload,
-    acceptIncomingTransfer,
-    rejectIncomingTransfer,
-    cleanup,
-    diagnostics,
-    debugLog,
-  } = useWebRTC("internet");
-
-  // Enrich sender progress with selected payload metadata so it never displays "0 Bytes"
-  const enrichedProgress: TransferProgressState = {
-    ...progress,
-    fileName: progress.fileName || selectedPayload.files[0]?.name,
-    fileSize:
-      progress.fileSize ||
-      (selectedPayload.files.length > 0
-        ? selectedPayload.files.reduce((acc, f) => acc + f.size, 0)
-        : undefined),
-    totalBytes:
-      progress.totalBytes > 0
-        ? progress.totalBytes
-        : getPayloadBytes(selectedPayload.files, selectedPayload.text),
-    totalFiles:
-      progress.totalFiles ||
-      (selectedPayload.files.length > 1 ? selectedPayload.files.length : undefined),
-    itemType: progress.itemType || (selectedPayload.files.length > 0 ? "file" : "text"),
-    textContent: progress.textContent || selectedPayload.text,
-  };
-
-  // Only open modal on Sender when peer initiates connection/transfer (waiting-acceptance, transferring, completed, error)
-  // While Sender is waiting for a peer (status === "connecting" or "idle"), keep QR/PIN 100% visible
-  const isSenderWaiting = role === "send" && (progress.status === "idle" || progress.status === "connecting");
-  const isModalOpen = !isSenderWaiting && progress.status !== "idle";
-
-  // Auto-start sender session with Auto PIN on mount or when switching to send role
-  useEffect(() => {
-    if (role === "send" && !roomCode && !isConnecting && keyStrategy === "auto") {
-      startSender().catch((err) => {
-        setErrorMsg(err instanceof Error ? err.message : "Failed to initialize sender session.");
-      });
-    }
-  }, [role, roomCode, isConnecting, keyStrategy, startSender]);
-
-  // Handle switching pairing method in Send view
-  const handleKeyStrategyChange = (newStrategy: KeyStrategy) => {
-    setKeyStrategy(newStrategy);
-    setErrorMsg(null);
-    if (newStrategy === "auto") {
-      startSender().catch((err) => {
-        setErrorMsg(err instanceof Error ? err.message : "Failed to create PIN session.");
-      });
-    }
-  };
-
-  // Apply custom mobile number or keyword as sender key
-  const handleApplyCustomKey = (key: string) => {
-    const clean = normalizeRoomCode(key);
-    if (!isValidRoomCode(clean)) {
-      setErrorMsg(
-        keyStrategy === "phone"
-          ? "Please enter a valid mobile number (e.g. 01712345678)."
-          : "Please enter a valid keyword (4–20 characters, e.g. HR998877)."
-      );
+  // Receiver auto-submit handler
+  const handleReceive = async (codeToUse?: string) => {
+    const raw = codeToUse || inputOtp;
+    const digits = raw.replace(/\D/g, "");
+    if (digits.length !== 6) {
+      setReceiveError("Please enter a valid 6-digit OTP.");
       return;
     }
-    setErrorMsg(null);
-    startSender(clean).catch((err) => {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to create custom key session.");
-    });
+    setReceiveError(null);
+    try {
+      await receiveByOtp(digits);
+      setCompletedResult({ files: ["Downloaded transfer"] });
+    } catch (err) {
+      setReceiveError(
+        err instanceof Error ? err.message : "Invalid or expired OTP. Please check the 6-digit code."
+      );
+    }
   };
 
-  // Refresh auto-generated PIN
-  const handleRefreshAutoPin = () => {
-    setErrorMsg(null);
-    startSender().catch((err) => {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to generate new PIN.");
-    });
-  };
-
-  // When sender dataChannel connects to receiver, automatically stream payload
+  // Auto-connect receiver once if initialOtp was passed from URL
   useEffect(() => {
-    if (rtcRole === "sender" && isConnected && (progress.status === "connecting" || progress.status === "idle")) {
-      if (selectedPayload.files.length > 0) {
-        sendFiles(selectedPayload.files).catch((err) => {
-          setErrorMsg(err.message);
-        });
-      } else if (selectedPayload.text.trim()) {
-        sendPayload({ text: selectedPayload.text }).catch((err) => {
-          setErrorMsg(err.message);
-        });
+    const candidate = initialOtp || initialRoomCode;
+    if (candidate && !hasAutoReceivedRef.current) {
+      const digits = candidate.replace(/\D/g, "").slice(0, 6);
+      if (digits.length === 6) {
+        hasAutoReceivedRef.current = true;
+        void (async () => {
+          try {
+            await receiveByOtp(digits);
+            setCompletedResult({ files: ["Downloaded transfer"] });
+          } catch (err) {
+            setReceiveError(
+              err instanceof Error ? err.message : "Invalid or expired OTP. Please check the 6-digit code."
+            );
+          }
+        })();
       }
     }
-  }, [rtcRole, isConnected, progress.status, selectedPayload, sendFiles, sendPayload]);
+  }, [initialOtp, initialRoomCode, receiveByOtp]);
 
-  // Receiver session start
-  const handleStartReceiver = useCallback(
-    async (codeToUse?: string) => {
-      const code = normalizeRoomCode(codeToUse || inputCode);
-      if (!isValidRoomCode(code)) {
-        setErrorMsg("Please enter a valid room PIN, Mobile Number, or Keyword.");
-        return;
-      }
-
-      try {
-        setIsConnecting(true);
-        setErrorMsg(null);
-        pollRelay(code);
-        await startReceiver(code);
-      } catch (err) {
-        setErrorMsg(err instanceof Error ? err.message : "Failed to join room. Verify key & retry.");
-      } finally {
-        setIsConnecting(false);
-      }
-    },
-    [inputCode, startReceiver, pollRelay]
-  );
-
-  // Stop polling relay when WebRTC connection succeeds
-  useEffect(() => {
-    if (isConnected) {
-      stopPolling();
+  const handleSend = async () => {
+    if (!canSend) return;
+    try {
+      await startRelaySend(selectedPayload.files, selectedPayload.text);
+    } catch {
+      // Error handled by hook
     }
-  }, [isConnected, stopPolling]);
-
-  // Auto-connect receiver ONCE if initialRoomCode was passed in URL query param (?room=123456)
-  useEffect(() => {
-    if (
-      initialRoomCode &&
-      isValidRoomCode(normalizeRoomCode(initialRoomCode)) &&
-      !hasAutoConnectedRef.current
-    ) {
-      hasAutoConnectedRef.current = true;
-      const clean = normalizeRoomCode(initialRoomCode);
-      const timer = setTimeout(() => {
-        handleStartReceiver(clean);
-      }, 50);
-      return () => clearTimeout(timer);
-    }
-  }, [initialRoomCode, handleStartReceiver]);
-
-  const handleScannerSuccess = (scannedCode: string) => {
-    if (scannedCode.includes("#otp=") && typeof window !== "undefined") {
-      const hashMatch = scannedCode.match(/#otp=[0-9\s-]+/i);
-      if (hashMatch) {
-        window.location.hash = hashMatch[0];
-      }
-    } else if (scannedCode.includes("#rc=") && typeof window !== "undefined") {
-      const hashMatch = scannedCode.match(/#rc=[A-Za-z0-9_-]+/i);
-      if (hashMatch) {
-        window.location.hash = hashMatch[0];
-      }
-    }
-    const clean = normalizeRoomCode(scannedCode);
-    setInputCode(clean);
-    handleStartReceiver(clean);
   };
 
   const handleReset = () => {
-    hasAutoConnectedRef.current = true;
-    stopPolling();
     cancelRelay();
-    cleanup();
-    setErrorMsg(null);
-    if (role === "send") {
-      startSender().catch(() => {});
+    setSelectedPayload({ files: [], text: "" });
+    setReceiveError(null);
+    setCompletedResult(null);
+  };
+
+  const handleScannerSuccess = (scanned: string) => {
+    setIsScannerOpen(false);
+    setReceiveError(null);
+    const match = scanned.match(/#otp=([0-9\s-]+)/i) || scanned.match(/[?&]otp=([0-9\s-]+)/i);
+    const rawDigits = match ? match[1].replace(/\D/g, "") : scanned.replace(/\D/g, "");
+    if (rawDigits.length === 6) {
+      setInputOtp(`${rawDigits.slice(0, 3)} ${rawDigits.slice(3)}`);
+      handleReceive(rawDigits);
+    } else {
+      setReceiveError("Invalid QR Code: No 6-digit OTP found.");
     }
   };
 
-  const handleRoleChange = (newRole: TransferRole) => {
-    if (newRole !== role) {
-      cleanup();
-      setRole(newRole);
-      setErrorMsg(null);
+  const activeOtp = otpCode || relayCode || "";
+  const cleanDigits = activeOtp.replace(/\D/g, "");
+  const formattedOtpDisplay =
+    cleanDigits.length === 6 ? `${cleanDigits.slice(0, 3)} ${cleanDigits.slice(3)}` : activeOtp;
+
+  const origin =
+    typeof window !== "undefined" && window.location.origin
+      ? window.location.origin
+      : "https://quicksend.vercel.app";
+  const directLink = qrUrl || `${origin}/#otp=${cleanDigits}`;
+
+  const handleCopyOtp = async () => {
+    try {
+      await navigator.clipboard.writeText(formattedOtpDisplay);
+      setCopiedOtp(true);
+      setTimeout(() => setCopiedOtp(false), 2000);
+    } catch {
+      // Ignore clipboard fallback
+    }
+  };
+
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(directLink);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    } catch {
+      // Ignore clipboard fallback
+    }
+  };
+
+  const handleCopyCompletedText = async () => {
+    if (completedResult?.text) {
+      try {
+        await navigator.clipboard.writeText(completedResult.text);
+        setCopiedCompletedText(true);
+        setTimeout(() => setCopiedCompletedText(false), 2000);
+      } catch {
+        // Ignore clipboard fallback
+      }
     }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* 1. TOP ROLE SWITCHER */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pb-4 border-b border-[var(--border-hairline)]">
+      <div className="flex items-center justify-between pb-3 border-b border-[var(--border-hairline)]">
         <div>
           <h3 className="font-bold text-base text-[var(--text)]">
             {role === "send" ? "Send Files or Text" : "Receive Files"}
           </h3>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
             {role === "send"
-              ? "Share via instant QR code or 6-digit PIN"
-              : "Scan sender's QR code or enter their PIN"}
+              ? "Upload and share with a simple 6-digit OTP or QR code"
+              : "Enter 6-digit OTP or scan sender's QR code"}
           </p>
         </div>
 
-        {/* Role selector */}
         <SegmentedControl
           ariaLabel="Transfer Role"
           value={role}
-          onChange={(val) => handleRoleChange(val as TransferRole)}
+          onChange={(val) => {
+            setRole(val as "send" | "receive");
+            setReceiveError(null);
+          }}
           options={[
             { value: "send", label: "Send" },
             { value: "receive", label: "Receive" },
@@ -304,482 +216,344 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
         />
       </div>
 
-      {/* Error Banner */}
-      {errorMsg && (
-        <div className="flex items-start gap-2.5 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200/80 dark:border-red-800/60 text-red-800 dark:text-red-300 text-xs">
-          <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-red-500" />
-          <span>{errorMsg}</span>
-        </div>
-      )}
-
-      {/* Subtle TURN Relay Notice */}
-      {hasTurn === false && (
-        <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] text-[var(--text-muted)] text-xs">
-          <AlertCircle className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
-          <span>TURN relay not configured — works on same Wi-Fi; 4G mobile data may require TURN.</span>
-        </div>
-      )}
-
-      {/* 2. SENDER VIEW */}
+      {/* 2. TAB 1: SEND VIEW */}
       {role === "send" && (
-        <div className="space-y-6">
-          {/* STEP 1: SELECT FILES OR TEXT */}
-          <div className="space-y-2">
-            <span className="text-xs font-semibold text-[var(--text)] block">
-              1. Select Files or Text to Send
-            </span>
-            <Dropzone onSelectionChange={setSelectedPayload} />
-            <EstimateBadge
-              channel="internet"
-              totalBytes={getPayloadBytes(selectedPayload.files, selectedPayload.text)}
-            />
-
-            {Boolean(relayStatus?.available) &&
-              (selectedPayload.files.length > 0 || selectedPayload.text.trim().length > 0) && (
-                <div className="space-y-3 pt-1">
-                  {!showRelayConsent && relayState === "idle" && (
-                    <button
-                      type="button"
-                      onClick={() => setShowRelayConsent(true)}
-                      className="w-full py-2.5 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] hover:bg-[var(--surface-muted)] text-[var(--text)] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
-                    >
-                      <Lock className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                      <span>Send via encrypted cloud relay</span>
-                    </button>
-                  )}
-
-                  {showRelayConsent && relayState === "idle" && (
-                    <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3 animate-in fade-in">
-                      <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                        This uploads an encrypted copy to temporary cloud storage. It is deleted after download or within 24 hours. (up to{" "}
-                        {formatBytes(relayStatus?.maxFileBytes || 786432000)} per file)
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowRelayConsent(false);
-                            if (roomCode) {
-                              startRelayUpload(roomCode, selectedPayload.files, selectedPayload.text);
-                            }
-                          }}
-                          className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-semibold text-xs cursor-pointer transition-colors"
-                        >
-                          Continue
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowRelayConsent(false)}
-                          className="px-4 py-2 rounded-xl border border-[var(--border-hairline)] hover:bg-[var(--surface-muted)] text-[var(--text)] font-semibold text-xs cursor-pointer transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {(relayState === "encrypting" || relayState === "uploading" || relayState === "registering") && (
-                    <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3 text-center animate-in fade-in">
-                      <div className="flex items-center justify-between text-xs font-medium text-[var(--text)]">
-                        <span>
-                          {relayState === "encrypting"
-                            ? "Encrypting with client key..."
-                            : relayState === "registering"
-                            ? "Registering encrypted transfer..."
-                            : chunksTotal > 0
-                            ? `Uploading chunk ${Math.min(chunksDone + 1, chunksTotal)} of ${chunksTotal}, ${formatBytes(uploadedBytes)} of ${formatBytes(relayTotalBytes)}`
-                            : `Uploading ${formatBytes(uploadedBytes)} of ${formatBytes(relayTotalBytes)}`}
-                        </span>
-                        <span className="font-mono">{relayProgress}%</span>
-                      </div>
-                      <div className="w-full bg-[var(--surface)] h-2 rounded-full overflow-hidden border border-[var(--border-hairline)]">
-                        <div
-                          className="bg-[var(--accent)] h-full transition-all duration-300"
-                          style={{ width: `${relayProgress}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-end pt-1">
-                        <button
-                          type="button"
-                          onClick={() => cancelRelay(roomCode || undefined)}
-                          className="px-3 py-1.5 rounded-xl border border-[var(--border-hairline)] hover:bg-[var(--surface-muted)] text-[var(--text-muted)] hover:text-[var(--text)] text-xs font-semibold cursor-pointer transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {relayState === "ready" && relayCode && (
-                    <div className="p-5 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3 text-center animate-in fade-in">
-                      <span className="text-xs font-semibold text-[var(--text-muted)] block">
-                        Encrypted Cloud Relay Code
-                      </span>
-                      <div className="text-2xl font-mono font-bold tracking-wider text-[var(--text)] select-all">
-                        {relayCode}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(relayCode);
-                          setCopiedRelayCode(true);
-                          setTimeout(() => setCopiedRelayCode(false), 2000);
-                        }}
-                        className="mx-auto py-2 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] hover:bg-[var(--surface-muted)] text-xs font-semibold text-[var(--text)] flex items-center gap-1.5 cursor-pointer"
-                      >
-                        {copiedRelayCode ? (
-                          <Check className="h-3.5 w-3.5" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" />
-                        )}
-                        <span>{copiedRelayCode ? "Copied!" : "Copy Code"}</span>
-                      </button>
-                      <p className="text-xs text-[var(--text-muted)]">
-                        Receiver enters PIN {formatRoomCode(roomCode || "")}, then this relay code.
-                      </p>
-                    </div>
-                  )}
-
-                  {relayError && (
-                    <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs">
-                      {relayError}
-                    </div>
-                  )}
-                </div>
-              )}
-          </div>
-
-          {/* STEP 2: PAIRING METHOD & LIVE QR / PIN */}
-          <div className="p-6 rounded-3xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-5">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-[var(--text)] block">
-                2. Receiver Connects via QR or PIN
-              </span>
-              <span className="text-[11px] text-[var(--text-muted)]">
-                Scan QR or type the code on receiving device
-              </span>
-            </div>
-
-            {/* Pairing Method Selector */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-[var(--text-muted)]">
-                  Pairing Key Method
-                </span>
-                {keyStrategy === "auto" && (
-                  <button
-                    type="button"
-                    onClick={handleRefreshAutoPin}
-                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--accent)] hover:underline cursor-pointer"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    <span>New Random PIN</span>
-                  </button>
-                )}
-              </div>
-
-              <SegmentedControl
-                ariaLabel="Pairing Method"
-                value={keyStrategy}
-                onChange={(val) => handleKeyStrategyChange(val as KeyStrategy)}
-                options={[
-                  { value: "auto", label: "Auto PIN" },
-                  { value: "phone", label: "Mobile No." },
-                  { value: "keyword", label: "Keyword" },
-                ]}
-              />
-
-              {/* Mobile Number Sub-Input */}
-              {keyStrategy === "phone" && (
-                <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] space-y-2.5 animate-in fade-in">
-                  <label className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
-                    <Phone className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                    <span>Sender Mobile Number</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={customSenderKey}
-                      onChange={(e) => setCustomSenderKey(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleApplyCustomKey(customSenderKey)}
-                      placeholder="e.g. 01712345678"
-                      className="flex-1 p-2.5 text-xs font-mono rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] placeholder:text-[var(--text-muted)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleApplyCustomKey(customSenderKey)}
-                      className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] text-xs font-semibold cursor-pointer transition-colors"
-                    >
-                      Set Number
-                    </button>
-                  </div>
+        <div className="space-y-5">
+          {/* STEP 1: Select files/text (before clicking Send) */}
+          {relayState === "idle" && (
+            <div className="space-y-4">
+              {relayError && (
+                <div className="flex items-center gap-2 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                  <span>{relayError}</span>
                 </div>
               )}
 
-              {/* Keyword Sub-Input */}
-              {keyStrategy === "keyword" && (
-                <div className="p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] space-y-2.5 animate-in fade-in">
-                  <label className="text-xs font-semibold text-[var(--text)] flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-[var(--text-muted)]" />
-                    <span>Custom Secret Keyword</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={customSenderKey}
-                      onChange={(e) => setCustomSenderKey(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleApplyCustomKey(customSenderKey)}
-                      placeholder="e.g. HR998877 or LAB2026"
-                      className="flex-1 p-2.5 text-xs font-mono uppercase font-bold rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] placeholder:text-[var(--text-muted)]"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleApplyCustomKey(customSenderKey)}
-                      className="px-4 py-2 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] text-xs font-semibold cursor-pointer transition-colors"
-                    >
-                      Set Keyword
-                    </button>
-                  </div>
-                </div>
+              <Dropzone onSelectionChange={setSelectedPayload} />
+
+              <EstimateBadge channel="internet" totalBytes={payloadTotalBytes} />
+
+              {hasOversizedFile && (
+                <p className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                  Files over 750 MB? Use Same Wi-Fi, Hotspot, or Cable.
+                </p>
               )}
-            </div>
 
-            {/* LIVE SCANNABLE QR CODE & ROOM PIN DISPLAY */}
-            {roomCode ? (
-              <div className="pt-2 flex flex-col items-center space-y-4">
-                <QRCodeDisplay
-                  code={roomCode}
-                  url={
-                    qrUrl
-                      ? qrUrl
-                      : relayCode && roomCode
-                      ? `${typeof window !== "undefined" && window.location.origin ? window.location.origin : "https://quicksend.vercel.app"}/?room=${roomCode}#rc=${relayCode}`
-                      : undefined
-                  }
-                />
-
-                {/* Status Pill */}
-                <div className="flex items-center gap-2.5 px-4 py-2 rounded-full bg-[var(--surface)] border border-[var(--border-hairline)] text-xs font-mono text-[var(--text)] shadow-xs">
-                  <span className="relative flex h-2 w-2">
-                    <span
-                      className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                        isConnected ? "bg-emerald-400" : "bg-indigo-400"
-                      }`}
-                    />
-                    <span
-                      className={`relative inline-flex rounded-full h-2 w-2 ${
-                        isConnected ? "bg-emerald-500" : "bg-indigo-500"
-                      }`}
-                    />
-                  </span>
-                  <span>
-                    {isConnected
-                      ? "Peer Connected! Ready to transfer."
-                      : `Waiting for receiver to connect... (${formatRoomCode(roomCode)})`}
-                  </span>
-                </div>
-
-                {/* Broker Notice */}
-                {brokerNotice && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200/80 dark:border-amber-800/60 text-amber-800 dark:text-amber-300 text-[11px] font-mono">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                    <span>{brokerNotice}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="py-8 flex flex-col items-center justify-center text-center space-y-2">
-                <RefreshCw className="w-5 h-5 text-[var(--text-muted)] animate-spin" />
-                <span className="text-xs text-[var(--text-muted)]">Creating secure session...</span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* 3. RECEIVER VIEW */}
-      {role === "receive" && (
-        <div className="space-y-6 max-w-md mx-auto">
-          {!roomCode ? (
-            <div className="space-y-5">
-              {/* Option 1: Prominent Scan QR Button */}
               <button
                 type="button"
-                onClick={() => setIsScannerOpen(true)}
-                className="w-full py-4 px-6 rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+                onClick={handleSend}
+                disabled={!canSend}
+                className="w-full py-3.5 px-6 rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-sm shadow-xs transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2"
               >
-                <Camera className="h-4 w-4" />
-                <span>Scan Sender&apos;s QR Code</span>
+                <Send className="h-4 w-4" />
+                <span>Send</span>
               </button>
+            </div>
+          )}
 
-              {/* Divider */}
-              <div className="relative flex py-1 items-center">
-                <div className="flex-grow border-t border-[var(--border-hairline)]" />
-                <span className="flex-shrink mx-4 text-[var(--text-muted)] text-xs font-mono">
-                  OR ENTER CODE
-                </span>
-                <div className="flex-grow border-t border-[var(--border-hairline)]" />
+          {/* STEP 2: Uploading chunks progress */}
+          {(relayState === "encrypting" || relayState === "uploading" || relayState === "registering") && (
+            <div className="p-6 rounded-3xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-4 text-center animate-in fade-in">
+              <div className="space-y-1">
+                <h4 className="font-bold text-sm text-[var(--text)]">Sending Transfer</h4>
+                <p className="text-xs text-[var(--text-muted)] font-mono">
+                  {relayState === "encrypting"
+                    ? "Encrypting with client key..."
+                    : relayState === "registering"
+                    ? "Finalizing transfer..."
+                    : `Preparing & sending chunk ${Math.min(chunksDone + 1, chunksTotal || 1)} of ${chunksTotal || 1} • ${formatBytes(uploadedBytes)} / ${formatBytes(totalBytes)}`}
+                </p>
               </div>
 
-              {/* Option 2: Enter Room Code / PIN */}
-              <div className="p-6 rounded-3xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3.5 text-center">
-                <div className="h-10 w-10 mx-auto rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-2xs flex items-center justify-center text-[var(--text)]">
-                  <KeyRound className="h-5 w-5" />
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-sm text-[var(--text)]">
-                    Enter Pairing Code or PIN
-                  </h4>
-                  <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
-                    Enter 6-digit PIN, mobile number, or secret keyword
-                  </p>
-                </div>
-
-                {/* Pairing Method Selector for Receiver */}
-                <SegmentedControl
-                  ariaLabel="Receiver Pairing Method"
-                  value={receiverStrategy}
-                  onChange={(val) => {
-                    setReceiverStrategy(val as KeyStrategy);
-                    setInputCode("");
-                    setErrorMsg(null);
-                  }}
-                  options={[
-                    { value: "auto", label: "Auto PIN" },
-                    { value: "phone", label: "Mobile No." },
-                    { value: "keyword", label: "Keyword" },
-                  ]}
+              <div className="w-full bg-[var(--surface)] h-2.5 rounded-full overflow-hidden border border-[var(--border-hairline)]">
+                <div
+                  className="bg-[var(--accent)] h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${progress}%` }}
                 />
+              </div>
 
-                <div className="space-y-2.5">
-                  <input
-                    type={receiverStrategy === "auto" || receiverStrategy === "phone" ? "tel" : "text"}
-                    inputMode={receiverStrategy === "auto" ? "numeric" : receiverStrategy === "phone" ? "tel" : "text"}
-                    maxLength={receiverStrategy === "auto" ? 7 : receiverStrategy === "phone" ? 15 : 20}
-                    value={inputCode}
-                    onChange={(e) => {
-                      const raw = e.target.value;
-                      if (receiverStrategy === "auto") {
-                        if (/[a-zA-Z]/.test(raw)) {
-                          setReceiverStrategy("keyword");
-                          setInputCode(raw.toUpperCase());
-                          return;
-                        }
-                        const digits = raw.replace(/\D/g, "").slice(0, 6);
-                        if (raw.replace(/\D/g, "").length > 6) {
-                          setReceiverStrategy("phone");
-                          setInputCode(raw.replace(/\D/g, "").slice(0, 15));
-                          return;
-                        }
-                        const formatted = digits.length > 3 ? `${digits.slice(0, 3)} ${digits.slice(3)}` : digits;
-                        setInputCode(formatted);
-                        if (digits.length === 6) {
-                          handleStartReceiver(digits);
-                        }
-                      } else if (receiverStrategy === "phone") {
-                        const digits = raw.replace(/[^\d+]/g, "").slice(0, 15);
-                        setInputCode(digits);
-                      } else {
-                        setInputCode(raw.toUpperCase());
-                      }
-                    }}
-                    onKeyDown={(e) => e.key === "Enter" && isValidRoomCode(inputCode) && handleStartReceiver()}
-                    placeholder={
-                      receiverStrategy === "auto"
-                        ? "123 456"
-                        : receiverStrategy === "phone"
-                        ? "e.g. 01712345678"
-                        : "e.g. HR998877"
-                    }
-                    className="w-full py-3 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] text-center font-mono font-bold text-base tracking-wider focus:outline-none focus:ring-2 focus:ring-[var(--accent)] placeholder:font-normal placeholder:tracking-normal placeholder:text-[var(--text-muted)]"
-                  />
+              <span className="font-mono text-xs font-semibold text-[var(--text-muted)]">
+                {progress}%
+              </span>
 
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="px-4 py-2 rounded-xl border border-[var(--border-hairline)] hover:bg-[var(--surface-muted)] text-[var(--text-muted)] hover:text-[var(--text)] text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3: Ready — Centered QR code + ONE 6-digit OTP box */}
+          {relayState === "ready" && cleanDigits.length === 6 && (
+            <div className="p-6 rounded-3xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] flex flex-col items-center space-y-5 text-center animate-in fade-in">
+              {/* Centered QR Code */}
+              <div className="p-4 bg-white rounded-2xl shadow-sm border border-[var(--border-hairline)]">
+                <QRCodeSVG
+                  value={directLink}
+                  size={180}
+                  level="M"
+                  includeMargin={false}
+                  className="rounded-lg"
+                />
+              </div>
+
+              {/* Single Clean 6-Digit Numeric OTP Box */}
+              <div className="space-y-1.5 w-full max-w-xs">
+                <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider block">
+                  6-Digit OTP
+                </span>
+                <div className="flex items-center justify-center gap-3 py-2.5 px-6 rounded-2xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-2xs">
+                  <span className="font-mono text-3xl sm:text-4xl font-extrabold tracking-widest text-[var(--accent)] tabular-nums">
+                    {formattedOtpDisplay}
+                  </span>
                   <button
                     type="button"
-                    onClick={() => handleStartReceiver()}
-                    disabled={isConnecting || !isValidRoomCode(inputCode)}
-                    className="w-full py-3 px-6 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2"
+                    onClick={handleCopyOtp}
+                    className="p-2 rounded-full text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
+                    title="Copy OTP"
                   >
-                    {isConnecting ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 animate-spin" />
-                        <span>Connecting...</span>
-                      </>
+                    {copiedOtp ? (
+                      <Check className="h-5 w-5 text-emerald-500" />
                     ) : (
-                      <>
-                        <span>Connect to Sender</span>
-                        <ArrowRight className="h-4 w-4" />
-                      </>
+                      <Copy className="h-5 w-5" />
                     )}
                   </button>
                 </div>
               </div>
-            </div>
-          ) : (
-            <div className="space-y-4 text-center py-4">
-              <div className="p-8 rounded-3xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] flex flex-col items-center gap-3.5">
-                <div className="h-12 w-12 rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] shadow-2xs flex items-center justify-center text-[var(--text)]">
-                  <Users className="h-6 w-6 animate-pulse" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-base text-[var(--text)]">
-                    Connecting to &ldquo;{formatRoomCode(roomCode)}&rdquo;
-                  </h4>
-                  <p className="text-xs text-[var(--text-muted)] mt-1">
-                    {isConnected
-                      ? "Connected to sender! Awaiting payload..."
-                      : "Exchanging WebRTC signaling..."}
-                  </p>
-                </div>
-              </div>
 
+              {/* Quick Action Buttons */}
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleCopyLink}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-[var(--border-hairline)] bg-[var(--surface)] hover:bg-[var(--surface-subtle)] font-semibold text-xs text-[var(--text)] transition-all shadow-2xs cursor-pointer"
+                >
+                  {copiedLink ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-500" />
+                  ) : (
+                    <LinkIcon className="h-3.5 w-3.5" />
+                  )}
+                  <span>{copiedLink ? "Link Copied" : "Copy Direct Link"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full border border-[var(--border-hairline)] hover:bg-[var(--surface-subtle)] font-medium text-xs text-[var(--text-muted)] hover:text-[var(--text)] transition-all cursor-pointer"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Send another</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Fallback error if send failed */}
+          {relayState === "error" && (
+            <div className="p-6 rounded-3xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-4 text-center animate-in fade-in">
+              <div className="flex items-center justify-center gap-2 text-red-600 dark:text-red-400 text-xs font-semibold">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{relayError || "Upload failed"}</span>
+              </div>
               <button
                 type="button"
                 onClick={handleReset}
-                className="text-xs text-[var(--text-muted)] hover:text-[var(--text)] underline cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-[var(--accent)] text-[var(--bg)] font-semibold text-xs transition-colors cursor-pointer"
               >
-                Disconnect &amp; Leave
+                Try Again
               </button>
             </div>
           )}
         </div>
       )}
 
-      {/* Real-time Connection Diagnostics */}
-      <ConnectionDiagnostics
-        diagnostics={diagnostics}
-        debugLog={debugLog}
-      />
+      {/* 3. TAB 2: RECEIVE VIEW */}
+      {role === "receive" && (
+        <div className="space-y-5 max-w-md mx-auto">
+          {/* DOWNLOADING STATE */}
+          {isDownloading ? (
+            <div className="p-6 rounded-3xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-4 text-center animate-in fade-in">
+              <div className="space-y-1">
+                <h4 className="font-bold text-sm text-[var(--text)]">Downloading Transfer</h4>
+                <p className="text-xs text-[var(--text-muted)] font-mono">
+                  Downloading {formatBytes(downloadedBytes)} of {formatBytes(totalBytes)}
+                </p>
+              </div>
+
+              <div className="w-full bg-[var(--surface)] h-2.5 rounded-full overflow-hidden border border-[var(--border-hairline)]">
+                <div
+                  className="bg-[var(--accent)] h-full transition-all duration-300 rounded-full"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+
+              <span className="font-mono text-xs font-semibold text-[var(--text-muted)]">
+                {progress}%
+              </span>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleReset}
+                  className="px-4 py-2 rounded-xl border border-[var(--border-hairline)] hover:bg-[var(--surface-muted)] text-[var(--text-muted)] hover:text-[var(--text)] text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : completedResult ? (
+            /* COMPLETED STATE */
+            <div className="p-6 rounded-3xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-4 text-center animate-in fade-in">
+              <div className="h-12 w-12 mx-auto rounded-2xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6" />
+              </div>
+
+              <div className="space-y-1">
+                <h4 className="font-bold text-base text-[var(--text)]">Transfer Complete!</h4>
+                <p className="text-xs text-[var(--text-muted)]">
+                  {completedResult.files.length > 0
+                    ? "Your files were received and saved to downloads."
+                    : "Text snippet received successfully."}
+                </p>
+              </div>
+
+              {completedResult.text && (
+                <div className="space-y-2 text-left">
+                  <div className="p-3 max-h-32 overflow-y-auto rounded-xl bg-[var(--surface)] border border-[var(--border-hairline)] font-mono text-xs whitespace-pre-wrap break-all text-[var(--text)]">
+                    {completedResult.text}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCopyCompletedText}
+                    className="w-full py-2 px-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-semibold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                  >
+                    {copiedCompletedText ? (
+                      <Check className="h-3.5 w-3.5" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                    <span>{copiedCompletedText ? "Copied Text" : "Copy to Clipboard"}</span>
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCompletedResult(null);
+                  setInputOtp("");
+                }}
+                className="w-full py-2.5 px-4 rounded-xl border border-[var(--border-hairline)] hover:bg-[var(--surface)] text-[var(--text)] font-semibold text-xs transition-colors cursor-pointer"
+              >
+                Receive another
+              </button>
+            </div>
+          ) : (
+            /* DEFAULT RECEIVE INPUT & SCAN SCREEN */
+            <div className="space-y-5">
+              {/* Inline dismissible error banner */}
+              {(receiveError || relayError) && (
+                <div className="flex items-center justify-between gap-2 p-3.5 rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-xs animate-in fade-in">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                    <span>{receiveError || relayError}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setReceiveError(null)}
+                    className="p-1 rounded-md hover:bg-red-200/50 dark:hover:bg-red-800/50 text-red-600 dark:text-red-300 cursor-pointer"
+                    aria-label="Dismiss error"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* Prominent Scan QR Code camera button */}
+              <button
+                type="button"
+                onClick={() => setIsScannerOpen(true)}
+                className="w-full py-4 px-6 rounded-2xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all flex items-center justify-center gap-2.5 cursor-pointer"
+              >
+                <Camera className="h-4 w-4" />
+                <span>Scan QR Code</span>
+              </button>
+
+              {/* Clean divider */}
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-[var(--border-hairline)]" />
+                <span className="flex-shrink mx-4 text-[var(--text-muted)] text-xs font-mono uppercase tracking-wider">
+                  or enter 6-digit OTP
+                </span>
+                <div className="flex-grow border-t border-[var(--border-hairline)]" />
+              </div>
+
+              {/* 6-Digit OTP Input Card */}
+              <div className="p-6 rounded-3xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3.5 text-center">
+                <div className="space-y-1">
+                  <label htmlFor="otp-input" className="font-bold text-sm text-[var(--text)] block">
+                    Enter 6-Digit Code
+                  </label>
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    Type the code shown on the sender device
+                  </p>
+                </div>
+
+                <div className="space-y-2.5">
+                  <input
+                    id="otp-input"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={7}
+                    value={inputOtp}
+                    onChange={(e) => {
+                      setReceiveError(null);
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 6);
+                      const formatted =
+                        digits.length > 3 ? `${digits.slice(0, 3)} ${digits.slice(3)}` : digits;
+                      setInputOtp(formatted);
+                      if (digits.length === 6) {
+                        handleReceive(digits);
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        const digits = inputOtp.replace(/\D/g, "");
+                        if (digits.length === 6) {
+                          handleReceive(digits);
+                        }
+                      }
+                    }}
+                    placeholder="482 915"
+                    className="w-full py-3.5 px-4 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface)] text-[var(--text)] text-center font-mono font-bold text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-[var(--accent)] placeholder:font-normal placeholder:tracking-normal placeholder:text-sm placeholder:text-[var(--text-muted)]"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => handleReceive()}
+                    disabled={inputOtp.replace(/\D/g, "").length !== 6 || isDownloading}
+                    className="w-full py-3 px-6 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-bold text-xs shadow-xs transition-all disabled:opacity-40 cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <ArrowDownToLine className="h-4 w-4" />
+                    <span>Receive</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* QR Scanner Camera Modal */}
       <QRScannerModal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScanSuccess={handleScannerSuccess}
-      />
-
-      {/* Live Transfer & Acceptance Modal */}
-      <TransferModal
-        isOpen={isModalOpen || Boolean(relayPayload)}
-        progress={enrichedProgress}
-        roomCode={roomCode || inputCode}
-        onAccept={acceptIncomingTransfer}
-        onReject={rejectIncomingTransfer}
-        onClose={handleReset}
-        onRelay={() => {
-          if (roomCode) {
-            startRelayUpload(roomCode, selectedPayload.files, selectedPayload.text);
-          }
-        }}
-        isRelayAvailable={Boolean(relayStatus?.available)}
-        relayPayload={relayPayload}
-        onDownloadRelay={(code) => downloadRelay(relayPayload!, code, roomCode || inputCode)}
-        isDownloadingRelay={isDownloadingRelay}
-        relayError={relayError}
-        relayDownloadedBytes={downloadedBytes}
-        relayTotalBytes={relayTotalBytes}
-        relayProgress={relayProgress}
       />
     </div>
   );

@@ -889,3 +889,14 @@
   - `startRelaySend(files, text)`: generates one 6-digit numeric OTP, derives zero-knowledge room code via `deriveRoomIdFromOtp()`, derives AES-GCM key from `otp6 + salt`, uploads 16 MiB chunks with live metrics (`chunksDone`, `chunksTotal`, `uploadedBytes`, `totalBytes`), and exposes `otpCode` (`"123-456"`) and QR URL `${origin}/#otp=${otp6}`.
   - `receiveByOtp(rawInput)`: parses 6-digit OTP from input or QR `#otp=` fragment, derives zero-knowledge room code, retrieves manifest, downloads & decrypts chunks with disk streaming for files > 100 MB, logs history, and executes `/api/relay/complete` deletion. Plain-English error on invalid/expired OTP (`"Invalid or expired OTP. Please check the 6-digit code."`).
 - [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).
+
+### Fix 14 (2026-11-19): Mode 1 zero-WebRTC step-by-step OTP wizard redesign
+- [x] Redesigned `src/components/InternetSharingCard.tsx` as a clean 2-tab zero-scroll wizard:
+  - Completely removed WebRTC, PeerJS ICE negotiation, STUN/TURN connection errors, strategy toggles (Auto/Phone/Keyword), and technical jargon.
+  - **Tab 1 (Send):** Step 1 (Pick files/text via Dropzone with 750 MB size note and primary Send button), Step 2 (Uploading card with live chunk progress and Cancel button), Step 3 (Centered QR code encoding `${origin}/#otp=${otp6}`, big formatted 6-digit numeric OTP `482 915`, 1-click Copy and Copy Link buttons, and subtle Send another button).
+  - **Tab 2 (Receive):** Prominent Scan QR Code camera button, clean divider, auto-formatting numeric OTP input (`482 915`) with auto-submission on 6 digits, downloading progress card with Cancel button, completed file list with text copy and Receive another button, and inline dismissible error banner.
+- [x] Hash-based auto-join in `src/components/ModeSelector.tsx`:
+  - Detects `#otp=123456` in `window.location.hash` on initial load, auto-switches to Mode 1 in Receive mode, passes the initial OTP to `InternetSharingCard`, and cleans the hash via `history.replaceState`.
+- [x] QR scanner support in `src/components/QRScannerModal.tsx`:
+  - Preserves `#otp=` hash URLs and raw 6-digit numeric strings when calling `onScanSuccess`.
+- [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).

@@ -56,7 +56,7 @@ flowchart TD
         ThemeTgl["ThemeToggle.tsx (Tactile Light/Dark Mode Switcher)"]
         HistoryMod["TransferHistoryModal.tsx (Session Transfer Drawer)"]
         SWReg["ServiceWorkerRegister.tsx (PWA /sw.js Registration)"]
-        InternetCard["InternetSharingCard.tsx (Mode 1 Controller: Dual-Transport PIN/QR)"]
+        InternetCard["InternetSharingCard.tsx (Mode 1 Controller: Zero-Knowledge OTP/QR Cloud Relay)"]
         SameNetCard["SameNetworkCard.tsx (Mode 2 Controller: Local Radar & Device Beaming)"]
         HotspotCard["HotspotAssistantCard.tsx (Mode 3 Controller: Hotspot QR & Wizard)"]
         NearbyCard["NearbyShareCard.tsx (Mode 4 Controller: Bluetooth & Native Quick Share)"]
@@ -324,12 +324,12 @@ flowchart TD
 - **Exports:** `AppHeader(): JSX.Element`
 
 #### `src/components/ModeSelector.tsx`
-- **Purpose:** Clean, linear 6-channel workspace coordinator. In the default Home state, renders the transfer option tiles in a tactile responsive grid directly styled after the reference card aesthetic (soft surface, squircle icon, clean typography). Selecting any mode smoothly transitions into a focused workspace card with an "All Channels" return pill.
+- **Purpose:** Clean, linear 6-channel workspace coordinator. In the default Home state, renders the transfer option tiles in a tactile responsive grid directly styled after the reference card aesthetic (soft surface, squircle icon, clean typography). Selecting any mode smoothly transitions into a focused workspace card with an "All Channels" return pill. Automatically handles `#otp=` hash parameters on load to route into Mode 1 Receive mode.
 - **Exports:** `ModeSelector(): JSX.Element`
 
 #### `src/components/InternetSharingCard.tsx`
-- **Purpose:** Mode 1 Interactive Controller (Via Internet). Provides co-located scannable QR code and 6-digit PIN across both Send and Receive screens, flexible sender pairing strategies (Auto PIN, Mobile Number, Custom Keyword), real-time `<ConnectionDiagnostics />` telemetry, dynamic `/api/turn` warning banner, and opt-in "Send via encrypted cloud relay" fallback with client-side encryption and `#rc=` PIN fragment appending.
-- **Exports:** `InternetSharingCard({ initialRoomCode }: InternetSharingCardProps): JSX.Element`
+- **Purpose:** Mode 1 Interactive Controller (Via Internet). Clean 2-tab zero-scroll step-by-step wizard powered by zero-knowledge chunked cloud relay (`useRelayTransfer`). Send tab provides Dropzone file/text picker, live chunk progress upload, centered QR code encoding `#otp=`, and single 6-digit numeric OTP box with 1-click copy. Receive tab provides QR camera scanner, formatted 6-digit numeric input with auto-download, live download progress, and completed view.
+- **Exports:** `InternetSharingCard({ initialRoomCode, initialOtp }: InternetSharingCardProps): JSX.Element`
 
 #### `src/components/SameNetworkCard.tsx`
 - **Purpose:** Mode 2 Controller (Same Network Wi-Fi). Automatic local subnet radar with peer cards, visual avatar emojis, 1-tap beam requests, 4-digit pairing PIN backup for CGNAT/cross-IP environments, connected WebRTC transfer (`useWebRTC("same-network")`), and collapsible ConnectionDiagnostics.
