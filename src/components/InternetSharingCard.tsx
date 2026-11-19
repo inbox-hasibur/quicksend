@@ -70,6 +70,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
     chunksDone,
     chunksTotal,
     relayCode,
+    qrUrl,
     error: relayError,
     relayPayload,
     isDownloading: isDownloadingRelay,
@@ -241,7 +242,12 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
   }, [initialRoomCode, handleStartReceiver]);
 
   const handleScannerSuccess = (scannedCode: string) => {
-    if (scannedCode.includes("#rc=") && typeof window !== "undefined") {
+    if (scannedCode.includes("#otp=") && typeof window !== "undefined") {
+      const hashMatch = scannedCode.match(/#otp=[0-9\s-]+/i);
+      if (hashMatch) {
+        window.location.hash = hashMatch[0];
+      }
+    } else if (scannedCode.includes("#rc=") && typeof window !== "undefined") {
       const hashMatch = scannedCode.match(/#rc=[A-Za-z0-9_-]+/i);
       if (hashMatch) {
         window.location.hash = hashMatch[0];
@@ -346,7 +352,7 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                     <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] border border-[var(--border-hairline)] space-y-3 animate-in fade-in">
                       <p className="text-xs text-[var(--text-muted)] leading-relaxed">
                         This uploads an encrypted copy to temporary cloud storage. It is deleted after download or within 24 hours. (up to{" "}
-                        {formatBytes(relayStatus?.maxFileBytes || 209715200)} per file)
+                        {formatBytes(relayStatus?.maxFileBytes || 786432000)} per file)
                       </p>
                       <div className="flex gap-2">
                         <button
@@ -544,7 +550,9 @@ export function InternetSharingCard({ initialRoomCode }: InternetSharingCardProp
                 <QRCodeDisplay
                   code={roomCode}
                   url={
-                    relayCode && roomCode
+                    qrUrl
+                      ? qrUrl
+                      : relayCode && roomCode
                       ? `${typeof window !== "undefined" && window.location.origin ? window.location.origin : "https://quicksend.vercel.app"}/?room=${roomCode}#rc=${relayCode}`
                       : undefined
                   }

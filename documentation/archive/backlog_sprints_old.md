@@ -806,3 +806,86 @@
   - Verified `cancelRelay()` triggers `/api/relay/complete`.
   - Verified files over 100 MB invoke `createDiskStreamWriter()`.
   - Verified all 47 test suites (322/322 unit tests) pass, 0 ESLint warnings/errors, and clean Turbopack build.
+
+### Fix 13 (2026-11-19): 16 MiB chunks (up to 750 MB per file / 800 MB total) and single 6-digit numeric OTP
+- [x] Scaled chunk sizing and transfer capacity in `src/lib/relayLimits.ts`:
+  - `RELAY_CHUNK_BYTES = 16 * 1024 * 1024` (16 MiB chunks — cuts Upstash write ops by 4x while keeping browser memory bounded).
+  - `RELAY_MAX_FILE_BYTES = 750 * 1024 * 1024` (750 MiB per file, safely within 1 GB Upstash free limit).
+  - `RELAY_MAX_TRANSFER_BYTES = 800 * 1024 * 1024` (800 MiB total transfer).
+- [x] Expanded upload quotas in `src/app/api/relay/upload/route.ts`:
+  - Raised per-IP hourly byte rate limit to `2 * 1024 * 1024 * 1024` (2 GiB/hr).
+  - Raised default daily budget `RELAY_DAILY_BYTES` to `2 * 1024 * 1024 * 1024` (2 GiB/day) to support large chunked files (e.g. 665 MB).
+- [x] Added zero-knowledge 6-digit numeric OTP support in `src/lib/relayCrypto.ts`:
+  - `generateNumericOtp()`: crypto-random 6-digit numeric string formatted `"123-456"`.
+  - `normalizeNumericOtp(input)`: strips spaces/dashes and validates `/^\d{6}$/`.
+  - `deriveRoomIdFromOtp(otp6)`: computes `SHA-256("qs-room:" + otp6)` via Web Crypto and returns the first 16 lowercase hex characters (zero-knowledge room identifier; server never sees raw OTP).
+  - Updated `deriveRelayKey(code, saltBase64)` to seamlessly support both 6-digit numeric OTPs and legacy codes.
+- [x] Enhanced `useRelayTransfer.ts`:
+  - `startRelaySend(files, text)`: generates one 6-digit numeric OTP, derives zero-knowledge room code via `deriveRoomIdFromOtp()`, derives AES-GCM key from `otp6 + salt`, uploads 16 MiB chunks with live metrics (`chunksDone`, `chunksTotal`, `uploadedBytes`, `totalBytes`), and exposes `otpCode` (`"123-456"`) and QR URL `${origin}/#otp=${otp6}`.
+  - `receiveByOtp(rawInput)`: parses 6-digit OTP from input or QR `#otp=` fragment, derives zero-knowledge room code, retrieves manifest, downloads & decrypts chunks with disk streaming for files > 100 MB, logs history, and executes `/api/relay/complete` deletion. Plain-English error on invalid/expired OTP (`"Invalid or expired OTP. Please check the 6-digit code."`).
+- [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).
+
+### Fix 11 (2026-11-19): Chunked relay server route handlers and proxy security hardening
+- [x] Updated `src/app/api/relay/status/route.ts`:
+  - Returns `RELAY_MAX_FILE_BYTES` (200 MiB), `RELAY_MAX_TRANSFER_BYTES` (300 MiB), `RELAY_MAX_FILES` (5), `chunkBytes: RELAY_CHUNK_BYTES` (4 MiB), and `ttlMinutes: RELAY_TTL_MINUTES` (15) from `relayLimits.ts`.
+- [x] Hardened chunk upload route in `src/app/api/relay/upload/route.ts`:
+  - Accepts new `{ roomCode, rid, chunks: { path: string, size: number }[] }` payload with max 64 chunks per batch.
+  - Validates roomCode, rid (32-character hex), path with `isValidChunkPath`, and chunk sizes (1 byte to `RELAY_CHUNK_BYTES + 16`).
+  - Generates 10-minute signed upload URLs via `bucket.signedUploadUrl`.
+  - Byte-counter rate limiting: enforces at most 600 MB/hr per IP and configurable daily budget via `process.env.RELAY_DAILY_BYTES` (default 629145600 bytes) with HTTP 429 `"Relay daily limit reached"` and HTTP 503 when unconfigured.
+- [x] Secured manifest attachment in `src/app/api/relay/attach/route.ts`:
+  - POST accepts `{ roomCode, rid, salt, baseUrl, files, text? }`.
+  - Validates rid (32 hex), baseUrl via `isAllowedRelayUrl`, max 5 files, file ids (16 hex), max 200 MiB per file, chunkCount matching `ceil(size / 4MB)` (max 50), total size max 300 MiB, and name max 200 chars.
+  - GET returns verified manifest without storing or exposing encryption keys.
+- [x] Streamlined and secured file streaming route in `src/app/api/relay/file/route.ts`:
+  - Changed signature to `GET /api/relay/file?code=<roomCode>&f=<fileId>&i=<index>`.
+  - Validates file existence in stored room manifest and index < chunkCount.
+  - Constructs canonical path with `chunkPath` and fetches via `bucket.signedReadUrl(path)` (or verified baseUrl), completely eliminating SSRF risk by never fetching arbitrary query URLs.
+  - Enforces 600 requests per 10 minutes per IP rate limit.
+- [x] Hardened cleanup in `src/app/api/relay/complete/route.ts`:
+  - Deletes all chunk paths derived from verified stored manifest with `bucket.del`.
+  - Scans leftover prefix `relay/<roomCode>/<rid>/` via `bucket.list` to purge unattached chunks. Idempotent.
+- [x] Enhanced `isAllowedRelayUrl` in `src/lib/upstashBlob.ts` to support both full chunk URLs and root baseUrls on permitted storage providers.
+- [x] Updated automated test suites in `upload.test.ts` and `route.test.ts`:
+  - Verified rejection of bad paths, bad rids, oversized chunks, >64 chunks, byte limit overruns, chunkCount mismatches, totals > 300 MB, foreign baseUrls, unknown fileIds/indices, SSRF query URL isolation, and idempotent complete deletion.
+  - 47 test suites, 317/317 unit tests passing, 0 ESLint warnings/errors, and clean Turbopack build.
+
+### Fix 12 (2026-11-19): Chunked relay transfer client, error reporting, and UI progress
+- [x] Implemented chunked sender and receiver transfer pipeline in `src/hooks/useRelayTransfer.ts`:
+  - **Sender:** Validates file count, per-file limits, and transfer limits against `/api/relay/status`. Generates relay code, salt, and derives PBKDF2 key once. Batches chunk upload URL requests in groups of up to 32 chunks via `POST /api/relay/upload`. Reads and encrypts chunks on-demand via `file.slice()` + `encryptChunk()` with AES-GCM and AAD to maintain low memory usage. Performs PUT uploads with concurrency 3, retrying failed chunks up to 3 times with exponential backoff (500, 1000, 2000 ms). Pauses queue on offline (`navigator.onLine === false`) and resumes on `online` event. Attaches metadata manifest via `POST /api/relay/attach`.
+  - **Receiver:** Derives key once. Downloads chunks in sequential order with concurrency 2, attempting direct bucket fetch via `baseUrl + "/" + chunkPath` first, falling back to `/api/relay/file?code=&f=&i=` on network or CORS errors. Decrypts chunks with `decryptChunk()` (tampering or wrong code immediately halts with `"Wrong relay code"` without triggering `/api/relay/complete`). Automatically activates `diskStream.ts` streaming writer (`createDiskStreamWriter`) for files > 100 MB (`DISK_STREAM_THRESHOLD`) to bypass browser tab RAM limits; smaller files assemble Blob parts and auto-download. Logs transfer history with channel `"internet"`. Triggers `/api/relay/complete` only upon full transfer success.
+  - **Cancellation:** `cancelRelay()` aborts in-flight fetch operations via `AbortController` and issues `POST /api/relay/complete` cleanup.
+  - **State and Metrics:** Exposes `uploadedBytes`, `downloadedBytes`, `totalBytes`, `chunksDone`, `chunksTotal`, and detailed error reporting naming failed step and status code (e.g. `"Upload failed at chunk 7 of 25: HTTP 403"`, `"Could not reach storage (network or CORS)"`, `"Register failed: HTTP 429"`).
+- [x] Enhanced UI components:
+  - `src/components/InternetSharingCard.tsx`: Sender displays live chunk progress (`"Uploading chunk X of Y, A MB of B MB"`), percentage progress bar, and "Cancel" button. Relay consent line displays active file limit (`up to 200 MB per file`) while keeping consent phrasing, relay code display, and `#rc=` fragment intact. Passes download byte metrics to `TransferModal`.
+  - `src/components/TransferModal.tsx`: Receiver displays `"Downloading A MB of B MB"` with matching progress bar during relay decryption/downloading, and renders both chunked `files` and legacy `items` lists.
+- [x] Streamlined cryptography in `src/lib/relayCrypto.ts`:
+  - Refactored `encryptText()` and `decryptText()` to handle AES-GCM directly with 12-byte random IVs.
+  - Safely removed legacy unused `encryptBytes()` and `decryptBytes()` functions and associated tests.
+- [x] Comprehensive test coverage in `src/hooks/__tests__/useRelayTransfer.test.ts`:
+  - Verified 10 MiB file uploads as 3 chunks.
+  - Verified chunk failing twice then succeeding passes with backoff.
+  - Verified chunk failing 4 times reports formatted error text.
+  - Verified offline pauses and online event resumes transfer.
+  - Verified wrong code on first chunk throws `"Wrong relay code"` without calling `/api/relay/complete`.
+  - Verified `cancelRelay()` triggers `/api/relay/complete`.
+  - Verified files over 100 MB invoke `createDiskStreamWriter()`.
+  - Verified all 47 test suites (322/322 unit tests) pass, 0 ESLint warnings/errors, and clean Turbopack build.
+
+### Fix 13 (2026-11-19): 16 MiB chunks (up to 750 MB per file / 800 MB total) and single 6-digit numeric OTP
+- [x] Scaled chunk sizing and transfer capacity in `src/lib/relayLimits.ts`:
+  - `RELAY_CHUNK_BYTES = 16 * 1024 * 1024` (16 MiB chunks — cuts Upstash write ops by 4x while keeping browser memory bounded).
+  - `RELAY_MAX_FILE_BYTES = 750 * 1024 * 1024` (750 MiB per file, safely within 1 GB Upstash free limit).
+  - `RELAY_MAX_TRANSFER_BYTES = 800 * 1024 * 1024` (800 MiB total transfer).
+- [x] Expanded upload quotas in `src/app/api/relay/upload/route.ts`:
+  - Raised per-IP hourly byte rate limit to `2 * 1024 * 1024 * 1024` (2 GiB/hr).
+  - Raised default daily budget `RELAY_DAILY_BYTES` to `2 * 1024 * 1024 * 1024` (2 GiB/day) to support large chunked files (e.g. 665 MB).
+- [x] Added zero-knowledge 6-digit numeric OTP support in `src/lib/relayCrypto.ts`:
+  - `generateNumericOtp()`: crypto-random 6-digit numeric string formatted `"123-456"`.
+  - `normalizeNumericOtp(input)`: strips spaces/dashes and validates `/^\d{6}$/`.
+  - `deriveRoomIdFromOtp(otp6)`: computes `SHA-256("qs-room:" + otp6)` via Web Crypto and returns the first 16 lowercase hex characters (zero-knowledge room identifier; server never sees raw OTP).
+  - Updated `deriveRelayKey(code, saltBase64)` to seamlessly support both 6-digit numeric OTPs and legacy codes.
+- [x] Enhanced `useRelayTransfer.ts`:
+  - `startRelaySend(files, text)`: generates one 6-digit numeric OTP, derives zero-knowledge room code via `deriveRoomIdFromOtp()`, derives AES-GCM key from `otp6 + salt`, uploads 16 MiB chunks with live metrics (`chunksDone`, `chunksTotal`, `uploadedBytes`, `totalBytes`), and exposes `otpCode` (`"123-456"`) and QR URL `${origin}/#otp=${otp6}`.
+  - `receiveByOtp(rawInput)`: parses 6-digit OTP from input or QR `#otp=` fragment, derives zero-knowledge room code, retrieves manifest, downloads & decrypts chunks with disk streaming for files > 100 MB, logs history, and executes `/api/relay/complete` deletion. Plain-English error on invalid/expired OTP (`"Invalid or expired OTP. Please check the 6-digit code."`).
+- [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).

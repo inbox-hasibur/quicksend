@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  generateRelayCode,
   normalizeRelayCode,
+  generateNumericOtp,
+  normalizeNumericOtp,
+  deriveRoomIdFromOtp,
   generateSalt,
   generateIvPrefix,
   deriveRelayKey,
@@ -29,7 +31,7 @@ import {
 } from "@/lib/relayLimits";
 import { createDiskStreamWriter, DISK_STREAM_THRESHOLD } from "@/lib/diskStream";
 import { addTransferHistoryItem } from "@/hooks/useTransferHistory";
-import { normalizeRoomCode } from "@/lib/codeGenerator";
+import { formatRoomCode, normalizeRoomCode } from "@/lib/codeGenerator";
 
 export type RelayState = "idle" | "encrypting" | "uploading" | "registering" | "ready" | "error";
 
@@ -135,6 +137,23 @@ async function waitForOnline(signal?: AbortSignal): Promise<void> {
   }
 }
 
+/**
+ * Extracts a 6-digit numeric OTP from user input or scanned QR URL fragment.
+ */
+function extractOtpFromInput(raw: string): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  const hashMatch = trimmed.match(/#otp=([0-9\s-]+)/i);
+  if (hashMatch && hashMatch[1]) {
+    return normalizeNumericOtp(hashMatch[1]);
+  }
+  const paramMatch = trimmed.match(/[?&]otp=([0-9\s-]+)/i);
+  if (paramMatch && paramMatch[1]) {
+    return normalizeNumericOtp(paramMatch[1]);
+  }
+  return normalizeNumericOtp(trimmed);
+}
+
 export function useRelayTransfer() {
   const [relayStatus, setRelayStatus] = useState<RelayStatus | null>(null);
   const [relayState, setRelayState] = useState<RelayState>("idle");
@@ -145,6 +164,8 @@ export function useRelayTransfer() {
   const [chunksDone, setChunksDone] = useState(0);
   const [chunksTotal, setChunksTotal] = useState(0);
   const [relayCode, setRelayCode] = useState<string | null>(null);
+  const [otpCode, setOtpCode] = useState<string | null>(null);
+  const [qrUrl, setQrUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [relayPayload, setRelayPayload] = useState<RelayPayloadData | null>(null);
   const [isPolling, setIsPolling] = useState(false);
@@ -186,9 +207,9 @@ export function useRelayTransfer() {
     };
   }, []);
 
-  // SENDER: Upload encrypted chunks to temporary cloud relay
-  const startRelayUpload = useCallback(
-    async (roomCode: string, files: File[], text?: string) => {
+  // Internal executor for chunk-based encrypted cloud relay upload
+  const executeUploadPipeline = useCallback(
+    async (files: File[], text?: string, explicitRoomCode?: string) => {
       if (!relayStatus?.available) {
         setError("Encrypted cloud relay is not available.");
         setRelayState("error");
@@ -207,7 +228,7 @@ export function useRelayTransfer() {
 
       for (const file of files) {
         if (file.size > maxFileBytes) {
-          setError(`File "${file.name}" exceeds the 200MB relay limit.`);
+          setError(`File "${file.name}" exceeds the 750MB relay limit.`);
           setRelayState("error");
           return;
         }
@@ -231,16 +252,36 @@ export function useRelayTransfer() {
       try {
         setError(null);
         setRelayState("encrypting");
-        activeRoomCodeRef.current = roomCode;
-        const cleanRoom = normalizeRoomCode(roomCode);
 
-        const generatedCode = generateRelayCode();
+        // Generate 6-digit numeric OTP and derive zero-knowledge room code
+        let formattedOtp: string;
+        let otp6: string;
+        let cleanRoom: string;
+
+        if (explicitRoomCode) {
+          const numeric = normalizeNumericOtp(explicitRoomCode);
+          if (numeric) {
+            otp6 = numeric;
+            formattedOtp = formatRoomCode(numeric);
+            cleanRoom = await deriveRoomIdFromOtp(otp6);
+          } else {
+            formattedOtp = explicitRoomCode;
+            otp6 = explicitRoomCode;
+            cleanRoom = normalizeRoomCode(explicitRoomCode);
+          }
+        } else {
+          formattedOtp = generateNumericOtp();
+          otp6 = normalizeNumericOtp(formattedOtp)!;
+          cleanRoom = await deriveRoomIdFromOtp(otp6);
+        }
+
+        activeRoomCodeRef.current = cleanRoom;
+
         const salt = generateSalt();
-        const key = await deriveRelayKey(generatedCode, salt);
-
+        const key = await deriveRelayKey(otp6, salt);
         const rid = newRelayId();
 
-        // Plan chunk tasks
+        // Plan chunk tasks using 16 MiB chunk boundaries
         interface ChunkTask {
           file: File;
           fileId: string;
@@ -299,7 +340,7 @@ export function useRelayTransfer() {
 
         setRelayState("uploading");
 
-        // Process batches of at most 32 chunks
+        // Process batches of at most 32 chunks so only one batch is held in memory
         for (let b = 0; b < tasks.length; b += BATCH_SIZE) {
           if (signal.aborted) throw new DOMException("Aborted", "AbortError");
           await waitForOnline(signal);
@@ -337,7 +378,7 @@ export function useRelayTransfer() {
             try {
               discoveredBaseUrl = new URL(uploadData.urls[0].url).origin;
             } catch {
-              // Ignore invalid origin
+              // Ignore malformed origin
             }
           }
 
@@ -438,7 +479,7 @@ export function useRelayTransfer() {
           };
         }
 
-        // Register payload with room
+        // Register payload manifest with room
         setRelayState("registering");
         setProgress(95);
 
@@ -470,7 +511,14 @@ export function useRelayTransfer() {
           throw new Error(`Register failed: HTTP ${attachRes.status}`);
         }
 
-        setRelayCode(generatedCode);
+        const origin =
+          typeof window !== "undefined" && window.location.origin
+            ? window.location.origin
+            : "https://quicksend.vercel.app";
+
+        setOtpCode(formattedOtp);
+        setRelayCode(formattedOtp);
+        setQrUrl(`${origin}/#otp=${otp6}`);
         setRelayState("ready");
         setProgress(100);
       } catch (err) {
@@ -481,6 +529,27 @@ export function useRelayTransfer() {
       }
     },
     [relayStatus]
+  );
+
+  // SENDER: Start chunked relay send with a single 6-digit numeric OTP
+  const startRelaySend = useCallback(
+    async (files: File[], text?: string) => {
+      return executeUploadPipeline(files, text);
+    },
+    [executeUploadPipeline]
+  );
+
+  // Backwards-compatible upload method
+  const startRelayUpload = useCallback(
+    async (roomCodeOrFiles: string | File[], filesOrText?: File[] | string, text?: string) => {
+      if (Array.isArray(roomCodeOrFiles)) {
+        return executeUploadPipeline(roomCodeOrFiles, filesOrText as string | undefined);
+      }
+      const files = (Array.isArray(filesOrText) ? filesOrText : []) as File[];
+      const maybeText = typeof filesOrText === "string" ? filesOrText : text;
+      return executeUploadPipeline(files, maybeText, roomCodeOrFiles);
+    },
+    [executeUploadPipeline]
   );
 
   // SENDER: Cancel relay and trigger server cleanup
@@ -500,6 +569,8 @@ export function useRelayTransfer() {
     }
     setRelayState("idle");
     setRelayCode(null);
+    setOtpCode(null);
+    setQrUrl(null);
     setProgress(0);
     setUploadedBytes(0);
     setDownloadedBytes(0);
@@ -560,7 +631,7 @@ export function useRelayTransfer() {
   // RECEIVER: Download, decrypt and complete relay
   const downloadRelay = useCallback(
     async (payload: RelayPayloadData, inputCode: string, roomCode?: string) => {
-      const normalizedCode = normalizeRelayCode(inputCode);
+      const normalizedCode = normalizeNumericOtp(inputCode) || normalizeRelayCode(inputCode);
       if (!normalizedCode) {
         setError("Wrong relay code");
         throw new Error("Wrong relay code");
@@ -832,6 +903,61 @@ export function useRelayTransfer() {
     []
   );
 
+  // RECEIVER: Receive transfer by 6-digit numeric OTP or QR URL
+  const receiveByOtp = useCallback(
+    async (rawInput: string) => {
+      const otp6 = extractOtpFromInput(rawInput);
+      if (!otp6) {
+        const err = "Invalid or expired OTP. Please check the 6-digit code.";
+        setError(err);
+        setRelayState("error");
+        throw new Error(err);
+      }
+
+      setIsDownloading(true);
+      setError(null);
+
+      const abortController = new AbortController();
+      abortControllerRef.current = abortController;
+      const signal = abortController.signal;
+
+      try {
+        const roomCode = await deriveRoomIdFromOtp(otp6);
+        activeRoomCodeRef.current = roomCode;
+
+        const res = await fetch(`/api/relay/attach?code=${encodeURIComponent(roomCode)}`, {
+          signal,
+        });
+
+        if (!res.ok) {
+          throw new Error("Invalid or expired OTP. Please check the 6-digit code.");
+        }
+
+        const data = (await res.json().catch(() => ({}))) as { relay?: RelayPayloadData };
+        if (!data || !data.relay) {
+          throw new Error("Invalid or expired OTP. Please check the 6-digit code.");
+        }
+
+        await downloadRelay(data.relay, otp6, roomCode);
+      } catch (err) {
+        if (signal.aborted) return;
+        const msg = err instanceof Error ? err.message : "Failed to receive transfer.";
+        const finalMsg =
+          msg.includes("Failed to download") ||
+          msg.includes("Wrong relay code") ||
+          msg.includes("Invalid or expired OTP")
+            ? "Invalid or expired OTP. Please check the 6-digit code."
+            : msg;
+        setError(finalMsg);
+        setRelayState("error");
+        throw new Error(finalMsg);
+      } finally {
+        setIsDownloading(false);
+      }
+    },
+    [downloadRelay]
+  );
+
   return {
     relayStatus,
     relayState,
@@ -842,11 +968,15 @@ export function useRelayTransfer() {
     chunksDone,
     chunksTotal,
     relayCode,
+    otpCode,
+    qrUrl,
     error,
     relayPayload,
     isPolling,
     isDownloading,
+    startRelaySend,
     startRelayUpload,
+    receiveByOtp,
     cancelRelay,
     pollRelay,
     stopPolling,

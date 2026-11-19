@@ -6,8 +6,8 @@ import { getUpstashBucket, isUpstashBlobConfigured } from "@/lib/upstashBlob";
 import { RELAY_CHUNK_BYTES } from "@/lib/relayLimits";
 import { isValidChunkPath } from "@/lib/relayChunks";
 
-const HOURLY_BYTE_LIMIT = 600 * 1024 * 1024; // 600 MB per hour per IP
-const DEFAULT_DAILY_BYTES = 629145600; // 600 MB default daily budget
+const HOURLY_BYTE_LIMIT = 2 * 1024 * 1024 * 1024; // 2 GiB per hour per IP
+const DEFAULT_DAILY_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB default daily budget
 const MAX_CHUNKS_PER_REQUEST = 64;
 
 interface ChunkUploadItem {

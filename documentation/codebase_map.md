@@ -446,7 +446,7 @@ flowchart TD
 - **Exports:** `useWebRTC(mode): { role, roomId, roomCode, isConnected, progress, pendingHeader, brokerNotice, startSender, startReceiver, sendFiles, sendText, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup, debugLog, diagnostics }`, `waitForDrain`, `DrainableChannel`, `WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`, `FIREWALL_BLOCKED_MESSAGE`, `ROOM_NOT_FOUND_MESSAGE`.
 
 #### `src/hooks/useRelayTransfer.ts`
-- **Purpose:** Chunk-based client-side encrypted cloud relay controller. Uploads and downloads files in 4 MiB chunks without holding full files in RAM. Derives AES-GCM 256 keys via PBKDF2 without server key exposure. Handles 32-chunk batching, concurrency 3 PUT uploads with exponential backoff retries (500/1000/2000ms), offline pause/online resume, registration via `/api/relay/attach`, concurrency 2 sequential chunk downloading with direct Upstash bucket fetch and `/api/relay/file` fallback, large-file disk streaming (>100MB) via `diskStream.ts`, progress reporting (`uploadedBytes`, `downloadedBytes`, `totalBytes`, `chunksDone`, `chunksTotal`), and automatic completion cleanup via `/api/relay/complete`.
+- **Purpose:** Chunk-based client-side encrypted cloud relay controller supporting 16 MiB chunks (up to 750 MB per file / 800 MB total). Generates single zero-knowledge 6-digit numeric OTPs (`otpCode`), derives hashed `roomCode = SHA-256("qs-room:" + otp6)` for server registration without exposing the OTP, and exposes QR URL (`#otp=<otp6>`). Features `startRelaySend`, `receiveByOtp`, 32-chunk batching, concurrency 3 PUT uploads with exponential backoff retries, offline pause/online resume, concurrency 2 sequential chunk downloading with direct Upstash bucket fetch and `/api/relay/file` fallback, large-file disk streaming (>100MB) via `diskStream.ts`, progress reporting, and automatic completion cleanup via `/api/relay/complete`.
 - **Exports:** `useRelayTransfer`, `RelayState`, `RelayStatus`, `RelayFileMetadata`, `RelayItemMetadata`, `RelayPayloadData`.
 
 #### `src/hooks/useLocalDiscovery.ts`
@@ -542,11 +542,11 @@ flowchart TD
 - **Exports:** `isUpstashBlobConfigured`, `getUpstashBucketName`, `getUpstashBucket`, `isAllowedRelayUrl`, `upload`, `UploadOptions`, `PutBlobResult`.
 
 #### `src/lib/relayCrypto.ts`
-- **Purpose:** Zero-knowledge client-side cryptography module for encrypted cloud relay transfers. Generates 8-character base-32 formatted relay codes (`XXXX-XXXX`), 16-byte random salts, derives non-extractable AES-GCM 256 keys via PBKDF2 (SHA-256, 200,000 iterations), and performs authenticated symmetric encryption/decryption with random 12-byte IVs. Supports chunk-based authenticated encryption (`encryptChunk`, `decryptChunk`) with deterministic 12-byte IVs (4-byte base64 prefix + 8-byte big-endian index) and AAD binding.
-- **Exports:** `generateRelayCode`, `normalizeRelayCode`, `generateSalt`, `generateIvPrefix`, `deriveRelayKey`, `encryptText`, `decryptText`, `encryptChunk`, `decryptChunk`.
+- **Purpose:** Zero-knowledge client-side cryptography module for encrypted cloud relay transfers. Generates 6-digit numeric OTPs (`generateNumericOtp`), normalizes OTPs (`normalizeNumericOtp`), derives zero-knowledge room IDs via SHA-256 (`deriveRoomIdFromOtp`), generates 8-character legacy codes, 16-byte random salts, derives non-extractable AES-GCM 256 keys via PBKDF2 (SHA-256, 200,000 iterations) from numeric OTPs or legacy codes, and performs authenticated symmetric encryption/decryption with random 12-byte IVs. Supports chunk-based authenticated encryption (`encryptChunk`, `decryptChunk`) with deterministic 12-byte IVs (4-byte base64 prefix + 8-byte big-endian index) and AAD binding.
+- **Exports:** `generateRelayCode`, `normalizeRelayCode`, `generateNumericOtp`, `normalizeNumericOtp`, `deriveRoomIdFromOtp`, `generateSalt`, `generateIvPrefix`, `deriveRelayKey`, `encryptText`, `decryptText`, `encryptChunk`, `decryptChunk`.
 
 #### `src/lib/relayLimits.ts`
-- **Purpose:** Centralized operational constraints for chunk-based encrypted cloud relay shared across client and server routes. Defines chunk sizing, per-file limits, max transfer limits, authentication tag sizes, and storage TTLs.
+- **Purpose:** Centralized operational constraints for chunk-based encrypted cloud relay shared across client and server routes. Defines 16 MiB chunk sizing, 750 MiB max per file, 800 MiB max transfer, authentication tag sizes, and storage TTLs.
 - **Exports:** `RELAY_CHUNK_BYTES`, `RELAY_MAX_FILE_BYTES`, `RELAY_MAX_TRANSFER_BYTES`, `RELAY_MAX_FILES`, `RELAY_MAX_CHUNKS_PER_FILE`, `RELAY_TAG_BYTES`, `RELAY_TTL_MINUTES`.
 
 #### `src/lib/relayChunks.ts`

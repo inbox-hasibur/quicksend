@@ -71,6 +71,45 @@ export function normalizeRelayCode(input: string): string | null {
 }
 
 /**
+ * Generates a crypto-random 6-digit numeric OTP formatted as "123-456".
+ */
+export function generateNumericOtp(): string {
+  const c = getCrypto();
+  const array = new Uint32Array(1);
+  c.getRandomValues(array);
+  const num = 100000 + (array[0] % 900000);
+  const raw = num.toString();
+  return `${raw.slice(0, 3)}-${raw.slice(3, 6)}`;
+}
+
+/**
+ * Normalizes user input by stripping spaces and dashes, ensuring exactly 6 digits.
+ */
+export function normalizeNumericOtp(input: string): string | null {
+  if (!input || typeof input !== "string") return null;
+  const clean = input.replace(/[\s-]/g, "");
+  if (!/^\d{6}$/.test(clean)) return null;
+  return clean;
+}
+
+/**
+ * Computes SHA-256("qs-room:" + otp6) and returns the first 16 lowercase hex characters.
+ * Server stores and matches this room ID without ever seeing the raw 6-digit OTP.
+ */
+export async function deriveRoomIdFromOtp(otp6: string): Promise<string> {
+  const clean = normalizeNumericOtp(otp6) || otp6.replace(/[\s-]/g, "");
+  const subtle = getSubtle();
+  const data = new TextEncoder().encode(`qs-room:${clean}`);
+  const hash = await subtle.digest("SHA-256", data);
+  const hashBytes = new Uint8Array(hash);
+  let hex = "";
+  for (let i = 0; i < 8; i++) {
+    hex += hashBytes[i].toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
+/**
  * Generates 16 random bytes encoded as base64 string.
  */
 export function generateSalt(): string {
@@ -81,16 +120,21 @@ export function generateSalt(): string {
 }
 
 /**
- * Derives a non-extractable AES-GCM 256 key from a relay code and salt via PBKDF2 SHA-256.
+ * Derives a non-extractable AES-GCM 256 key from a relay code or 6-digit numeric OTP and salt via PBKDF2 SHA-256.
  */
 export async function deriveRelayKey(
   code: string,
   saltBase64: string
 ): Promise<CryptoKey> {
   const subtle = getSubtle();
+  const normalized =
+    normalizeNumericOtp(code) ||
+    normalizeRelayCode(code) ||
+    code.replace(/[\s-]/g, "");
+
   const keyMaterial = await subtle.importKey(
     "raw",
-    new TextEncoder().encode(code),
+    new TextEncoder().encode(normalized),
     "PBKDF2",
     false,
     ["deriveKey"]

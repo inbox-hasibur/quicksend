@@ -63,8 +63,13 @@ export function TransferModal({
   const [copied, setCopied] = useState(false);
   const [dismissedKey, setDismissedKey] = useState<string | null>(null);
   const [enteredRelayCode, setEnteredRelayCode] = useState(() => {
-    if (typeof window !== "undefined" && window.location.hash.startsWith("#rc=")) {
-      return decodeURIComponent(window.location.hash.slice(4));
+    if (typeof window !== "undefined") {
+      if (window.location.hash.startsWith("#otp=")) {
+        return decodeURIComponent(window.location.hash.slice(5));
+      }
+      if (window.location.hash.startsWith("#rc=")) {
+        return decodeURIComponent(window.location.hash.slice(4));
+      }
     }
     return "";
   });
@@ -72,8 +77,12 @@ export function TransferModal({
 
   useEffect(() => {
     const onHashChange = () => {
-      if (typeof window !== "undefined" && window.location.hash.startsWith("#rc=")) {
-        setEnteredRelayCode(decodeURIComponent(window.location.hash.slice(4)));
+      if (typeof window !== "undefined") {
+        if (window.location.hash.startsWith("#otp=")) {
+          setEnteredRelayCode(decodeURIComponent(window.location.hash.slice(5)));
+        } else if (window.location.hash.startsWith("#rc=")) {
+          setEnteredRelayCode(decodeURIComponent(window.location.hash.slice(4)));
+        }
       }
     };
     window.addEventListener("hashchange", onHashChange);
@@ -459,7 +468,7 @@ export function TransferModal({
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. XXXX-XXXX"
+                  placeholder="e.g. 123-456 or XXXX-XXXX"
                   value={enteredRelayCode}
                   onChange={(e) => {
                     setEnteredRelayCode(e.target.value);
