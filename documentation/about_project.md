@@ -344,6 +344,12 @@ quicksend/
     │   ├── useTransferHistory.ts
     │   └── useWebRTC.ts
     ├── lib/
+    │   ├── webrtc/
+    │   │   ├── backpressure.ts
+    │   │   ├── diagnostics.ts
+    │   │   ├── index.ts
+    │   │   ├── peerJsHelper.ts
+    │   │   └── types.ts
     │   ├── __tests__/
     │   │   ├── base45.test.ts
     │   │   ├── chunker.test.ts

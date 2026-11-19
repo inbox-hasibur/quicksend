@@ -970,3 +970,15 @@
 - [x] Automated Verification & Quality:
   - Added test suite `src/components/__tests__/SameNetworkCard.test.tsx` verifying Step 1 Dropzone view, Receive tab radar view, and direct connect fallback swap.
   - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).
+
+### Fix 20 (2026-11-19): Modularize useWebRTC monolith into focused src/lib/webrtc submodules
+- [x] Extracted focused modules under `src/lib/webrtc/` (<200 lines each):
+  - `src/lib/webrtc/types.ts` (77 lines): Shared constants (`BUFFER_THRESHOLD`, `FIREWALL_BLOCKED_MESSAGE`, `ROOM_NOT_FOUND_MESSAGE`), interfaces (`WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`, `DrainableChannel`, `PeerJsConnection`, `PeerJsInstance`, `ActiveTransport`), and initial diagnostics generator (`getInitialDiagnostics`).
+  - `src/lib/webrtc/backpressure.ts` (197 lines): `waitForDrain`, `waitForChannelOpen`, `normalizeChunkBuffer`, `triggerBlobDownload`, `streamBlobChunks`, and `finalizeReceivedPayload`.
+  - `src/lib/webrtc/diagnostics.ts` (185 lines): `appendDebugLog`, `parseCandidateType`, `inspectSelectedCandidatePair`, and `setupRtcPeerConnectionListeners`.
+  - `src/lib/webrtc/peerJsHelper.ts` (173 lines): `loadPeerConstructor`, `formatPeerJsId`, `wirePeerConnectionEvents`, `createPeerJsSender`, and `createPeerJsReceiver`.
+  - `src/lib/webrtc/index.ts` (4 lines): Barrel export cleanly re-exporting all modular WebRTC primitives and types.
+- [x] Refactored `src/hooks/useWebRTC.ts`:
+  - Maintained 100% identical public return signature and named exports for complete backwards-compatibility with `SameNetworkCard`, `HotspotAssistantCard`, `CableTransferCard`, and existing tests.
+  - Reduced monolith complexity by delegating chunk backpressure streaming, diagnostics processing, and PeerJS broker adapters to `src/lib/webrtc/`.
+- [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 9/9 passing tests in `src/hooks/__tests__/useWebRTC.test.ts`.

@@ -446,7 +446,7 @@ flowchart TD
 ### 3.3 Custom Hooks (`src/hooks/`)
 
 #### `src/hooks/useWebRTC.ts`
-- **Purpose:** Complete WebRTC peer connection and DataChannel manager. Orchestrates signaling exchange, candidate queuing, binary chunk slicing with buffer backpressure via `waitForDrain`, dynamic TURN fetching via `fetchIceConfig`, 12-second Peer/Signaling watchdog, 15-second receiver dial timeout with clear room not found vs 4G firewall error differentiation, automated one-shot `pc.restartIce()`, PeerJS internal `conn.peerConnection` ICE tracking, transport isolation (`activeTransportRef`), live diagnostics metrics collection (ICE, gathering, signaling, channel, candidate counts, selected pair), and 40-entry debug log ring buffer.
+- **Purpose:** Complete WebRTC peer connection and DataChannel manager, backed by focused submodules in `src/lib/webrtc/`. Orchestrates signaling exchange, candidate queuing, binary chunk slicing with buffer backpressure via `waitForDrain` (`@/lib/webrtc/backpressure`), dynamic TURN fetching via `fetchIceConfig`, 12-second Peer/Signaling watchdog, 15-second receiver dial timeout with clear room not found vs 4G firewall error differentiation, automated one-shot `pc.restartIce()`, PeerJS internal `conn.peerConnection` ICE tracking via `@/lib/webrtc/peerJsHelper`, transport isolation (`activeTransportRef`), live diagnostics metrics collection via `@/lib/webrtc/diagnostics` (ICE, gathering, signaling, channel, candidate counts, selected pair), and 40-entry debug log ring buffer.
 - **Exports:** `useWebRTC(mode): { role, roomId, roomCode, isConnected, progress, pendingHeader, brokerNotice, startSender, startReceiver, sendFiles, sendText, sendPayload, acceptIncomingTransfer, rejectIncomingTransfer, cleanup, debugLog, diagnostics }`, `waitForDrain`, `DrainableChannel`, `WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`, `FIREWALL_BLOCKED_MESSAGE`, `ROOM_NOT_FOUND_MESSAGE`.
 
 #### `src/hooks/useRelayTransfer.ts`
@@ -572,6 +572,13 @@ flowchart TD
 #### `src/lib/modeAvailability.ts`
 - **Purpose:** Pure business logic functions determining mode accessibility, descriptions, and dynamic badges based on network status and hardware support.
 - **Exports:** `isModeAvailable`, `getModeStatus`, `getAllModesStatus`.
+
+#### `src/lib/webrtc/` (Modular WebRTC Protocol Subsystem)
+- **`src/lib/webrtc/types.ts`**: Shared TypeScript interfaces (`WebRTCDiagnostics`, `DebugLogEntry`, `CandidateCounts`, `SelectedCandidatePair`, `DrainableChannel`, `PeerJsConnection`, `PeerJsInstance`, `ActiveTransport`) and error message constants (`FIREWALL_BLOCKED_MESSAGE`, `ROOM_NOT_FOUND_MESSAGE`).
+- **`src/lib/webrtc/backpressure.ts`**: Stream flow control and buffer backpressure (`waitForDrain`, `waitForChannelOpen`, `normalizeChunkBuffer`, `triggerBlobDownload`, `streamBlobChunks`, `finalizeReceivedPayload`).
+- **`src/lib/webrtc/diagnostics.ts`**: WebRTC diagnostics, candidate inspection (`inspectSelectedCandidatePair`, `parseCandidateType`), debug ring-buffer logging (`appendDebugLog`), and standard RTCPeerConnection event listener wiring (`setupRtcPeerConnectionListeners`).
+- **`src/lib/webrtc/peerJsHelper.ts`**: Cloud broker adapter for PeerJS (`loadPeerConstructor`, `formatPeerJsId`, `wirePeerConnectionEvents`, `createPeerJsSender`, `createPeerJsReceiver`).
+- **`src/lib/webrtc/index.ts`**: Barrel export re-exporting all modular WebRTC primitives and types.
 
 ---
 
