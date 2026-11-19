@@ -106,6 +106,20 @@ export async function POST(request: Request): Promise<NextResponse> {
 
   try {
     const bucket = getUpstashBucket();
+
+    let baseUrl: string | undefined;
+    try {
+      const pub = await bucket.publicUrl("");
+      if (pub) {
+        baseUrl = pub.replace(/\/+$/, "");
+      }
+    } catch {
+      // Fallback if publicUrl fails
+    }
+    if (!baseUrl && process.env.UPSTASH_BLOB_URL?.trim()) {
+      baseUrl = process.env.UPSTASH_BLOB_URL.trim().replace(/\/+$/, "");
+    }
+
     const urls = await Promise.all(
       (chunks as ChunkUploadItem[]).map(async (chunk) => {
         const signed = await bucket.signedUploadUrl(chunk.path, {
@@ -120,7 +134,7 @@ export async function POST(request: Request): Promise<NextResponse> {
       })
     );
 
-    return NextResponse.json({ urls });
+    return NextResponse.json({ urls, baseUrl });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Upload error" },

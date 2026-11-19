@@ -304,7 +304,7 @@ flowchart TD
 - **Exports:** `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/upload/route.ts`
-- **Purpose:** Secure Upstash Blob presigned chunk upload URL generator (`POST`) via `bucket.signedUploadUrl()`. Accepts `{ roomCode, rid, chunks }` (max 64 chunks/request), validates every chunk path via `isValidChunkPath`, and issues 10-minute presigned upload URLs. Enforces IP byte rate limiting (600 MB/hr) and daily upload budget via `process.env.RELAY_DAILY_BYTES` (default 629145600 bytes).
+- **Purpose:** Secure Upstash Blob presigned chunk upload URL generator (`POST`) via `bucket.signedUploadUrl()`. Accepts `{ roomCode, rid, chunks }` (max 100 chunks/request), validates every chunk path via `isValidChunkPath`, and issues 10-minute presigned upload URLs and public CDN `baseUrl`. Enforces IP byte rate limiting (2 GiB/hr) and daily upload budget via `process.env.RELAY_DAILY_BYTES` (default 2 GiB).
 - **Exports:** `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/cleanup/route.ts`

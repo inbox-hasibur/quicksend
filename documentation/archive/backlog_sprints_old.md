@@ -905,13 +905,14 @@
 - [x] Storage presigned PUT CORS & CSP fix (`vercel.json`, `src/app/api/relay/upload/route.ts`, `src/hooks/useRelayTransfer.ts`):
   - In `vercel.json`, added `https://blob.upstash.io` and `https://upstash.io` to `connect-src` CSP alongside `*.blob.upstash.io`, `*.upstash.io`, `*.upstash-blob.com`, and `*.r2.cloudflarestorage.com`.
   - In `src/app/api/relay/upload/route.ts`, stopped passing `size: chunk.size` to `bucket.signedUploadUrl()` so `content-length` is not pinned into AWS S3/R2 `X-Amz-SignedHeaders` (preventing browser preflight rejections and signature mismatch on forbidden browser headers).
-  - In `src/hooks/useRelayTransfer.ts`, re-used verified `FORBIDDEN_BROWSER_HEADERS` filtering and `buildSafePutHeaders()` logic from `src/lib/upstashBlob.ts`.
+  - Returned public bucket `baseUrl` via `bucket.publicUrl("")` / `process.env.UPSTASH_BLOB_URL` from `/api/relay/upload`, enabling the receiver to download from public Upstash CDN (`*.blob.upstash.io`) instead of the private R2 origin.
+  - In `src/hooks/useRelayTransfer.ts`, deduplicated headers case-insensitively in `buildSafePutHeaders()` before PUT requests to never send conflicting `"Content-Type"` and `"content-type"` headers.
 - [x] Safe 8 MiB chunks (up to 750 MB per file / 800 MB total) (`src/lib/relayLimits.ts`, `src/lib/relayChunks.ts`, `src/app/api/relay/upload/route.ts`):
   - Set `RELAY_CHUNK_BYTES = 8 * 1024 * 1024` (8 MiB — strictly below single-PUT multipart thresholds and resilient across mobile/home connections).
-  - Set `RELAY_MAX_CHUNKS_PER_FILE = 100` and updated `isValidChunkPath()` regex to `([0-9]|[1-9][0-9])` (accepting chunk indices 0..99).
+  - Set `RELAY_MAX_CHUNKS_PER_FILE = 100` and updated `isValidChunkPath()` to validate `index >= 0 && index < RELAY_MAX_CHUNKS_PER_FILE` (accepting chunk indices 0..99).
   - Raised `MAX_CHUNKS_PER_REQUEST = 100` in `/api/relay/upload`.
 - [x] Continuous real-time byte progress & diagnostics (`src/hooks/useRelayTransfer.ts`):
-  - Implemented `uploadChunkXhr()` helper with `xhr.upload.onprogress` tracking per-chunk in-flight bytes, continuously updating `uploadedBytes` and progress percentage instead of freezing at 5% / 0 Bytes.
+  - Implemented `xhrPut()` helper with `xhr.upload.onprogress` tracking per-chunk in-flight bytes, continuously updating `uploadedBytes` and progress percentage instead of freezing at 5% / 0 Bytes.
   - Lowered chunk upload concurrency from 3 to 2 for improved connection stability.
   - Added safe non-secret diagnostic logging (`console.error` with target hostname, HTTP status, and sanitized message — omitting signature tokens) and descriptive UI error messaging (`Upload blocked by storage CORS/CSP (host: ...)` or `Upload failed at chunk X of Y: HTTP ...`).
 - [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).

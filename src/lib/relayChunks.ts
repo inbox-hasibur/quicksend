@@ -1,6 +1,6 @@
 // Utilities for chunk-based encrypted cloud relay planning and path management
 
-import { RELAY_CHUNK_BYTES, RELAY_TAG_BYTES } from "./relayLimits";
+import { RELAY_CHUNK_BYTES, RELAY_MAX_CHUNKS_PER_FILE, RELAY_TAG_BYTES } from "./relayLimits";
 
 export interface ChunkPlan {
   index: number;
@@ -84,9 +84,17 @@ export function isValidChunkPath(path: string, roomCode: string, rid: string): b
   const roomPattern = escapeRegex(roomCode);
   const ridPattern = escapeRegex(rid);
   const regex = new RegExp(
-    `^relay\\/${roomPattern}\\/${ridPattern}\\/([0-9a-f]{16})-([0-9]|[1-9][0-9])\\.bin$`
+    `^relay\\/${roomPattern}\\/${ridPattern}\\/([0-9a-f]{16})-(\\d+)\\.bin$`
   );
-  return regex.test(path);
+  const match = path.match(regex);
+  if (!match) return false;
+  const index = Number.parseInt(match[2], 10);
+  return (
+    Number.isInteger(index) &&
+    index >= 0 &&
+    index < RELAY_MAX_CHUNKS_PER_FILE &&
+    String(index) === match[2]
+  );
 }
 
 /**
