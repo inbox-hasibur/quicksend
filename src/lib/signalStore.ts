@@ -231,7 +231,7 @@ export class RedisSignalStore implements SignalStoreAdapter {
     if (!url || !token) {
       throw new Error("Redis REST credentials missing");
     }
-    return { url: url.replace(/\/$/, ""), token };
+    return { url: url.replace(/\/+$/, ""), token };
   }
 
   private async command<T = unknown>(args: (string | number)[]): Promise<T | null> {
@@ -251,6 +251,9 @@ export class RedisSignalStore implements SignalStoreAdapter {
     }
 
     const data = await res.json();
+    if (data && data.error) {
+      throw new Error(data.error);
+    }
     return (data && data.result !== undefined ? data.result : null) as T;
   }
 
@@ -271,6 +274,9 @@ export class RedisSignalStore implements SignalStoreAdapter {
     }
 
     const data = await res.json();
+    if (data && data.error) {
+      throw new Error(data.error);
+    }
     return data as T;
   }
 

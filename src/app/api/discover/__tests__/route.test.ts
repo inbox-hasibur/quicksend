@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   GET,
   POST,
+  getClientIp,
   computeNetworkId,
   normalizeIpv6Prefix,
   isLocalOrPrivateIp,
@@ -9,6 +10,39 @@ import {
 } from "../route";
 
 describe("Discovery API Route (/api/discover)", () => {
+  it("should extract client IP correctly prioritizing cf-connecting-ip then x-real-ip then x-forwarded-for", () => {
+    // 1. cf-connecting-ip takes precedence
+    const req1 = new Request("http://localhost/api/discover", {
+      headers: {
+        "cf-connecting-ip": "104.28.1.1",
+        "x-real-ip": "192.168.1.1",
+        "x-forwarded-for": "10.0.0.1, 10.0.0.2",
+      },
+    });
+    expect(getClientIp(req1)).toBe("104.28.1.1");
+
+    // 2. x-real-ip when cf-connecting-ip is missing
+    const req2 = new Request("http://localhost/api/discover", {
+      headers: {
+        "x-real-ip": "198.51.100.5",
+        "x-forwarded-for": "10.0.0.1, 10.0.0.2",
+      },
+    });
+    expect(getClientIp(req2)).toBe("198.51.100.5");
+
+    // 3. x-forwarded-for (first IP) when x-real-ip is missing
+    const req3 = new Request("http://localhost/api/discover", {
+      headers: {
+        "x-forwarded-for": "203.0.113.88, 10.0.0.2",
+      },
+    });
+    expect(getClientIp(req3)).toBe("203.0.113.88");
+
+    // 4. Default fallback
+    const req4 = new Request("http://localhost/api/discover");
+    expect(getClientIp(req4)).toBe("127.0.0.1");
+  });
+
   it("should return local-lan networkId for private LAN and loopback IPs", async () => {
     const req = new Request("http://localhost/api/discover", {
       headers: { "x-forwarded-for": "192.168.1.105" },
@@ -459,9 +493,9 @@ describe("Discovery API Route (/api/discover)", () => {
       const lookupData1 = await lookupRes1.json();
       expect(lookupData1.found).toBe(true);
 
-      // Advance time past presence TTL (15s)
+      // Advance time past presence TTL (45s)
       const origNow = Date.now;
-      Date.now = () => origNow() + 16000;
+      Date.now = () => origNow() + 46000;
       try {
         const lookupReq2 = new Request("http://localhost/api/discover", {
           method: "POST",

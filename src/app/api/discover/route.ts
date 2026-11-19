@@ -38,8 +38,12 @@ if (!globalThis.__quicksendDiscoveryPendingBeams) {
 }
 const pendingBeams = globalThis.__quicksendDiscoveryPendingBeams;
 
+export const PRESENCE_TTL_SECONDS = 45;
+export const PEER_EXPIRY_MS = PRESENCE_TTL_SECONDS * 1000;
+export const REDIS_CONTAINER_TTL_SECONDS = 120;
+
 function getRedisCredentials(): { url: string; token: string } {
-  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "";
+  const url = (process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL || "").replace(/\/+$/, "");
   const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN || "";
   return { url, token };
 }
@@ -59,6 +63,7 @@ async function redisCommand<T = unknown>(args: (string | number)[]): Promise<T |
     });
     if (!res.ok) return null;
     const data = await res.json();
+    if (data && data.error) return null;
     return (data && data.result !== undefined ? data.result : null) as T;
   } catch {
     return null;
@@ -66,12 +71,15 @@ async function redisCommand<T = unknown>(args: (string | number)[]): Promise<T |
 }
 
 export function getClientIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0].trim();
-  }
+  const cfIp = request.headers.get("cf-connecting-ip");
+  if (cfIp) return cfIp.trim();
   const realIp = request.headers.get("x-real-ip");
   if (realIp) return realIp.trim();
+  const forwarded = request.headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded.split(",")[0].trim();
+    if (first) return first;
+  }
   return "127.0.0.1";
 }
 
@@ -200,7 +208,7 @@ export function getNetworkGroupInfo(rawIp: string): {
   return { groupLabel: "local-lan", ipFamily: "local" };
 }
 
-function pruneStalePeers(peers: Map<string, DiscoveredPeer>, ttlMs = 15000): DiscoveredPeer[] {
+function pruneStalePeers(peers: Map<string, DiscoveredPeer>, ttlMs = PEER_EXPIRY_MS): DiscoveredPeer[] {
   const now = Date.now();
   const active: DiscoveredPeer[] = [];
   for (const [id, peer] of peers.entries()) {
@@ -229,7 +237,7 @@ async function getNetworkPeers(networkId: string): Promise<DiscoveredPeer[]> {
           for (let i = 0; i < raw.length; i += 2) {
             try {
               const p: DiscoveredPeer = JSON.parse(raw[i + 1]);
-              if (now - p.lastSeen <= 15000) {
+              if (now - p.lastSeen <= PEER_EXPIRY_MS) {
                 peers.push(p);
               } else {
                 expiredIds.push(raw[i]);
@@ -242,7 +250,7 @@ async function getNetworkPeers(networkId: string): Promise<DiscoveredPeer[]> {
           for (const [id, val] of Object.entries(raw)) {
             try {
               const p: DiscoveredPeer = JSON.parse(val);
-              if (now - p.lastSeen <= 15000) {
+              if (now - p.lastSeen <= PEER_EXPIRY_MS) {
                 peers.push(p);
               } else {
                 expiredIds.push(id);
@@ -280,7 +288,7 @@ async function savePeer(networkId: string, peer: DiscoveredPeer): Promise<void> 
         peer.id,
         JSON.stringify(peer),
       ]);
-      await redisCommand(["EXPIRE", `quicksend:discover:${networkId}`, 60]);
+      await redisCommand(["EXPIRE", `quicksend:discover:${networkId}`, REDIS_CONTAINER_TTL_SECONDS]);
     } catch {
       // Ignore
     }
@@ -443,7 +451,7 @@ export async function POST(request: Request) {
       if (rawTarget) {
         try {
           const parsed: DiscoveredPeer = JSON.parse(rawTarget);
-          if (Date.now() - parsed.lastSeen <= 15000) {
+          if (Date.now() - parsed.lastSeen <= PEER_EXPIRY_MS) {
             targetPeer = parsed;
           }
         } catch {
@@ -453,7 +461,7 @@ export async function POST(request: Request) {
       if (!targetPeer) {
         for (const pMap of networkPeers.values()) {
           const p = pMap.get(targetDeviceId);
-          if (p && Date.now() - p.lastSeen <= 15000) {
+          if (p && Date.now() - p.lastSeen <= PEER_EXPIRY_MS) {
             targetPeer = p;
             break;
           }
@@ -479,11 +487,11 @@ export async function POST(request: Request) {
       }
 
       // Check existing active peers on this network (excluding caller)
-      const activePeers = await getNetworkPeers(targetNetworkId);
-      const otherPeers = activePeers.filter((p) => p.id !== deviceId);
+      const initialPeers = await getNetworkPeers(targetNetworkId);
+      const otherPeersBeforeSave = initialPeers.filter((p) => p.id !== deviceId);
 
       // Collect emojis already in use by other peers on this subnet
-      const takenEmojis = new Set(otherPeers.map((p) => p.avatarEmoji).filter(Boolean));
+      const takenEmojis = new Set(otherPeersBeforeSave.map((p) => p.avatarEmoji).filter(Boolean));
 
       let assignedEmoji = avatarEmoji || "🦊";
       let assignedCodename = codename || name || "Curious Fox";
@@ -500,7 +508,6 @@ export async function POST(request: Request) {
       }
 
       // 4-digit unique pairing PIN allocation and refresh
-      const PRESENCE_TTL_SECONDS = 15;
       let assignedPin = await signalStore.getKey(`devpin:${deviceId}`);
       if (assignedPin && /^\d{4}$/.test(assignedPin)) {
         await signalStore.setKey(`pin:${assignedPin}`, deviceId, PRESENCE_TTL_SECONDS);
@@ -537,6 +544,10 @@ export async function POST(request: Request) {
 
       await savePeer(targetNetworkId, peerRecord);
       await signalStore.setKey(`device:${deviceId}`, JSON.stringify(peerRecord), PRESENCE_TTL_SECONDS);
+
+      // Re-read active peers so any concurrent announcers saved in the interim are included
+      const activePeers = await getNetworkPeers(targetNetworkId);
+      const otherPeers = activePeers.filter((p) => p.id !== deviceId);
 
       // Check if another peer on this subnet initiated a direct beam to this device
       const incomingBeam = await getAndClearBeam(deviceId);

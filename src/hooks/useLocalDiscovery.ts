@@ -63,6 +63,13 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
   const isScanning = isAutoDiscovering;
   const announceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const activeCodeRef = useRef<string | undefined>(validCode);
+  const profileRef = useRef<DeviceProfile>(profile);
+  const currentNetworkIdRef = useRef<string | null>(null);
+  const inFlightRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   useEffect(() => {
     activeCodeRef.current = validCode;
@@ -72,25 +79,33 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
   // Announce local device to discovery endpoint
   const announcePresence = useCallback(async () => {
     // Avoid announcing while running with server fallback mock
-    if (typeof window === "undefined" || profile.id === "srv_mock") {
+    if (typeof window === "undefined") {
+      return;
+    }
+    const currentProfile = profileRef.current;
+    if (!currentProfile || currentProfile.id === "srv_mock") {
       return;
     }
 
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
+
     try {
+      const codeToSend = activeCodeRef.current;
       const announcePayload: Record<string, unknown> = {
         action: "announce",
-        deviceId: profile.id,
-        name: profile.name,
-        codename: profile.codename,
-        avatarEmoji: profile.avatarEmoji,
-        avatarColor: profile.avatarColor,
-        os: profile.os,
-        browser: profile.browser,
-        formFactor: profile.formFactor,
-        peerId: `qs-lan-${profile.id}`,
+        deviceId: currentProfile.id,
+        name: currentProfile.name,
+        codename: currentProfile.codename,
+        avatarEmoji: currentProfile.avatarEmoji,
+        avatarColor: currentProfile.avatarColor,
+        os: currentProfile.os,
+        browser: currentProfile.browser,
+        formFactor: currentProfile.formFactor,
+        peerId: `qs-lan-${currentProfile.id}`,
       };
-      if (validCode) {
-        announcePayload.code = validCode;
+      if (codeToSend) {
+        announcePayload.code = codeToSend;
       }
 
       const res = await fetch("/api/discover", {
@@ -102,6 +117,7 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
       if (res.ok) {
         const data = await res.json();
         if (data.success) {
+          currentNetworkIdRef.current = data.networkId || null;
           setNetworkId(data.networkId);
           const activePeers = data.peers || [];
           setPeers(activePeers);
@@ -124,8 +140,8 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
           // If server reassigned avatar to avoid conflict on this subnet, update local profile
           if (
             data.assignedAvatar &&
-            (data.assignedAvatar.avatarEmoji !== profile.avatarEmoji ||
-              data.assignedAvatar.codename !== profile.codename)
+            (data.assignedAvatar.avatarEmoji !== currentProfile.avatarEmoji ||
+              data.assignedAvatar.codename !== currentProfile.codename)
           ) {
             updateLocalAvatar({
               emoji: data.assignedAvatar.avatarEmoji,
@@ -156,31 +172,34 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
         lastPollAt: Date.now(),
         lastError: err instanceof Error ? err.message : "Network error",
       }));
+    } finally {
+      inFlightRef.current = false;
     }
-  }, [profile, validCode]);
+  }, []);
 
   // Direct beam signaling from sender to receiver on same network or across networks
   const beamToPeer = useCallback(
     async (target: string | { id: string }, roomCode: string) => {
       const targetDeviceId = typeof target === "string" ? target : target.id;
+      const currentProfile = profileRef.current;
       try {
         const beamPayload: Record<string, unknown> = {
           action: "beam",
           targetDeviceId,
           roomCode,
           fromPeer: {
-            id: profile.id,
-            name: profile.name,
-            codename: profile.codename,
-            avatarEmoji: profile.avatarEmoji,
-            avatarColor: profile.avatarColor,
-            os: profile.os,
-            browser: profile.browser,
-            formFactor: profile.formFactor,
+            id: currentProfile.id,
+            name: currentProfile.name,
+            codename: currentProfile.codename,
+            avatarEmoji: currentProfile.avatarEmoji,
+            avatarColor: currentProfile.avatarColor,
+            os: currentProfile.os,
+            browser: currentProfile.browser,
+            formFactor: currentProfile.formFactor,
           },
         };
-        if (validCode) {
-          beamPayload.code = validCode;
+        if (activeCodeRef.current) {
+          beamPayload.code = activeCodeRef.current;
         }
 
         await fetch("/api/discover", {
@@ -192,7 +211,7 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
         // Ignore beam signaling hiccup
       }
     },
-    [profile, validCode]
+    []
   );
 
   const lookupPin = useCallback(async (searchPin: string): Promise<NearbyPeer | null> => {
@@ -228,28 +247,34 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
 
   const clearIncomingBeam = useCallback(async () => {
     setIncomingBeam(null);
+    const currentProfile = profileRef.current;
+    if (!currentProfile || currentProfile.id === "srv_mock") return;
     try {
       await fetch("/api/discover", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           action: "clearBeam",
-          deviceId: profile.id,
+          deviceId: currentProfile.id,
         }),
       });
     } catch {
       // Ignore
     }
-  }, [profile.id]);
+  }, []);
 
   // Leave network when unmounting or changing code
   const leaveNetwork = useCallback(async () => {
+    const currentProfile = profileRef.current;
+    if (!currentProfile || currentProfile.id === "srv_mock") return;
     try {
       const leavePayload: Record<string, unknown> = {
         action: "leave",
-        deviceId: profile.id,
+        deviceId: currentProfile.id,
       };
-      if (activeCodeRef.current) {
+      if (currentNetworkIdRef.current) {
+        leavePayload.networkId = currentNetworkIdRef.current;
+      } else if (activeCodeRef.current) {
         leavePayload.code = activeCodeRef.current;
       }
 
@@ -260,8 +285,10 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
       });
     } catch {
       // Ignore leave errors
+    } finally {
+      currentNetworkIdRef.current = null;
     }
-  }, [profile.id]);
+  }, []);
 
   useEffect(() => {
     if (!isAutoDiscovering) {
@@ -273,9 +300,7 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
     }
 
     // Announce initially
-    const initialTimer = setTimeout(() => {
-      announcePresence();
-    }, 0);
+    announcePresence();
 
     // Heartbeat every 3 seconds
     announceTimerRef.current = setInterval(() => {
@@ -283,14 +308,13 @@ export function useLocalDiscovery(isAutoDiscovering = true, code?: string) {
     }, 3000);
 
     return () => {
-      clearTimeout(initialTimer);
       if (announceTimerRef.current) {
         clearInterval(announceTimerRef.current);
         announceTimerRef.current = null;
       }
       leaveNetwork();
     };
-  }, [isAutoDiscovering, announcePresence, leaveNetwork]);
+  }, [isAutoDiscovering, validCode, announcePresence, leaveNetwork]);
 
   const updateName = (newName: string) => {
     updateLocalDeviceName(newName);

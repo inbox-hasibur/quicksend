@@ -315,4 +315,62 @@ describe("SignalStore - RedisSignalStore (REST Mode with mocked fetch)", () => {
       })
     );
   });
+
+  it("should throw when Redis REST API returns an error field", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ error: "ERR syntax error" }),
+    });
+
+    const store = new RedisSignalStore(900);
+    await expect(store.getKey("some_key")).rejects.toThrow("ERR syntax error");
+  });
+
+  it("should handle setKey with EX and fallback to plain SET when KEEPTTL fails", async () => {
+    const store = new RedisSignalStore(900);
+
+    // 1. With TTL
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ result: "OK" }),
+    });
+    await store.setKey("exp_key", "val_1", 45);
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      "https://mock-redis.upstash.io",
+      expect.objectContaining({
+        body: JSON.stringify(["SET", "quicksend:exp_key", "val_1", "EX", 45]),
+      })
+    );
+
+    // 2. Without TTL: KEEPTTL succeeds
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ result: "OK" }),
+    });
+    await store.setKey("keep_key", "val_2");
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      "https://mock-redis.upstash.io",
+      expect.objectContaining({
+        body: JSON.stringify(["SET", "quicksend:keep_key", "val_2", "KEEPTTL"]),
+      })
+    );
+
+    // 3. Without TTL: KEEPTTL fails, falls back to plain SET
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ error: "ERR syntax error" }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ result: "OK" }),
+      });
+    await store.setKey("fallback_key", "val_3");
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      "https://mock-redis.upstash.io",
+      expect.objectContaining({
+        body: JSON.stringify(["SET", "quicksend:fallback_key", "val_3"]),
+      })
+    );
+  });
 });

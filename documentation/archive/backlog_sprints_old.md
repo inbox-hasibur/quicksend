@@ -943,3 +943,19 @@
 - [x] Resilient chunk download retries (`src/hooks/useRelayTransfer.ts`):
   - Added retry loop in `downloadWorker` with up to 2 retries (500ms, 1000ms backoff) to withstand transient 4G/mobile network hiccups.
 - [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).
+
+### Fix 18 (2026-11-19): Fix Wi-Fi radar peer discovery and presence lifecycle
+- [x] Decoupled `useLocalDiscovery.ts` lifecycle to prevent premature teardown:
+  - Replaced inline `profile` dependencies in `announcePresence` and `leaveNetwork` with `profileRef = useRef(profile)`, keeping callbacks stable.
+  - Stopped automatic avatar reassignments and name/avatar updates from tearing down the polling effect and sending unintended `action: "leave"` requests to `/api/discover`.
+  - Added `inFlightRef` guard in `announcePresence` to prevent overlapping concurrent network polls.
+  - Tracked `currentNetworkIdRef` so `leaveNetwork` accurately removes device from its active subnet on unmount or network switch.
+- [x] Strengthened `signalStore.ts` error handling & key persistence:
+  - In `RedisSignalStore.command` and `pipeline`, checked for `data.error` and threw explicit errors on Upstash REST 200 `{ "error": "ERR ..." }` responses.
+  - In `RedisSignalStore.setKey`, ensured safe fallback to plain `SET` when `KEEPTTL` is rejected on new keys or engines.
+  - Sanitized Upstash Redis REST credentials with `.replace(/\/+$/, "")` to avoid double-slash URL corruption.
+- [x] Robust IP extraction and 45s presence in `src/app/api/discover/route.ts`:
+  - In `getClientIp()`, prioritized Cloudflare `cf-connecting-ip`, then `x-real-ip`, then `x-forwarded-for` (first entry), followed by `127.0.0.1` fallback.
+  - Extended presence TTL from 15s to 45s (`PRESENCE_TTL_SECONDS = 45`, `PEER_EXPIRY_MS = 45000`, container expiration 120s) to tolerate mobile throttling and tab backgrounding without dropping peers from radar.
+  - In `action: "announce"`, ensured peer presence is persisted (`savePeer`) and re-read so concurrent announcers immediately discover each other on initial heartbeat.
+- [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 40/40 passing targeted vitest tests (`src/app/api/discover/__tests__/route.test.ts` & `src/lib/__tests__/signalStore.test.ts`).

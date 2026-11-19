@@ -284,8 +284,8 @@ flowchart TD
 - **Exports:** `GET(request: Request)`, `POST(request: Request)`
 
 #### `src/app/api/discover/route.ts`
-- **Purpose:** Local network subnet discovery endpoint (`GET`, `POST`). Extracts client IP, groups devices by private subnet or optional 4-digit pairing code (`code:XXXX`) for cross-IP / CGNAT environments, maintains 45-second presence TTL, and coordinates instant 1-tap beaming requests.
-- **Exports:** `GET(request: Request)`, `POST(request: Request)`, `getClientIp(request: Request): string`, `isLocalOrPrivateIp(cleanIp: string): boolean`, `DiscoveredPeer`, `IncomingBeamNotice`.
+- **Purpose:** Local network subnet discovery endpoint (`GET`, `POST`). Extracts client IP with `cf-connecting-ip` -> `x-real-ip` -> `x-forwarded-for` priority, groups devices by private subnet or optional 4-digit pairing code (`code:XXXX`) for cross-IP / CGNAT environments, maintains 45-second presence TTL (`PRESENCE_TTL_SECONDS = 45`), sanitizes Upstash REST credentials, ensures concurrent-safe peer saving before returning active peers, and coordinates instant 1-tap beaming requests.
+- **Exports:** `GET(request: Request)`, `POST(request: Request)`, `getClientIp(request: Request): string`, `isLocalOrPrivateIp(cleanIp: string): boolean`, `computeNetworkId(rawIp: string): string`, `normalizeIpv6Prefix(cleanIp: string): string`, `getNetworkGroupInfo(rawIp: string)`, `PRESENCE_TTL_SECONDS`, `PEER_EXPIRY_MS`, `REDIS_CONTAINER_TTL_SECONDS`, `DiscoveredPeer`, `IncomingBeamNotice`.
 
 #### `src/app/api/turn/route.ts`
 - **Purpose:** Dynamic ICE & TURN credential endpoint (`GET`). Delivers public STUN pool, queries ephemeral TURN credentials securely from Metered.ca without exposing the secret API key to clients, supports static TURN variables, and caches server responses in memory with a 10-minute TTL.
@@ -450,8 +450,8 @@ flowchart TD
 - **Exports:** `useRelayTransfer`, `RelayState`, `RelayStatus`, `RelayFileMetadata`, `RelayItemMetadata`, `RelayPayloadData`.
 
 #### `src/hooks/useLocalDiscovery.ts`
-- **Purpose:** Local network peer discovery via `/api/discover`. Manages peer heartbeat polling, dynamic avatar conflict resolution, incoming beam handling, optional 4-digit pairing code for cross-IP / CGNAT discovery, and exposes detailed poll status (`DiscoveryStatus` with `groupLabel` and `ipFamily`).
-- **Exports:** `useLocalDiscovery(isAutoDiscovering, code): { profile, peers, networkId, incomingBeam, beamToPeer, clearIncomingBeam, isScanning, updateName, cycleAvatar, refreshPeers, status }`, `DiscoveryStatus`, `NearbyPeer`, `IncomingBeamEvent`.
+- **Purpose:** Local network peer discovery via `/api/discover`. Manages peer heartbeat polling every 3s, in-flight request deduplication, dynamic avatar conflict resolution without premature teardown (via decoupled `profileRef`), incoming beam handling, optional 4-digit pairing code for cross-IP / CGNAT discovery, and exposes detailed poll status (`DiscoveryStatus` with `groupLabel` and `ipFamily`).
+- **Exports:** `useLocalDiscovery(isAutoDiscovering, code): { profile, peers, networkId, incomingBeam, beamToPeer, clearIncomingBeam, isScanning, updateName, cycleAvatar, refreshPeers, status, pin, lookupPin }`, `DiscoveryStatus`, `NearbyPeer`, `IncomingBeamEvent`.
 
 #### `src/hooks/useNearbyShare.ts`
 - **Purpose:** Web Share API (`navigator.share`) delegating files and text to native OS Bluetooth, Quick Share, or AirDrop, combined with a Web Bluetooth GATT client (`navigator.bluetooth`) connecting to peripheral BLE hardware sensors.
@@ -526,7 +526,7 @@ flowchart TD
 - **Exports:** `getDeviceProfile(): DeviceProfile`, `saveDeviceProfile(profile: DeviceProfile): void`, `AVATAR_PRESETS`, `DeviceProfile`, `AvatarPreset`, `DeviceFormFactor`.
 
 #### `src/lib/signalStore.ts`
-- **Purpose:** Dual-mode storage adapter for ephemeral signaling rooms. Seamlessly switches between zero-dependency Redis REST mode (using native `fetch` with Upstash Redis / Vercel KV REST API) and in-memory TTL mode with capacity guard and automatic 15-minute pruning.
+- **Purpose:** Dual-mode storage adapter for ephemeral signaling rooms. Seamlessly switches between zero-dependency Redis REST mode (using native `fetch` with Upstash Redis / Vercel KV REST API with trailing slash URL sanitization, command error propagation, and fallback `SET` on unsupported `KEEPTTL`) and in-memory TTL mode with capacity guard and automatic 15-minute pruning.
 - **Exports:** `signalStore`, `MemorySignalStore`, `RedisSignalStore`, `isRedisConfigured`, `getSignalStore`.
 
 #### `src/lib/iceConfig.ts`
