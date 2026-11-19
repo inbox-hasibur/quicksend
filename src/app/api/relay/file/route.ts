@@ -65,15 +65,31 @@ export async function GET(request: Request): Promise<Response> {
         const bucket = getUpstashBucket();
         const signed = await bucket.signedReadUrl(path, { expiresIn: "5m" });
         upstream = await fetch(signed.url, { cache: "no-store" });
+
+        // Seamless fallback if chunk was uploaded before uppercase normalization
+        if (!upstream.ok && upstream.status === 404 && cleanCode !== cleanCode.toLowerCase()) {
+          const altPath = chunkPath(cleanCode.toLowerCase(), rid, file.id, index);
+          try {
+            const altSigned = await bucket.signedReadUrl(altPath, { expiresIn: "5m" });
+            const altRes = await fetch(altSigned.url, { cache: "no-store" });
+            if (altRes.ok) {
+              upstream = altRes;
+            }
+          } catch {
+            // Keep original upstream response
+          }
+        }
       } catch (bucketErr) {
         if (room.relay.baseUrl) {
           const cleanBase = room.relay.baseUrl.replace(/\/$/, "");
           const fullUrl = `${cleanBase}/${path}`;
           if (!isAllowedRelayUrl(fullUrl, cleanCode)) {
+            console.error(`[Relay File] Forbidden storage host: ${fullUrl}`);
             return NextResponse.json({ error: "Forbidden storage host" }, { status: 403 });
           }
           upstream = await fetch(fullUrl, { cache: "no-store" });
         } else {
+          console.error(`[Relay File] Bucket signedReadUrl failed for "${path}":`, bucketErr);
           throw bucketErr;
         }
       }
@@ -81,6 +97,7 @@ export async function GET(request: Request): Promise<Response> {
       const cleanBase = room.relay.baseUrl.replace(/\/$/, "");
       const fullUrl = `${cleanBase}/${path}`;
       if (!isAllowedRelayUrl(fullUrl, cleanCode)) {
+        console.error(`[Relay File] Forbidden storage host: ${fullUrl}`);
         return NextResponse.json({ error: "Forbidden storage host" }, { status: 403 });
       }
       upstream = await fetch(fullUrl, { cache: "no-store" });
@@ -89,8 +106,15 @@ export async function GET(request: Request): Promise<Response> {
     }
 
     if (!upstream.ok || !upstream.body) {
+      console.error(
+        `[Relay File] Storage fetch failed for chunk "${path}": upstream HTTP ${upstream.status}`
+      );
       return NextResponse.json(
-        { error: "Failed to stream chunk from storage" },
+        {
+          error: `Failed to stream chunk from storage (upstream HTTP ${upstream.status})`,
+          status: upstream.status,
+          path,
+        },
         { status: upstream.status || 502 }
       );
     }

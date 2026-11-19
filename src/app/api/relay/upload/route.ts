@@ -107,19 +107,6 @@ export async function POST(request: Request): Promise<NextResponse> {
   try {
     const bucket = getUpstashBucket();
 
-    let baseUrl: string | undefined;
-    try {
-      const pub = await bucket.publicUrl("");
-      if (pub) {
-        baseUrl = pub.replace(/\/+$/, "");
-      }
-    } catch {
-      // Fallback if publicUrl fails
-    }
-    if (!baseUrl && process.env.UPSTASH_BLOB_URL?.trim()) {
-      baseUrl = process.env.UPSTASH_BLOB_URL.trim().replace(/\/+$/, "");
-    }
-
     const urls = await Promise.all(
       (chunks as ChunkUploadItem[]).map(async (chunk) => {
         const signed = await bucket.signedUploadUrl(chunk.path, {
@@ -133,6 +120,38 @@ export async function POST(request: Request): Promise<NextResponse> {
         };
       })
     );
+
+    let baseUrl: string | undefined;
+    const chunkList = chunks as ChunkUploadItem[];
+    if (chunkList.length > 0) {
+      try {
+        const samplePath = chunkList[0].path;
+        const samplePub = await bucket.publicUrl(samplePath);
+        if (samplePub) {
+          const cleanSample = samplePath.replace(/^\/+/, "");
+          const suffix = `/${cleanSample}`;
+          if (samplePub.endsWith(suffix)) {
+            baseUrl = samplePub.slice(0, -suffix.length);
+          } else {
+            const idx = samplePub.indexOf(suffix);
+            if (idx !== -1) {
+              baseUrl = samplePub.slice(0, idx);
+            } else {
+              try {
+                baseUrl = new URL(samplePub).origin;
+              } catch {
+                baseUrl = undefined;
+              }
+            }
+          }
+        }
+      } catch (pubErr) {
+        console.warn("[Relay Upload] publicUrl derivation notice:", pubErr);
+      }
+    }
+    if (!baseUrl && process.env.UPSTASH_BLOB_URL?.trim()) {
+      baseUrl = process.env.UPSTASH_BLOB_URL.trim().replace(/\/+$/, "");
+    }
 
     return NextResponse.json({ urls, baseUrl });
   } catch (error) {

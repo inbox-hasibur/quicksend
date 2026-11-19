@@ -929,3 +929,17 @@
   - Updated `POST /api/relay/attach` to cleanly accept text-only transfers (`files: []` + `text`).
   - Verified limit checks against `RELAY_MAX_FILE_BYTES` (750 MiB), `RELAY_MAX_TRANSFER_BYTES` (800 MiB), `RELAY_CHUNK_BYTES` (8 MiB), and `RELAY_MAX_CHUNKS_PER_FILE` (100).
 - [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).
+
+### Fix 17 (2026-11-19): Fix chunk streaming, baseUrl resolution, and download retries
+- [x] Fixed `baseUrl` resolution in `src/app/api/relay/upload/route.ts`:
+  - Moved `publicUrl` lookup after `signedUploadUrl` generation, passing a non-empty chunk path and stripping the path suffix to derive the canonical bucket origin (e.g. `https://<id>.blob.upstash.io`).
+  - Kept `process.env.UPSTASH_BLOB_URL` as secondary fallback.
+  - In `src/hooks/useRelayTransfer.ts`, prevented falling back to private `r2.cloudflarestorage.com` origin as `discoveredBaseUrl`.
+  - In `src/app/api/relay/attach/route.ts`, allowed `baseUrl` to be optional/empty string when `files.length > 0` while preserving `isAllowedRelayUrl` validation for non-empty URLs.
+- [x] Fixed chunk streaming proxy in `src/app/api/relay/file/route.ts`:
+  - Verified canonical `chunkPath` with `cleanCode = normalizeRoomCode(rawCode)`.
+  - Added seamless lowercase room code fallback if initial chunk read returns 404.
+  - Enhanced error diagnostics with server log (`console.error`) and included upstream HTTP status code in error JSON.
+- [x] Resilient chunk download retries (`src/hooks/useRelayTransfer.ts`):
+  - Added retry loop in `downloadWorker` with up to 2 retries (500ms, 1000ms backoff) to withstand transient 4G/mobile network hiccups.
+- [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).

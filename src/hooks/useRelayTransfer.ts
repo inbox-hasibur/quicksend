@@ -488,16 +488,8 @@ export function useRelayTransfer() {
             throw new Error(uploadData.error || "Failed to get upload URLs");
           }
 
-          if (!discoveredBaseUrl) {
-            if (uploadData.baseUrl) {
-              discoveredBaseUrl = uploadData.baseUrl;
-            } else if (uploadData.urls.length > 0) {
-              try {
-                discoveredBaseUrl = new URL(uploadData.urls[0].url).origin;
-              } catch {
-                // Ignore malformed origin
-              }
-            }
+          if (!discoveredBaseUrl && uploadData.baseUrl) {
+            discoveredBaseUrl = uploadData.baseUrl;
           }
 
           // Upload chunks with concurrency 2
@@ -850,48 +842,69 @@ export function useRelayTransfer() {
                   const idx = downloadIdx++;
                   if (idx >= file.chunkCount) break;
 
-                  try {
-                    const path = chunkPath(cleanRoom, rid, file.id, idx);
-                    let cipherBuffer: ArrayBuffer | null = null;
+                  const DOWNLOAD_RETRY_BACKOFFS = [500, 1000];
+                  let attempt = 0;
+                  let chunkSuccess = false;
+                  let lastChunkError: Error | null = null;
 
-                    // 1. Direct fetch from storage bucket
-                    if (baseUrl) {
-                      try {
-                        const directRes = await fetch(`${baseUrl}/${path}`, { signal });
-                        if (directRes.ok) {
-                          cipherBuffer = await directRes.arrayBuffer();
-                        }
-                      } catch {
-                        // Fall back on network or CORS error
-                      }
-                    }
+                  while (attempt <= 2 && !chunkSuccess) {
+                    if (signal.aborted) throw new DOMException("Aborted", "AbortError");
+                    if (downloadError) return;
 
-                    // 2. Fallback to /api/relay/file
-                    if (!cipherBuffer) {
-                      const fallbackRes = await fetch(
-                        `/api/relay/file?code=${encodeURIComponent(cleanRoom)}&f=${encodeURIComponent(file.id)}&i=${idx}`,
-                        { signal }
-                      );
-                      if (!fallbackRes.ok) {
-                        let errDetail = "";
+                    try {
+                      const path = chunkPath(cleanRoom, rid, file.id, idx);
+                      let cipherBuffer: ArrayBuffer | null = null;
+
+                      // 1. Direct fetch from storage bucket
+                      if (baseUrl) {
                         try {
-                          const errData = (await fallbackRes.json()) as { error?: string };
-                          if (errData?.error) errDetail = `: ${errData.error}`;
+                          const directRes = await fetch(`${baseUrl}/${path}`, { signal });
+                          if (directRes.ok) {
+                            cipherBuffer = await directRes.arrayBuffer();
+                          }
                         } catch {
-                          // ignore non-json error
+                          // Fall back on network or CORS error
                         }
-                        throw new Error(
-                          `Failed to download chunk ${idx + 1}/${file.chunkCount} of ${file.name} (HTTP ${fallbackRes.status}${errDetail})`
-                        );
                       }
-                      cipherBuffer = await fallbackRes.arrayBuffer();
-                    }
 
-                    const aad = chunkAad(file.id, idx, file.chunkCount);
-                    const plainBuffer = await decryptChunk(key, cipherBuffer, file.ivPrefix, idx, aad);
-                    chunkBuffers[idx] = plainBuffer;
-                  } catch (err) {
-                    downloadError = err instanceof Error ? err : new Error(String(err));
+                      // 2. Fallback to /api/relay/file
+                      if (!cipherBuffer) {
+                        const fallbackRes = await fetch(
+                          `/api/relay/file?code=${encodeURIComponent(cleanRoom)}&f=${encodeURIComponent(file.id)}&i=${idx}`,
+                          { signal }
+                        );
+                        if (!fallbackRes.ok) {
+                          let errDetail = "";
+                          try {
+                            const errData = (await fallbackRes.json()) as { error?: string };
+                            if (errData?.error) errDetail = `: ${errData.error}`;
+                          } catch {
+                            // ignore non-json error
+                          }
+                          throw new Error(
+                            `Failed to download chunk ${idx + 1}/${file.chunkCount} of ${file.name} (HTTP ${fallbackRes.status}${errDetail})`
+                          );
+                        }
+                        cipherBuffer = await fallbackRes.arrayBuffer();
+                      }
+
+                      const aad = chunkAad(file.id, idx, file.chunkCount);
+                      const plainBuffer = await decryptChunk(key, cipherBuffer, file.ivPrefix, idx, aad);
+                      chunkBuffers[idx] = plainBuffer;
+                      chunkSuccess = true;
+                    } catch (err) {
+                      lastChunkError = err instanceof Error ? err : new Error(String(err));
+                      if (attempt < 2 && !signal.aborted) {
+                        await delay(DOWNLOAD_RETRY_BACKOFFS[attempt]);
+                        attempt++;
+                      } else {
+                        break;
+                      }
+                    }
+                  }
+
+                  if (!chunkSuccess) {
+                    downloadError = lastChunkError || new Error(`Failed to download chunk ${idx + 1} of ${file.name}`);
                     break;
                   }
                 }
