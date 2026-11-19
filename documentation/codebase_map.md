@@ -296,7 +296,7 @@ flowchart TD
 - **Exports:** `GET(): Promise<NextResponse>`.
 
 #### `src/app/api/relay/attach/route.ts`
-- **Purpose:** Encrypted relay attachment endpoint (`GET`, `POST`). Validates room codes, `rid` (32 hex), `baseUrl` with `isAllowedRelayUrl()`, bounds file size to 200MB (total 300MB), files to 5, and verifies chunkCount matches `ceil(size / 4MB)`. Stores relay manifest in `signalStore` without server-side key exposure. Rate-limited to 30 req/min per IP.
+- **Purpose:** Encrypted relay attachment endpoint (`GET`, `POST`). Validates room codes, `rid` (32 hex), `baseUrl` with `isAllowedRelayUrl()`, bounds file size to 750MB (total 800MB), files to 5, and verifies chunkCount matches `ceil(size / 8MB)`. Supports text-only payloads (`files: []` + `text`). Stores relay manifest in `signalStore` without server-side key exposure. Rate-limited to 30 req/min per IP.
 - **Exports:** `GET(request: Request): Promise<NextResponse>`, `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/complete/route.ts`
@@ -542,7 +542,7 @@ flowchart TD
 - **Exports:** `isUpstashBlobConfigured`, `getUpstashBucketName`, `getUpstashBucket`, `isAllowedRelayUrl`, `upload`, `UploadOptions`, `PutBlobResult`.
 
 #### `src/lib/relayCrypto.ts`
-- **Purpose:** Zero-knowledge client-side cryptography module for encrypted cloud relay transfers. Generates 6-digit numeric OTPs (`generateNumericOtp`), normalizes OTPs (`normalizeNumericOtp`), derives zero-knowledge room IDs via SHA-256 (`deriveRoomIdFromOtp`), generates 8-character legacy codes, 16-byte random salts, derives non-extractable AES-GCM 256 keys via PBKDF2 (SHA-256, 200,000 iterations) from numeric OTPs or legacy codes, and performs authenticated symmetric encryption/decryption with random 12-byte IVs. Supports chunk-based authenticated encryption (`encryptChunk`, `decryptChunk`) with deterministic 12-byte IVs (4-byte base64 prefix + 8-byte big-endian index) and AAD binding.
+- **Purpose:** Zero-knowledge client-side cryptography module for encrypted cloud relay transfers. Generates 6-digit numeric OTPs (`generateNumericOtp`), normalizes OTPs (`normalizeNumericOtp`), derives uppercase zero-knowledge room IDs via SHA-256 (`deriveRoomIdFromOtp`), generates 8-character legacy codes, 16-byte random salts, derives non-extractable AES-GCM 256 keys via PBKDF2 (SHA-256, 200,000 iterations) from numeric OTPs or legacy codes, and performs authenticated symmetric encryption/decryption with random 12-byte IVs. Supports chunk-based authenticated encryption (`encryptChunk`, `decryptChunk`) with deterministic 12-byte IVs (4-byte base64 prefix + 8-byte big-endian index) and AAD binding.
 - **Exports:** `generateRelayCode`, `normalizeRelayCode`, `generateNumericOtp`, `normalizeNumericOtp`, `deriveRoomIdFromOtp`, `generateSalt`, `generateIvPrefix`, `deriveRelayKey`, `encryptText`, `decryptText`, `encryptChunk`, `decryptChunk`.
 
 #### `src/lib/relayLimits.ts`

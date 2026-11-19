@@ -916,3 +916,16 @@
   - Lowered chunk upload concurrency from 3 to 2 for improved connection stability.
   - Added safe non-secret diagnostic logging (`console.error` with target hostname, HTTP status, and sanitized message — omitting signature tokens) and descriptive UI error messaging (`Upload blocked by storage CORS/CSP (host: ...)` or `Upload failed at chunk X of Y: HTTP ...`).
 - [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).
+
+### Fix 16 (2026-11-19): Fix room code case sensitivity and unmask download errors
+- [x] Resolved room code uppercase/lowercase mismatch across storage and routes:
+  - In `src/lib/relayCrypto.ts`, updated `deriveRoomIdFromOtp()` to return uppercase hex (`hex.toUpperCase()`) matching `normalizeRoomCode()`.
+  - In `src/hooks/useRelayTransfer.ts`, ensured `cleanRoom = normalizeRoomCode(await deriveRoomIdFromOtp(otp6))` in sender pipeline, receiver `receiveByOtp()`, and `downloadRelay()` so storage keys match between upload (`chunkPath`) and retrieval (`/api/relay/file`).
+  - In `src/hooks/useRelayTransfer.ts`, updated `cancelRelay()` so passing a 6-digit OTP resolves via `activeRoomCodeRef.current` or `deriveRoomIdFromOtp()` to delete the actual hashed room blobs.
+- [x] Stop masking download errors as "Invalid or expired OTP":
+  - In `src/hooks/useRelayTransfer.ts`, removed `msg.includes("Failed to download")` from the ternary in `receiveByOtp()`, only masking genuine 404 missing room or `Wrong relay code` decryption errors.
+  - Added HTTP status and server error detail reporting on `/api/relay/file` fallback download failures.
+- [x] Robust attach validation and text-only payload support (`src/app/api/relay/attach/route.ts`):
+  - Updated `POST /api/relay/attach` to cleanly accept text-only transfers (`files: []` + `text`).
+  - Verified limit checks against `RELAY_MAX_FILE_BYTES` (750 MiB), `RELAY_MAX_TRANSFER_BYTES` (800 MiB), `RELAY_CHUNK_BYTES` (8 MiB), and `RELAY_MAX_CHUNKS_PER_FILE` (100).
+- [x] Verified zero TypeScript compilation errors (`npx tsc --noEmit`) and 0 ESLint warnings/errors (`npm run lint`).

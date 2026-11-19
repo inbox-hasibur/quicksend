@@ -360,7 +360,7 @@ export function useRelayTransfer() {
           if (numeric) {
             otp6 = numeric;
             formattedOtp = formatRoomCode(numeric);
-            cleanRoom = await deriveRoomIdFromOtp(otp6);
+            cleanRoom = normalizeRoomCode(await deriveRoomIdFromOtp(otp6));
           } else {
             formattedOtp = explicitRoomCode;
             otp6 = explicitRoomCode;
@@ -369,7 +369,7 @@ export function useRelayTransfer() {
         } else {
           formattedOtp = generateNumericOtp();
           otp6 = normalizeNumericOtp(formattedOtp)!;
-          cleanRoom = await deriveRoomIdFromOtp(otp6);
+          cleanRoom = normalizeRoomCode(await deriveRoomIdFromOtp(otp6));
         }
 
         activeRoomCodeRef.current = cleanRoom;
@@ -646,7 +646,7 @@ export function useRelayTransfer() {
             : {
                 roomCode: cleanRoom,
                 salt,
-                items: [],
+                files: [],
                 text: encryptedTextPayload,
               };
 
@@ -708,7 +708,13 @@ export function useRelayTransfer() {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
     }
-    const code = roomCode || activeRoomCodeRef.current;
+    let code = roomCode || activeRoomCodeRef.current;
+    if (code) {
+      const cleanOtp = normalizeNumericOtp(code);
+      if (cleanOtp) {
+        code = activeRoomCodeRef.current || (await deriveRoomIdFromOtp(cleanOtp));
+      }
+    }
     if (code) {
       const clean = normalizeRoomCode(code);
       await fetch("/api/relay/complete", {
@@ -867,7 +873,16 @@ export function useRelayTransfer() {
                         { signal }
                       );
                       if (!fallbackRes.ok) {
-                        throw new Error(`Failed to download encrypted chunk ${idx} of file ${file.name}`);
+                        let errDetail = "";
+                        try {
+                          const errData = (await fallbackRes.json()) as { error?: string };
+                          if (errData?.error) errDetail = `: ${errData.error}`;
+                        } catch {
+                          // ignore non-json error
+                        }
+                        throw new Error(
+                          `Failed to download chunk ${idx + 1}/${file.chunkCount} of ${file.name} (HTTP ${fallbackRes.status}${errDetail})`
+                        );
                       }
                       cipherBuffer = await fallbackRes.arrayBuffer();
                     }
@@ -1072,7 +1087,7 @@ export function useRelayTransfer() {
       const signal = abortController.signal;
 
       try {
-        const roomCode = await deriveRoomIdFromOtp(otp6);
+        const roomCode = normalizeRoomCode(await deriveRoomIdFromOtp(otp6));
         activeRoomCodeRef.current = roomCode;
 
         const res = await fetch(`/api/relay/attach?code=${encodeURIComponent(roomCode)}`, {
@@ -1093,8 +1108,7 @@ export function useRelayTransfer() {
         if (signal.aborted) return;
         const msg = err instanceof Error ? err.message : "Failed to receive transfer.";
         const finalMsg =
-          msg.includes("Failed to download") ||
-          msg.includes("Wrong relay code") ||
+          msg === "Wrong relay code" ||
           msg.includes("Invalid or expired OTP")
             ? "Invalid or expired OTP. Please check the 6-digit code."
             : msg;

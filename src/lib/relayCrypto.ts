@@ -93,7 +93,7 @@ export function normalizeNumericOtp(input: string): string | null {
 }
 
 /**
- * Computes SHA-256("qs-room:" + otp6) and returns the first 16 lowercase hex characters.
+ * Computes SHA-256("qs-room:" + otp6) and returns the first 16 uppercase hex characters.
  * Server stores and matches this room ID without ever seeing the raw 6-digit OTP.
  */
 export async function deriveRoomIdFromOtp(otp6: string): Promise<string> {
@@ -106,7 +106,7 @@ export async function deriveRoomIdFromOtp(otp6: string): Promise<string> {
   for (let i = 0; i < 8; i++) {
     hex += hashBytes[i].toString(16).padStart(2, "0");
   }
-  return hex;
+  return hex.toUpperCase();
 }
 
 /**

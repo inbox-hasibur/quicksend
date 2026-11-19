@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   }
 
   // Return manifest without any encryption key
-  if (room.relay.files && room.relay.rid) {
+  if (room.relay.files !== undefined) {
     return NextResponse.json({
       relay: {
         rid: room.relay.rid,
@@ -87,16 +87,29 @@ export async function POST(request: Request) {
 
     // Chunk-based encrypted relay payload
     if (Array.isArray(files)) {
-      if (files.length === 0 || files.length > RELAY_MAX_FILES) {
+      if (files.length > RELAY_MAX_FILES) {
         return NextResponse.json({ error: "Invalid files count" }, { status: 400 });
       }
 
-      if (!rid || typeof rid !== "string" || !/^[0-9a-f]{32}$/i.test(rid)) {
-        return NextResponse.json({ error: "Invalid rid" }, { status: 400 });
+      if (files.length === 0 && (!text || typeof text !== "object")) {
+        return NextResponse.json({ error: "No payload provided" }, { status: 400 });
       }
 
-      if (!baseUrl || typeof baseUrl !== "string" || !isAllowedRelayUrl(baseUrl, roomCode)) {
-        return NextResponse.json({ error: "Forbidden storage host" }, { status: 400 });
+      if (files.length > 0) {
+        if (!rid || typeof rid !== "string" || !/^[0-9a-f]{32}$/i.test(rid)) {
+          return NextResponse.json({ error: "Invalid rid" }, { status: 400 });
+        }
+
+        if (!baseUrl || typeof baseUrl !== "string" || !isAllowedRelayUrl(baseUrl, roomCode)) {
+          return NextResponse.json({ error: "Forbidden storage host" }, { status: 400 });
+        }
+      } else {
+        if (rid && (typeof rid !== "string" || !/^[0-9a-f]{32}$/i.test(rid))) {
+          return NextResponse.json({ error: "Invalid rid" }, { status: 400 });
+        }
+        if (baseUrl && (typeof baseUrl !== "string" || !isAllowedRelayUrl(baseUrl, roomCode))) {
+          return NextResponse.json({ error: "Forbidden storage host" }, { status: 400 });
+        }
       }
 
       let totalSize = 0;
@@ -159,8 +172,8 @@ export async function POST(request: Request) {
       const relayPayload: SignalingRoomState["relay"] = {
         salt,
         createdAt: Date.now(),
-        rid,
-        baseUrl,
+        ...(rid ? { rid } : {}),
+        ...(baseUrl ? { baseUrl } : {}),
         files: (files as AttachFileInput[]).map((f) => ({
           id: f.id,
           name: f.name,
