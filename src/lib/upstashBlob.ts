@@ -140,7 +140,7 @@ export function getUpstashBucket(): Bucket {
 /**
  * Validate that a URL belongs to the allowed Upstash Blob storage domain and room path.
  */
-export function isAllowedRelayUrl(urlStr: string, roomCode: string): boolean {
+export function isAllowedRelayUrl(urlStr: string, roomCode?: string): boolean {
   try {
     const parsed = new URL(urlStr);
     if (parsed.protocol !== "https:") {
@@ -168,6 +168,11 @@ export function isAllowedRelayUrl(urlStr: string, roomCode: string): boolean {
 
     if (!hostAllowed) {
       return false;
+    }
+
+    // When validating a baseUrl (root path) or roomCode is not specified, host check is sufficient
+    if (!roomCode || parsed.pathname === "/" || parsed.pathname === "") {
+      return true;
     }
 
     const cleanCode = normalizeRoomCode(roomCode);

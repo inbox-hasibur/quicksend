@@ -292,19 +292,19 @@ flowchart TD
 - **Exports:** `GET(): Promise<NextResponse>`, `_resetTurnCacheForTest(): void`.
 
 #### `src/app/api/relay/status/route.ts`
-- **Purpose:** Ephemeral encrypted cloud relay availability endpoint (`GET`). Returns `{ available, maxFileBytes, maxFiles, ttlMinutes }` based on `isUpstashBlobConfigured()` with `Cache-Control: no-store`.
+- **Purpose:** Ephemeral encrypted cloud relay availability endpoint (`GET`). Returns `{ available, maxFileBytes, maxTransferBytes, maxFiles, chunkBytes, ttlMinutes }` reading constants from `relayLimits.ts` with `Cache-Control: no-store`.
 - **Exports:** `GET(): Promise<NextResponse>`.
 
 #### `src/app/api/relay/attach/route.ts`
-- **Purpose:** Encrypted relay attachment endpoint (`GET`, `POST`). Validates room codes, validates blob URLs with `isAllowedRelayUrl()`, bounds file size to 50MB and items to 5. Stores relay metadata (salt, items, IVs, optional encrypted text) in `signalStore` without server-side key exposure. Rate-limited to 30 req/min per IP.
+- **Purpose:** Encrypted relay attachment endpoint (`GET`, `POST`). Validates room codes, `rid` (32 hex), `baseUrl` with `isAllowedRelayUrl()`, bounds file size to 200MB (total 300MB), files to 5, and verifies chunkCount matches `ceil(size / 4MB)`. Stores relay manifest in `signalStore` without server-side key exposure. Rate-limited to 30 req/min per IP.
 - **Exports:** `GET(request: Request): Promise<NextResponse>`, `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/complete/route.ts`
-- **Purpose:** Relay completion & cleanup endpoint (`POST`). Idempotently purges verified blob URLs/paths from `@upstash/blob` via `bucket.del()` using ONLY targets found in the verified store (ignoring request body URLs) and clears room relay state. Rate-limited to 30 req/min per IP.
+- **Purpose:** Relay completion & cleanup endpoint (`POST`). Idempotently purges verified chunk paths from `@upstash/blob` via `bucket.del()` using paths derived from the stored manifest (`chunkPath`) and purges leftover unattached objects under `relay/<roomCode>/<rid>/` via `bucket.list()`. Rate-limited to 30 req/min per IP.
 - **Exports:** `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/upload/route.ts`
-- **Purpose:** Secure Upstash Blob presigned upload URL generator (`POST`) via `bucket.signedUploadUrl()`. Enforces room code and strict pathname format (`^relay/<roomCode>/[A-Za-z0-9._-]{1,80}$`, case-insensitive), client IP rate limiting (50 tokens/hr), and daily upload budget (600 MB/day).
+- **Purpose:** Secure Upstash Blob presigned chunk upload URL generator (`POST`) via `bucket.signedUploadUrl()`. Accepts `{ roomCode, rid, chunks }` (max 64 chunks/request), validates every chunk path via `isValidChunkPath`, and issues 10-minute presigned upload URLs. Enforces IP byte rate limiting (600 MB/hr) and daily upload budget via `process.env.RELAY_DAILY_BYTES` (default 629145600 bytes).
 - **Exports:** `POST(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/cleanup/route.ts`
@@ -312,7 +312,7 @@ flowchart TD
 - **Exports:** `GET(request: Request): Promise<NextResponse>`.
 
 #### `src/app/api/relay/file/route.ts`
-- **Purpose:** Lightweight fallback streaming endpoint (`GET`). Directly streams encrypted blob payload from Upstash/R2 storage (`new Response(upstream.body)`) when client-side cross-origin fetch hits CORS restrictions on restrictive networks.
+- **Purpose:** Hardened chunk streaming proxy endpoint (`GET /api/relay/file?code=<roomCode>&f=<fileId>&i=<index>`). Verifies fileId in stored room manifest and chunk index bounds, constructs canonical path with `chunkPath`, and fetches upstream chunk via `bucket.signedReadUrl(path)` (or verified baseUrl), completely preventing SSRF by never fetching arbitrary query URLs. Rate-limited to 600 req/10m per IP.
 - **Exports:** `GET(request: Request): Promise<Response>`.
 
 ---
@@ -627,8 +627,8 @@ flowchart TD
 | `src/app/api/discover/__tests__/route.test.ts` | `api/discover/route.ts` | Local IP detection, subnet grouping, 4-digit PIN pairing, beam delivery, and TTL expiration. |
 | `src/app/api/health/__tests__/route.test.ts` | `api/health/route.ts` | Operational health check JSON payload, Redis/memory storage telemetry, and HTTP 200. |
 | `src/app/api/relay/__tests__/cleanup.test.ts` | `api/relay/cleanup/route.ts` | Bearer CRON_SECRET auth, Blob list cursor pagination, 30-minute stale blob del() purge. |
-| `src/app/api/relay/__tests__/route.test.ts` | `api/relay/status & attach & complete` | 503 without token, domain validation, size bounding, and idempotent verified blob deletion. |
-| `src/app/api/relay/__tests__/upload.test.ts` | `api/relay/upload/route.ts` | Client upload token generation, IP rate limiting (6/hr), daily budget (600MB) checks. |
+| `src/app/api/relay/__tests__/route.test.ts` | `api/relay/status, attach, complete, file` | Status limits, foreign baseUrl rejection, chunkCount mismatch, 300MB total ceiling, SSRF file proxy prevention, and exact manifest blob deletion. |
+| `src/app/api/relay/__tests__/upload.test.ts` | `api/relay/upload/route.ts` | Chunk batch validation (max 64), bad path/rid rejection, oversized chunks, hourly byte limiter (600MB/hr), and daily budget (process.env.RELAY_DAILY_BYTES). |
 | `src/app/api/signal/__tests__/route.test.ts` | `api/signal/route.ts` | Room creation, room query by code, peer joining, signaling delivery, error codes, and cleanup. |
 | `src/app/api/turn/__tests__/route.test.ts` | `api/turn/route.ts` | Dynamic TURN fetching, Metered API caching, STUN fallback, and static config. |
 | `src/components/__tests__/CableTransferCard.test.tsx` | `CableTransferCard.tsx` | Mode 6 cable UI, Android USB tethering shortcut button, and direct PIN connection flow. |

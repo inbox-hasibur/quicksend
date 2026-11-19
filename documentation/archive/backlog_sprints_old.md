@@ -759,3 +759,28 @@
   - Added `src/lib/__tests__/relayChunks.test.ts` covering boundary chunk planning (0, 1, 4 MiB, 4 MiB + 1, 200 MiB), AAD generation, cipher sizing, and strict path validation against traversal and out-of-bounds indices.
   - Added chunk encryption/decryption tests in `src/lib/__tests__/relayCrypto.test.ts` verifying 3-chunk round-trip, AAD mismatch on chunk swap, wrong code rejection, and IV prefix generation.
   - Verified 47/47 test files passing (310/310 unit tests), 0 ESLint warnings/errors, and clean Turbopack production build.
+
+### Fix 11 (2026-11-19): Chunked relay server route handlers and proxy security hardening
+- [x] Updated `src/app/api/relay/status/route.ts`:
+  - Returns `RELAY_MAX_FILE_BYTES` (200 MiB), `RELAY_MAX_TRANSFER_BYTES` (300 MiB), `RELAY_MAX_FILES` (5), `chunkBytes: RELAY_CHUNK_BYTES` (4 MiB), and `ttlMinutes: RELAY_TTL_MINUTES` (15) from `relayLimits.ts`.
+- [x] Hardened chunk upload route in `src/app/api/relay/upload/route.ts`:
+  - Accepts new `{ roomCode, rid, chunks: { path: string, size: number }[] }` payload with max 64 chunks per batch.
+  - Validates roomCode, rid (32-character hex), path with `isValidChunkPath`, and chunk sizes (1 byte to `RELAY_CHUNK_BYTES + 16`).
+  - Generates 10-minute signed upload URLs via `bucket.signedUploadUrl`.
+  - Byte-counter rate limiting: enforces at most 600 MB/hr per IP and configurable daily budget via `process.env.RELAY_DAILY_BYTES` (default 629145600 bytes) with HTTP 429 `"Relay daily limit reached"` and HTTP 503 when unconfigured.
+- [x] Secured manifest attachment in `src/app/api/relay/attach/route.ts`:
+  - POST accepts `{ roomCode, rid, salt, baseUrl, files, text? }`.
+  - Validates rid (32 hex), baseUrl via `isAllowedRelayUrl`, max 5 files, file ids (16 hex), max 200 MiB per file, chunkCount matching `ceil(size / 4MB)` (max 50), total size max 300 MiB, and name max 200 chars.
+  - GET returns verified manifest without storing or exposing encryption keys.
+- [x] Streamlined and secured file streaming route in `src/app/api/relay/file/route.ts`:
+  - Changed signature to `GET /api/relay/file?code=<roomCode>&f=<fileId>&i=<index>`.
+  - Validates file existence in stored room manifest and index < chunkCount.
+  - Constructs canonical path with `chunkPath` and fetches via `bucket.signedReadUrl(path)` (or verified baseUrl), completely eliminating SSRF risk by never fetching arbitrary query URLs.
+  - Enforces 600 requests per 10 minutes per IP rate limit.
+- [x] Hardened cleanup in `src/app/api/relay/complete/route.ts`:
+  - Deletes all chunk paths derived from verified stored manifest with `bucket.del`.
+  - Scans leftover prefix `relay/<roomCode>/<rid>/` via `bucket.list` to purge unattached chunks. Idempotent.
+- [x] Enhanced `isAllowedRelayUrl` in `src/lib/upstashBlob.ts` to support both full chunk URLs and root baseUrls on permitted storage providers.
+- [x] Updated automated test suites in `upload.test.ts` and `route.test.ts`:
+  - Verified rejection of bad paths, bad rids, oversized chunks, >64 chunks, byte limit overruns, chunkCount mismatches, totals > 300 MB, foreign baseUrls, unknown fileIds/indices, SSRF query URL isolation, and idempotent complete deletion.
+  - 47 test suites, 317/317 unit tests passing, 0 ESLint warnings/errors, and clean Turbopack build.
