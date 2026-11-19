@@ -98,7 +98,7 @@ function bytesToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-const FORBIDDEN_HEADERS = new Set([
+const FORBIDDEN_BROWSER_HEADERS = new Set([
   "content-length",
   "host",
   "connection",
@@ -107,6 +107,99 @@ const FORBIDDEN_HEADERS = new Set([
   "referer",
   "cookie",
 ]);
+
+function buildSafePutHeaders(signedHeaders?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = {};
+  if (signedHeaders) {
+    for (const [key, val] of Object.entries(signedHeaders)) {
+      if (typeof val === "string" && !FORBIDDEN_BROWSER_HEADERS.has(key.toLowerCase())) {
+        headers[key] = val;
+      }
+    }
+  }
+  if (!headers["content-type"] && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/octet-stream";
+  }
+  return headers;
+}
+
+interface UploadChunkXhrOptions {
+  url: string;
+  headers: Record<string, string>;
+  body: ArrayBuffer | Blob;
+  signal?: AbortSignal;
+  onProgress?: (loaded: number, total: number) => void;
+}
+
+interface UploadChunkResult {
+  status: number;
+  statusText: string;
+  responseText: string;
+}
+
+function uploadChunkXhr(opts: UploadChunkXhrOptions): Promise<UploadChunkResult> {
+  return new Promise((resolve, reject) => {
+    if (opts.signal?.aborted) {
+      return reject(new DOMException("Aborted", "AbortError"));
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", opts.url, true);
+
+    for (const [key, val] of Object.entries(opts.headers)) {
+      try {
+        xhr.setRequestHeader(key, val);
+      } catch {
+        // Ignore unsafe/disallowed headers in browser runtime
+      }
+    }
+
+    const onAbort = () => {
+      xhr.abort();
+      reject(new DOMException("Aborted", "AbortError"));
+    };
+
+    if (opts.signal) {
+      opts.signal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    if (xhr.upload && opts.onProgress) {
+      xhr.upload.onprogress = (e) => {
+        opts.onProgress!(
+          e.loaded,
+          e.lengthComputable ? e.total : (opts.body as ArrayBuffer).byteLength || e.loaded
+        );
+      };
+    }
+
+    xhr.onload = () => {
+      if (opts.signal) {
+        opts.signal.removeEventListener("abort", onAbort);
+      }
+      resolve({
+        status: xhr.status,
+        statusText: xhr.statusText,
+        responseText: xhr.responseText || "",
+      });
+    };
+
+    xhr.onerror = () => {
+      if (opts.signal) {
+        opts.signal.removeEventListener("abort", onAbort);
+      }
+      reject(new TypeError("Network or CORS error"));
+    };
+
+    xhr.ontimeout = () => {
+      if (opts.signal) {
+        opts.signal.removeEventListener("abort", onAbort);
+      }
+      reject(new Error("Upload timed out"));
+    };
+
+    xhr.send(opts.body);
+  });
+}
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -335,6 +428,22 @@ export function useRelayTransfer() {
         let chunksCompleted = 0;
         let discoveredBaseUrl = "";
 
+        // Track per-chunk in-flight bytes for real-time smooth byte progress
+        const inFlightBytes = new Map<number, number>();
+
+        const updateLiveProgress = () => {
+          let inFlightTotal = 0;
+          for (const loaded of inFlightBytes.values()) {
+            inFlightTotal += loaded;
+          }
+          const currentLoaded = Math.min(totalFilesBytes, bytesUploaded + inFlightTotal);
+          setUploadedBytes(currentLoaded);
+          if (totalFilesBytes > 0) {
+            const rawPct = Math.floor((currentLoaded / totalFilesBytes) * 95);
+            setProgress(Math.min(95, Math.max(5, rawPct)));
+          }
+        };
+
         const BATCH_SIZE = 32;
         const RETRY_BACKOFFS = [500, 1000, 2000];
 
@@ -382,7 +491,7 @@ export function useRelayTransfer() {
             }
           }
 
-          // Upload chunks with concurrency 3
+          // Upload chunks with concurrency 2
           let batchTaskIndex = 0;
           const uploadWorker = async () => {
             while (batchTaskIndex < batchTasks.length) {
@@ -399,15 +508,13 @@ export function useRelayTransfer() {
               const aad = chunkAad(t.fileId, t.index, t.chunkCount);
               const cipher = await encryptChunk(key, rawBuffer, t.ivPrefix, t.index, aad);
 
-              const putHeaders: Record<string, string> = {
-                "Content-Type": "application/octet-stream",
-              };
-              if (signed.headers) {
-                for (const [hk, hv] of Object.entries(signed.headers)) {
-                  if (!FORBIDDEN_HEADERS.has(hk.toLowerCase())) {
-                    putHeaders[hk] = hv;
-                  }
-                }
+              const putHeaders = buildSafePutHeaders(signed.headers);
+
+              let uploadHost = "storage";
+              try {
+                uploadHost = new URL(signed.url).hostname;
+              } catch {
+                // Ignore malformed URL
               }
 
               let attempt = 0;
@@ -419,28 +526,70 @@ export function useRelayTransfer() {
                 await waitForOnline(signal);
 
                 try {
-                  const putRes = await fetch(signed.url, {
-                    method: "PUT",
-                    headers: putHeaders,
-                    body: cipher,
-                    signal,
-                  });
+                  let res: { status: number; statusText: string; responseText: string };
 
-                  if (putRes.ok) {
+                  if (typeof XMLHttpRequest !== "undefined") {
+                    res = await uploadChunkXhr({
+                      url: signed.url,
+                      headers: putHeaders,
+                      body: cipher,
+                      signal,
+                      onProgress: (loaded) => {
+                        inFlightBytes.set(t.globalIndex, Math.min(plainBytes, loaded));
+                        updateLiveProgress();
+                      },
+                    });
+                  } else {
+                    const fetchRes = await fetch(signed.url, {
+                      method: "PUT",
+                      headers: putHeaders,
+                      body: cipher,
+                      signal,
+                    });
+                    const text = await fetchRes.text().catch(() => "");
+                    res = {
+                      status: fetchRes.status,
+                      statusText: fetchRes.statusText,
+                      responseText: text,
+                    };
+                  }
+
+                  if (res.status >= 200 && res.status < 300) {
                     success = true;
+                    inFlightBytes.delete(t.globalIndex);
+                    bytesUploaded += plainBytes;
+                    chunksCompleted++;
+                    setChunksDone(chunksCompleted);
+                    updateLiveProgress();
                     break;
                   }
 
-                  lastError = new Error(
-                    `Upload failed at chunk ${t.globalIndex + 1} of ${totalChunks}: HTTP ${putRes.status}`
+                  // Safe non-secret diagnostic logging
+                  console.error(
+                    `[Relay Upload] Chunk ${t.globalIndex + 1}/${totalChunks} rejected by ${uploadHost} (HTTP ${res.status}): ${res.responseText.slice(0, 100)}`
                   );
-                } catch (fetchErr) {
-                  if (signal.aborted) throw fetchErr;
+
+                  lastError = new Error(
+                    `Upload failed at chunk ${t.globalIndex + 1} of ${totalChunks}: HTTP ${res.status}`
+                  );
+                } catch (putErr) {
+                  inFlightBytes.delete(t.globalIndex);
+                  updateLiveProgress();
+
+                  if (signal.aborted) throw putErr;
                   if (typeof navigator !== "undefined" && navigator.onLine === false) {
                     await waitForOnline(signal);
                     continue;
                   }
-                  lastError = new Error("Could not reach storage (network or CORS)");
+
+                  const errMsg = putErr instanceof Error ? putErr.message : String(putErr);
+                  console.error(
+                    `[Relay Upload] Chunk ${t.globalIndex + 1}/${totalChunks} could not reach host ${uploadHost}: ${errMsg}`
+                  );
+
+                  lastError = new Error(
+                    `Upload blocked by storage CORS/CSP (host: ${uploadHost})`
+                  );
                 }
 
                 if (attempt < 3) {
@@ -455,18 +604,10 @@ export function useRelayTransfer() {
                   new Error(`Upload failed at chunk ${t.globalIndex + 1} of ${totalChunks}`)
                 );
               }
-
-              chunksCompleted++;
-              bytesUploaded += plainBytes;
-              setChunksDone(chunksCompleted);
-              setUploadedBytes(bytesUploaded);
-              if (totalFilesBytes > 0) {
-                setProgress(Math.round((bytesUploaded / totalFilesBytes) * 90));
-              }
             }
           };
 
-          await Promise.all([uploadWorker(), uploadWorker(), uploadWorker()]);
+          await Promise.all([uploadWorker(), uploadWorker()]);
         }
 
         // Encrypt optional text payload

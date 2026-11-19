@@ -127,7 +127,7 @@ describe("useRelayTransfer hook", () => {
     expect(hookData.isPolling).toBe(false);
   });
 
-  it("a 10 MiB file uploads as 3 chunks", async () => {
+  it("a 10 MiB file uploads as 2 chunks", async () => {
     let hookData!: ReturnType<typeof useRelayTransfer>;
 
     await act(async () => {
@@ -176,10 +176,10 @@ describe("useRelayTransfer hook", () => {
       await hookData.startRelayUpload("123456", [file]);
     });
 
-    expect(uploadPayloadChunks.length).toBe(3);
-    expect(putUrls.length).toBe(3);
-    expect(hookData.chunksTotal).toBe(3);
-    expect(hookData.chunksDone).toBe(3);
+    expect(uploadPayloadChunks.length).toBe(2);
+    expect(putUrls.length).toBe(2);
+    expect(hookData.chunksTotal).toBe(2);
+    expect(hookData.chunksDone).toBe(2);
     expect(hookData.uploadedBytes).toBe(tenMb);
     expect(hookData.relayState).toBe("ready");
     expect(hookData.relayCode).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{4}$/);

@@ -40,12 +40,12 @@ describe("relayChunks", () => {
       expect(plan).toEqual([{ index: 0, start: 0, end: 1 }]);
     });
 
-    it("handles exactly 4 MiB (RELAY_CHUNK_BYTES) with a single chunk", () => {
+    it("handles exactly 8 MiB (RELAY_CHUNK_BYTES) with a single chunk", () => {
       const plan = planChunks(RELAY_CHUNK_BYTES);
       expect(plan).toEqual([{ index: 0, start: 0, end: RELAY_CHUNK_BYTES }]);
     });
 
-    it("handles 4 MiB + 1 byte with 2 chunks", () => {
+    it("handles 8 MiB + 1 byte with 2 chunks", () => {
       const size = RELAY_CHUNK_BYTES + 1;
       const plan = planChunks(size);
       expect(plan).toEqual([
@@ -54,13 +54,14 @@ describe("relayChunks", () => {
       ]);
     });
 
-    it("handles 200 MiB (RELAY_MAX_FILE_BYTES) with 50 chunks", () => {
+    it("handles 750 MiB (RELAY_MAX_FILE_BYTES) with 94 chunks", () => {
       const plan = planChunks(RELAY_MAX_FILE_BYTES);
-      expect(plan.length).toBe(50);
+      const expectedCount = Math.ceil(RELAY_MAX_FILE_BYTES / RELAY_CHUNK_BYTES);
+      expect(plan.length).toBe(expectedCount);
       expect(plan[0]).toEqual({ index: 0, start: 0, end: RELAY_CHUNK_BYTES });
-      expect(plan[49]).toEqual({
-        index: 49,
-        start: 49 * RELAY_CHUNK_BYTES,
+      expect(plan[expectedCount - 1]).toEqual({
+        index: expectedCount - 1,
+        start: (expectedCount - 1) * RELAY_CHUNK_BYTES,
         end: RELAY_MAX_FILE_BYTES,
       });
       // Contiguous boundaries check
@@ -95,15 +96,16 @@ describe("relayChunks", () => {
     const rid = "0123456789abcdef0123456789abcdef";
     const fileId = "0123456789abcdef";
 
-    it("accepts valid chunk paths for index 0 through 49", () => {
+    it("accepts valid chunk paths for index 0 through 99", () => {
       expect(isValidChunkPath(chunkPath(roomCode, rid, fileId, 0), roomCode, rid)).toBe(true);
       expect(isValidChunkPath(chunkPath(roomCode, rid, fileId, 15), roomCode, rid)).toBe(true);
       expect(isValidChunkPath(chunkPath(roomCode, rid, fileId, 49), roomCode, rid)).toBe(true);
+      expect(isValidChunkPath(chunkPath(roomCode, rid, fileId, 99), roomCode, rid)).toBe(true);
     });
 
-    it("rejects index 50", () => {
-      const path50 = `relay/${roomCode}/${rid}/${fileId}-50.bin`;
-      expect(isValidChunkPath(path50, roomCode, rid)).toBe(false);
+    it("rejects index 100", () => {
+      const path100 = `relay/${roomCode}/${rid}/${fileId}-100.bin`;
+      expect(isValidChunkPath(path100, roomCode, rid)).toBe(false);
     });
 
     it("rejects wrong room code", () => {

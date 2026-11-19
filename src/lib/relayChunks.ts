@@ -76,7 +76,7 @@ function escapeRegex(str: string): string {
 
 /**
  * Validates a chunk path against room code and relay ID.
- * Strict checks: fileId must be 16 hex chars, chunk index 0 to 49, no path traversal.
+ * Strict checks: fileId must be 16 hex chars, chunk index 0 to 99, no path traversal.
  */
 export function isValidChunkPath(path: string, roomCode: string, rid: string): boolean {
   if (!path || !roomCode || !rid) return false;
@@ -84,7 +84,7 @@ export function isValidChunkPath(path: string, roomCode: string, rid: string): b
   const roomPattern = escapeRegex(roomCode);
   const ridPattern = escapeRegex(rid);
   const regex = new RegExp(
-    `^relay\\/${roomPattern}\\/${ridPattern}\\/([0-9a-f]{16})-([0-9]|[1-4][0-9])\\.bin$`
+    `^relay\\/${roomPattern}\\/${ridPattern}\\/([0-9a-f]{16})-([0-9]|[1-9][0-9])\\.bin$`
   );
   return regex.test(path);
 }

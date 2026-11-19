@@ -8,7 +8,7 @@ import { isValidChunkPath } from "@/lib/relayChunks";
 
 const HOURLY_BYTE_LIMIT = 2 * 1024 * 1024 * 1024; // 2 GiB per hour per IP
 const DEFAULT_DAILY_BYTES = 2 * 1024 * 1024 * 1024; // 2 GiB default daily budget
-const MAX_CHUNKS_PER_REQUEST = 64;
+const MAX_CHUNKS_PER_REQUEST = 100;
 
 interface ChunkUploadItem {
   path: string;
@@ -110,7 +110,6 @@ export async function POST(request: Request): Promise<NextResponse> {
       (chunks as ChunkUploadItem[]).map(async (chunk) => {
         const signed = await bucket.signedUploadUrl(chunk.path, {
           contentType: "application/octet-stream",
-          size: chunk.size,
           expiresIn: "10m",
         });
         return {
