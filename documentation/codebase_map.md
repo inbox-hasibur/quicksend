@@ -332,7 +332,7 @@ flowchart TD
 - **Exports:** `InternetSharingCard({ initialRoomCode, initialOtp }: InternetSharingCardProps): JSX.Element`
 
 #### `src/components/SameNetworkCard.tsx`
-- **Purpose:** Mode 2 Controller (Same Network Wi-Fi). Zero-scroll 2-tab wizard matching Mode 1 simplicity. Send tab features Step 1 (Dropzone payload selection + EstimateBadge + Find Devices action) and Step 2 (live RadarPanel with 1-tap peer beaming, Change Files button, and subtle PIN/QR fallback toggle). Receive tab features live RadarPanel with pulsing device identity awaiting incoming transfers. Technical diagnostics are kept cleanly hidden inside the fallback panel.
+- **Purpose:** Mode 2 Controller (Same Network Wi-Fi). Zero-scroll 2-tab wizard matching Mode 1 simplicity. Send tab features Step 1 (Dropzone payload selection + EstimateBadge + Find Devices action with continuous peer discovery) and Step 2 (live RadarPanel with race-free 1-tap peer beaming, auto-send on connect guarded by ref, Change Files button, 4-second radar fallback hint, and subtle PIN/QR fallback toggle). Receive tab features live RadarPanel with pulsing device identity awaiting incoming transfers, instant beam receiver startup, and clean consecutive transfer reset. Technical diagnostics are kept cleanly hidden inside the fallback panel.
 - **Exports:** `SameNetworkCard(): JSX.Element`
 
 #### `src/components/LanDirectFallback.tsx`
@@ -534,7 +534,7 @@ flowchart TD
 - **Exports:** `signalStore`, `MemorySignalStore`, `RedisSignalStore`, `isRedisConfigured`, `getSignalStore`.
 
 #### `src/lib/iceConfig.ts`
-- **Purpose:** Resilient WebRTC ICE / STUN configuration providing multi-provider public STUN pool (Google + Cloudflare), dynamic `/api/turn` fetching with 2s timeout and client caching, optional static TURN relay injection (`NEXT_PUBLIC_TURN_URL`), and mode-specific RTCConfiguration generator (`getRtcConfig`, `fetchIceConfig`).
+- **Purpose:** Resilient WebRTC ICE / STUN configuration providing multi-provider public STUN pool (Google + Cloudflare), dynamic `/api/turn` fetching for both "internet" and "same-network" modes with 2s timeout and client caching, optional static TURN relay injection (`NEXT_PUBLIC_TURN_URL`), and mode-specific RTCConfiguration generator (`getRtcConfig`, `fetchIceConfig`).
 - **Exports:** `PUBLIC_STUN_SERVERS`, `getTurnServers`, `getRtcConfig`, `fetchIceConfig`, `_resetDynamicIceCacheForTest`, `FIREWALL_FALLBACK_MESSAGE`.
 
 #### `src/lib/diskStream.ts`

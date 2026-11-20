@@ -60,6 +60,7 @@ export function SameNetworkCard() {
   const [localDevicePin] = useState(generatePairPin);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [showRadarHint, setShowRadarHint] = useState(false);
 
   const {
     profile,
@@ -90,6 +91,19 @@ export function SameNetworkCard() {
   } = useWebRTC("same-network");
 
   const processedBeamCodeRef = useRef<string | null>(null);
+  const hasSentPayloadRef = useRef(false);
+
+  // Radar 4-second hint timer when 0 peers appear
+  useEffect(() => {
+    if (peers.length > 0) return;
+    const timer = setTimeout(() => {
+      setShowRadarHint(true);
+    }, 4000);
+    return () => {
+      clearTimeout(timer);
+      setShowRadarHint(false);
+    };
+  }, [peers.length]);
 
   // When an incoming beam is directed to this device by a peer, automatically start receiver session
   useEffect(() => {
@@ -103,37 +117,46 @@ export function SameNetworkCard() {
       processedBeamCodeRef.current !== incomingBeam.roomCode
     ) {
       processedBeamCodeRef.current = incomingBeam.roomCode;
-      clearIncomingBeam();
+      clearIncomingBeam().catch(() => {});
       startReceiver(incomingBeam.roomCode).catch(() => {});
     }
   }, [incomingBeam, isConnected, progress.status, clearIncomingBeam, startReceiver]);
 
-  // When sender connects to target peer, automatically transmit selected payload
+  // When sender connects to target peer, automatically transmit selected payload ONCE
   useEffect(() => {
-    if (rtcRole === "sender" && isConnected && progress.status === "connecting") {
-      if (selectedPayload.files.length > 0) {
+    if (rtcRole === "sender" && isConnected && !hasSentPayloadRef.current) {
+      const hasFiles = selectedPayload.files.length > 0;
+      const hasText = Boolean(selectedPayload.text.trim());
+      if (!hasFiles && !hasText) return;
+
+      hasSentPayloadRef.current = true;
+      if (hasFiles) {
         sendFiles(selectedPayload.files).catch((err) => {
-          setErrorMsg(err.message);
+          setErrorMsg(err instanceof Error ? err.message : String(err));
+          hasSentPayloadRef.current = false;
         });
-      } else if (selectedPayload.text.trim()) {
+      } else {
         sendPayload({ text: selectedPayload.text }).catch((err) => {
-          setErrorMsg(err.message);
+          setErrorMsg(err instanceof Error ? err.message : String(err));
+          hasSentPayloadRef.current = false;
         });
       }
     }
-  }, [rtcRole, isConnected, progress.status, selectedPayload, sendFiles, sendPayload]);
+  }, [rtcRole, isConnected, selectedPayload, sendFiles, sendPayload]);
 
   const handleModalClose = () => {
     cleanup();
     setTargetPeer(null);
     setErrorMsg(null);
     processedBeamCodeRef.current = null;
+    hasSentPayloadRef.current = false;
     clearIncomingBeam().catch(() => {});
   };
 
   const handleSendToPeer = async (peer: NearbyPeer) => {
     setTargetPeer(peer);
     setErrorMsg(null);
+    hasSentPayloadRef.current = false;
 
     const hasPayload = selectedPayload.files.length > 0 || selectedPayload.text.trim().length > 0;
     if (!hasPayload) {
@@ -262,6 +285,9 @@ export function SameNetworkCard() {
               setRole(val as "send" | "receive");
               setErrorMsg(null);
               setShowDirectFallback(false);
+              cleanup();
+              processedBeamCodeRef.current = null;
+              hasSentPayloadRef.current = false;
             }}
             options={[
               { value: "send", label: "Send" },
@@ -312,6 +338,7 @@ export function SameNetworkCard() {
                   onClick={() => {
                     setSendStep(1);
                     setShowDirectFallback(false);
+                    hasSentPayloadRef.current = false;
                   }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[var(--surface-subtle)] hover:bg-[var(--surface)] border border-[var(--border-hairline)] text-xs font-semibold text-[var(--text)] transition-colors cursor-pointer"
                 >
@@ -341,6 +368,12 @@ export function SameNetworkCard() {
                     onBeam={handleSendToPeer}
                     onChangeAvatar={cycleAvatar}
                   />
+
+                  {showRadarHint && peers.length === 0 && (
+                    <p className="text-center text-xs text-[var(--text-muted)] animate-in fade-in">
+                      Not seeing your device? Routers sometimes split IPv4/IPv6 — use PIN or QR below.
+                    </p>
+                  )}
 
                   <div className="text-center pt-1">
                     <button
@@ -374,6 +407,12 @@ export function SameNetworkCard() {
                 onChangeAvatar={cycleAvatar}
                 onBeam={handleSendToPeer}
               />
+
+              {showRadarHint && peers.length === 0 && (
+                <p className="text-center text-xs text-[var(--text-muted)] animate-in fade-in">
+                  Not seeing your device? Routers sometimes split IPv4/IPv6 — use PIN or QR below.
+                </p>
+              )}
 
               <div className="text-center pt-1">
                 <button

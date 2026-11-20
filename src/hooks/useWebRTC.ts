@@ -849,88 +849,92 @@ export function useWebRTC(mode: TransferMode = "internet") {
       setRoomId(newRoomId);
       setRoomCode(generatedCode);
 
-      // PeerJS Cloud Broker
-      if (typeof window !== "undefined" && mode !== "hotspot") {
-        loadPeerConstructor().then((PeerClass) => {
-          if (sessionGenRef.current !== currentSession || !PeerClass || isConnectedRef.current) return;
-          const peer = createPeerJsSender(PeerClass, generatedCode, {
-            dynamicConfig,
-            onConnection: (conn) => {
-              dataConnRef.current = conn;
-              hasSignalingActivityRef.current = true;
-              if (conn.peerConnection) {
-                wirePeerJs(conn, "sender");
-              } else {
-                const checkPc = setInterval(() => {
-                  if (conn.peerConnection) {
-                    clearInterval(checkPc);
-                    wirePeerJs(conn, "sender");
+      // PeerJS Cloud Broker & HTTP signal store initialization
+      const initPeerJs = async () => {
+        if (typeof window !== "undefined" && mode !== "hotspot") {
+          try {
+            const PeerClass = await loadPeerConstructor();
+            if (sessionGenRef.current !== currentSession || !PeerClass || isConnectedRef.current) return;
+            const peer = createPeerJsSender(PeerClass, generatedCode, {
+              dynamicConfig,
+              onConnection: (conn) => {
+                dataConnRef.current = conn;
+                hasSignalingActivityRef.current = true;
+                if (conn.peerConnection) {
+                  wirePeerJs(conn, "sender");
+                } else {
+                  const checkPc = setInterval(() => {
+                    if (conn.peerConnection) {
+                      clearInterval(checkPc);
+                      wirePeerJs(conn, "sender");
+                    }
+                  }, 100);
+                  setTimeout(() => clearInterval(checkPc), 2000);
+                }
+
+                const handleOpen = () => {
+                  if (sessionGenRef.current !== currentSession) return;
+                  if (activeTransportRef.current === "webrtc" && isConnectedRef.current) {
+                    try {
+                      conn.close();
+                    } catch {
+                      // Ignore
+                    }
+                    return;
                   }
-                }, 100);
-                setTimeout(() => clearInterval(checkPc), 2000);
-              }
-
-              const handleOpen = () => {
-                if (sessionGenRef.current !== currentSession) return;
-                if (activeTransportRef.current === "webrtc" && isConnectedRef.current) {
-                  try {
-                    conn.close();
-                  } catch {
-                    // Ignore
+                  clearHandshakeWatchdog();
+                  clearReceiverWatchdogs();
+                  activeTransportRef.current = "peerjs";
+                  if (conn.dataChannel) {
+                    dcRef.current = conn.dataChannel;
                   }
-                  return;
-                }
-                clearHandshakeWatchdog();
-                clearReceiverWatchdogs();
-                activeTransportRef.current = "peerjs";
-                if (conn.dataChannel) {
-                  dcRef.current = conn.dataChannel;
-                }
-                isConnectedRef.current = true;
-                setIsConnected(true);
+                  isConnectedRef.current = true;
+                  setIsConnected(true);
 
-                if (pcRef.current) {
-                  const rawPc = pcRef.current;
-                  pcRef.current = null;
-                  try {
-                    rawPc.close();
-                  } catch {
-                    // Ignore
+                  if (pcRef.current) {
+                    const rawPc = pcRef.current;
+                    pcRef.current = null;
+                    try {
+                      rawPc.close();
+                    } catch {
+                      // Ignore
+                    }
                   }
-                }
-              };
+                };
 
-              if (conn.open) {
-                handleOpen();
-              } else {
-                conn.on("open", handleOpen);
-              }
-              conn.on("data", handleIncomingData);
-              conn.on("close", () => {
-                if (activeTransportRef.current === "peerjs") {
-                  isConnectedRef.current = false;
-                  setIsConnected(false);
+                if (conn.open) {
+                  handleOpen();
+                } else {
+                  conn.on("open", handleOpen);
                 }
-              });
-              conn.on("error", (err) => console.debug("PeerJS conn error:", err));
-            },
-            onError: (errType) => {
-              addLog(`PeerJS cloud broker notice: ${errType}. HTTP signaling fallback active.`);
-              setDiagnostics((d) => ({
-                ...d,
-                lastError: `Cloud broker notice (${errType}). Using HTTP signaling fallback.`,
-              }));
-              setBrokerNotice("Cloud broker unavailable; direct relay fallback active.");
-            },
-          });
-          peerInstanceRef.current = peer;
-        }).catch(() => {});
-      }
+                conn.on("data", handleIncomingData);
+                conn.on("close", () => {
+                  if (activeTransportRef.current === "peerjs") {
+                    isConnectedRef.current = false;
+                    setIsConnected(false);
+                  }
+                });
+                conn.on("error", (err) => console.debug("PeerJS conn error:", err));
+              },
+              onError: (errType) => {
+                addLog(`PeerJS cloud broker notice: ${errType}. HTTP signaling fallback active.`);
+                setDiagnostics((d) => ({
+                  ...d,
+                  lastError: `Cloud broker notice (${errType}). Using HTTP signaling fallback.`,
+                }));
+                setBrokerNotice("Cloud broker unavailable; direct relay fallback active.");
+              },
+            });
+            peerInstanceRef.current = peer;
+          } catch {
+            // Ignore PeerJS load failure
+          }
+        }
+      };
 
-      // Concurrently initiate HTTP signal store fallback
-      signalingRef.current
-        .createRoom(generatedCode)
-        .then(({ roomId: sigRoomId, code: sigCode }) => {
+      const initSignaling = async () => {
+        try {
+          const { roomId: sigRoomId, code: sigCode } = await signalingRef.current.createRoom(generatedCode);
           if (sessionGenRef.current !== currentSession || !sigCode || isConnectedRef.current) return;
           setRoomId(sigRoomId);
           setRoomCode(sigCode);
@@ -939,8 +943,12 @@ export function useWebRTC(mode: TransferMode = "internet") {
               handleSignalMessage(msg, "sender");
             }
           });
-        })
-        .catch(() => {});
+        } catch (err) {
+          addLog(`HTTP signaling room creation error: ${err}`);
+        }
+      };
+
+      await Promise.all([initPeerJs(), initSignaling()]);
 
       return { roomId: newRoomId, code: generatedCode };
     },
@@ -1048,81 +1056,87 @@ export function useWebRTC(mode: TransferMode = "internet") {
       setRoomId(joinedRoomId);
       setRoomCode(cleanCode);
 
-      if (typeof window !== "undefined" && mode !== "hotspot") {
-        loadPeerConstructor().then((PeerClass) => {
-          if (sessionGenRef.current !== currentSession || !PeerClass || isConnectedRef.current) return;
-          const { peer, cleanup: receiverCleanup } = createPeerJsReceiver(PeerClass, cleanCode, {
-            dynamicConfig,
-            isSessionActive: () => sessionGenRef.current === currentSession && !isConnectedRef.current,
-            onConnection: (conn) => {
-              dataConnRef.current = conn;
-              if (conn.peerConnection) {
-                wirePeerJs(conn, "receiver");
-              } else {
-                const checkPc = setInterval(() => {
-                  if (conn.peerConnection) {
-                    clearInterval(checkPc);
-                    wirePeerJs(conn, "receiver");
+      // PeerJS Cloud Broker & HTTP signal store initialization
+      const initPeerJs = async () => {
+        if (typeof window !== "undefined" && mode !== "hotspot") {
+          try {
+            const PeerClass = await loadPeerConstructor();
+            if (sessionGenRef.current !== currentSession || !PeerClass || isConnectedRef.current) return;
+            const { peer, cleanup: receiverCleanup } = createPeerJsReceiver(PeerClass, cleanCode, {
+              dynamicConfig,
+              isSessionActive: () => sessionGenRef.current === currentSession && !isConnectedRef.current,
+              onConnection: (conn) => {
+                dataConnRef.current = conn;
+                if (conn.peerConnection) {
+                  wirePeerJs(conn, "receiver");
+                } else {
+                  const checkPc = setInterval(() => {
+                    if (conn.peerConnection) {
+                      clearInterval(checkPc);
+                      wirePeerJs(conn, "receiver");
+                    }
+                  }, 100);
+                  setTimeout(() => clearInterval(checkPc), 2000);
+                }
+
+                const handleOpen = () => {
+                  if (sessionGenRef.current !== currentSession) return;
+                  if (activeTransportRef.current === "webrtc" && isConnectedRef.current) {
+                    try {
+                      conn.close();
+                    } catch {
+                      // Ignore
+                    }
+                    return;
                   }
-                }, 100);
-                setTimeout(() => clearInterval(checkPc), 2000);
-              }
-
-              const handleOpen = () => {
-                if (sessionGenRef.current !== currentSession) return;
-                if (activeTransportRef.current === "webrtc" && isConnectedRef.current) {
-                  try {
-                    conn.close();
-                  } catch {
-                    // Ignore
+                  clearHandshakeWatchdog();
+                  clearReceiverWatchdogs();
+                  activeTransportRef.current = "peerjs";
+                  if (conn.dataChannel) {
+                    dcRef.current = conn.dataChannel;
                   }
-                  return;
-                }
-                clearHandshakeWatchdog();
-                clearReceiverWatchdogs();
-                activeTransportRef.current = "peerjs";
-                if (conn.dataChannel) {
-                  dcRef.current = conn.dataChannel;
-                }
-                isConnectedRef.current = true;
-                setIsConnected(true);
+                  isConnectedRef.current = true;
+                  setIsConnected(true);
 
-                if (pcRef.current) {
-                  const rawPc = pcRef.current;
-                  pcRef.current = null;
-                  try {
-                    rawPc.close();
-                  } catch {
-                    // Ignore
+                  if (pcRef.current) {
+                    const rawPc = pcRef.current;
+                    pcRef.current = null;
+                    try {
+                      rawPc.close();
+                    } catch {
+                      // Ignore
+                    }
                   }
+                };
+
+                if (conn.open) {
+                  handleOpen();
+                } else {
+                  conn.on("open", handleOpen);
                 }
-              };
+                conn.on("data", handleIncomingData);
+                conn.on("close", () => {
+                  if (activeTransportRef.current === "peerjs") {
+                    isConnectedRef.current = false;
+                    setIsConnected(false);
+                  }
+                });
+                conn.on("error", (err) => console.debug("PeerJS receiver conn error:", err));
+              },
+              onNotice: (type) => console.debug("PeerJS receiver notice (fallback active):", type),
+            });
 
-              if (conn.open) {
-                handleOpen();
-              } else {
-                conn.on("open", handleOpen);
-              }
-              conn.on("data", handleIncomingData);
-              conn.on("close", () => {
-                if (activeTransportRef.current === "peerjs") {
-                  isConnectedRef.current = false;
-                  setIsConnected(false);
-                }
-              });
-              conn.on("error", (err) => console.debug("PeerJS receiver conn error:", err));
-            },
-            onNotice: (type) => console.debug("PeerJS receiver notice (fallback active):", type),
-          });
+            peerInstanceRef.current = peer;
+            peerReceiverCleanupRef.current = receiverCleanup;
+          } catch {
+            // Ignore PeerJS load failure
+          }
+        }
+      };
 
-          peerInstanceRef.current = peer;
-          peerReceiverCleanupRef.current = receiverCleanup;
-        }).catch(() => {});
-      }
-
-      signalingRef.current
-        .joinRoom(cleanCode)
-        .then(({ roomId: sigRoomId, code: sigCode }) => {
+      const initSignaling = async () => {
+        try {
+          const { roomId: sigRoomId, code: sigCode } = await signalingRef.current.joinRoom(cleanCode);
           if (sessionGenRef.current !== currentSession || !sigCode || isConnectedRef.current) return;
           hasSignalingActivityRef.current = true;
           setRoomId(sigRoomId);
@@ -1133,8 +1147,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
               handleSignalMessage(msg, "receiver");
             }
           });
-        })
-        .catch((err) => {
+        } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
           addLog(`HTTP signaling join notice: ${msg}`);
           if (
@@ -1144,7 +1157,10 @@ export function useWebRTC(mode: TransferMode = "internet") {
           ) {
             roomNotFoundRef.current = true;
           }
-        });
+        }
+      };
+
+      await Promise.all([initPeerJs(), initSignaling()]);
     },
     [
       cleanup,

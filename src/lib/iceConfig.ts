@@ -83,7 +83,7 @@ export function _resetDynamicIceCacheForTest() {
 }
 
 /**
- * Dynamically fetches ICE configuration with ephemeral TURN relay credentials for "internet" mode.
+ * Dynamically fetches ICE configuration with ephemeral TURN relay credentials for "internet" and "same-network" modes.
  * Falls back safely to synchronous getRtcConfig() if offline, timed out (2s), or on network failure.
  */
 export async function fetchIceConfig(mode: TransferMode = "internet"): Promise<RTCConfiguration> {
@@ -91,8 +91,8 @@ export async function fetchIceConfig(mode: TransferMode = "internet"): Promise<R
     return getRtcConfig(mode);
   }
 
-  // If outside browser or not internet mode, return local config
-  if (typeof window === "undefined" || mode !== "internet") {
+  // If outside browser or not an online WebRTC mode, return local config
+  if (typeof window === "undefined" || (mode !== "internet" && mode !== "same-network")) {
     return getRtcConfig(mode);
   }
 

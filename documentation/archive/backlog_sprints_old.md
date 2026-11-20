@@ -992,3 +992,16 @@
   - Added unit test confirming peers sharing an ISP `/24` CGNAT pool (`103.187.50.12` and `103.187.50.17`) compute identical `networkId` and discover each other.
   - Added unit test verifying cross-network isolation between distinct `/24` subnets (`203.0.113.10` vs `192.0.2.20`).
   - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 24/24 passing tests in `src/app/api/discover/__tests__/route.test.ts`.
+
+### Fix 22 (2026-11-20): Mode 2 Same Wi-Fi end-to-end reliability, dynamic TURN & race-free beaming
+- [x] Dynamic TURN & STUN Traversal for Same Wi-Fi (`src/lib/iceConfig.ts`):
+  - Updated `fetchIceConfig` to allow both `"internet"` and `"same-network"` modes to fetch dynamic STUN/TURN credentials from `/api/turn`.
+  - WebRTC ICE agent prioritizes LAN `host` candidates first for full local Wi-Fi speeds, while seamlessly falling back to `srflx`/TURN if local UDP is blocked by Windows Firewall, AP router isolation, or mDNS `.local` address masking.
+- [x] Race-Free Beaming & WebRTC Session Initialization (`src/hooks/useWebRTC.ts`):
+  - Updated `startSender` and `startReceiver` to execute room creation and PeerJS broker initialization via `Promise.all` before resolving, ensuring the `/api/signal` room and PeerJS ID definitely exist prior to beam transmission.
+- [x] Reliable Auto-Send & Consecutive Transfer Reset (`src/components/SameNetworkCard.tsx`):
+  - Added `hasSentPayloadRef` guard in `SameNetworkCard` so connecting automatically triggers transmission exactly once without double-sending or skipping.
+  - Reset beam codes, WebRTC connections, and auto-send refs on modal close and role toggles so consecutive transfers succeed without page refreshes.
+  - Added clean 4-second zero-peer fallback hint under `RadarPanel` directing users to PIN/QR options when routers split subnets.
+- [x] Unit Testing & Verification (`src/lib/__tests__/iceConfig.test.ts`, `src/components/__tests__/SameNetworkCard.test.tsx`, `src/hooks/__tests__/useWebRTC.test.ts`, `src/app/api/discover/__tests__/route.test.ts`):
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 48/48 passing tests across all 4 targeted test suites.

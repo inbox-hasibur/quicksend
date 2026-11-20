@@ -100,4 +100,35 @@ describe("SameNetworkCard Component", () => {
 
     expect(container.textContent).toContain("Waiting for nearby sender on Wi-Fi...");
   });
+
+  it("should show radar hint when 0 peers appear after 4 seconds", async () => {
+    vi.useFakeTimers();
+
+    await act(async () => {
+      root.render(<SameNetworkCard />);
+    });
+
+    // Switch to receive
+    const receiveBtn = Array.from(container.querySelectorAll("button")).find(
+      (b) => b.textContent?.trim() === "Receive"
+    );
+    await act(async () => {
+      receiveBtn?.click();
+    });
+
+    expect(container.textContent).not.toContain(
+      "Not seeing your device? Routers sometimes split IPv4/IPv6"
+    );
+
+    // Advance 4s
+    await act(async () => {
+      vi.advanceTimersByTime(4000);
+    });
+
+    expect(container.textContent).toContain(
+      "Not seeing your device? Routers sometimes split IPv4/IPv6 — use PIN or QR below."
+    );
+
+    vi.useRealTimers();
+  });
 });

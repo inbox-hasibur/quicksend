@@ -125,6 +125,24 @@ describe("ICE & WebRTC Configuration", () => {
       expect(cached.iceServers).toEqual(mockDynamicServers);
     });
 
+    it("should fetch dynamic ICE servers from /api/turn for same-network mode", async () => {
+      const mockDynamicServers: RTCIceServer[] = [
+        { urls: "turn:relay.quicksend.app:443", username: "dyn-user", credential: "dyn-pass" },
+      ];
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ iceServers: mockDynamicServers, hasTurn: true }),
+      });
+      globalThis.fetch = fetchMock;
+
+      const config = await fetchIceConfig("same-network");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe("/api/turn");
+      expect(config.iceServers).toEqual(mockDynamicServers);
+      expect(config.iceCandidatePoolSize).toBe(10);
+    });
+
     it("should fall back safely to getRtcConfig when /api/turn fetch fails", async () => {
       globalThis.fetch = vi.fn().mockRejectedValue(new Error("Fetch failed"));
 
