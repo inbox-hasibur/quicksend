@@ -14,6 +14,18 @@ All AI coding assistants and autonomous agents (Antigravity, Cursor, Claude Code
 
 ---
 
+## Locked Working Channels (STRICT — DO NOT MODIFY)
+
+NEVER edit, refactor, or reformat any file belonging to a LOCKED channel unless the user explicitly writes `UNLOCK <channel>`. If a shared file is needed, keep its existing exports and behavior 100% backwards-compatible.
+
+### Mode 1: Via Internet — LOCKED (Verified Working)
+- `src/components/InternetSharingCard.tsx`
+- `src/hooks/useRelayTransfer.ts`
+- `src/lib/relayCrypto.ts`, `src/lib/relayLimits.ts`, `src/lib/relayChunks.ts`, `src/lib/upstashBlob.ts`
+- `src/app/api/relay/**`
+
+---
+
 ## 1. Git Commit Message Rule
 - **Format:** Every git commit message **MUST** be **2 to 5 words** in plain natural language.
   - ✅ **Valid Examples:**
