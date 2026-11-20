@@ -113,6 +113,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
   const startTimeRef = useRef<number>(0);
   const candidateQueueRef = useRef<RTCIceCandidateInit[]>([]);
   const isConnectedRef = useRef<boolean>(false);
+  const hasCreatedOfferRef = useRef<boolean>(false);
 
   // Batch queue & disk streaming refs
   const diskWriterRef = useRef<DiskStreamWriter | null>(null);
@@ -381,6 +382,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
     receivedChunkCountRef.current = 0;
     currentHeaderRef.current = null;
     candidateQueueRef.current = [];
+    hasCreatedOfferRef.current = false;
     setIsConnected(false);
     setPendingHeader(null);
     setRole(null);
@@ -632,7 +634,10 @@ export function useWebRTC(mode: TransferMode = "internet") {
           checkSelectedPair(pc);
         },
         onIceFailed: () => {
-          if (activeTransportRef.current === "peerjs" || isConnectedRef.current) return;
+          if (activeTransportRef.current === "peerjs" || isConnectedRef.current || (dataConnRef.current && dataConnRef.current.open)) {
+            addLog("Raw WebRTC ICE failed, but PeerJS transport is active/connected");
+            return;
+          }
           if (!hasRestartedIceRef.current && typeof pc.restartIce === "function") {
             hasRestartedIceRef.current = true;
             addLog("ICE state failed, attempting restartIce()...");
@@ -669,7 +674,7 @@ export function useWebRTC(mode: TransferMode = "internet") {
           setIsConnected(true);
         },
         onConnectionFailed: () => {
-          if (activeTransportRef.current === "peerjs") return;
+          if (activeTransportRef.current === "peerjs" || (dataConnRef.current && dataConnRef.current.open)) return;
           isConnectedRef.current = false;
           setIsConnected(false);
           clearHandshakeWatchdog();
@@ -714,6 +719,8 @@ export function useWebRTC(mode: TransferMode = "internet") {
       switch (message.type) {
         case "peer-joined": {
           if (activeTransportRef.current === "peerjs" && isConnectedRef.current) return;
+          if (hasCreatedOfferRef.current) return;
+          hasCreatedOfferRef.current = true;
           startHandshakeWatchdog(currentRole);
           if (currentRole === "sender" && pc) {
             const dc = pc.createDataChannel("share-channel", { ordered: true });

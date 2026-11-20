@@ -1,5 +1,5 @@
 import { generateRoomCode, normalizeRoomCode } from "@/lib/codeGenerator";
-import type { SignalingRoomState } from "@/types/signaling";
+import type { SignalingRoomState, SignalMessage } from "@/types/signaling";
 
 export type StorageMode = "redis" | "memory";
 
@@ -20,6 +20,8 @@ export interface SignalStoreAdapter {
   getKey(key: string): Promise<string | null>;
   setKey(key: string, value: string, ttlSeconds?: number): Promise<void>;
   deleteKey(key: string): Promise<boolean>;
+  appendSignal(identifier: string, msg: SignalMessage, ttlSeconds?: number): Promise<void>;
+  getSignals(identifier: string): Promise<SignalMessage[]>;
 }
 
 const DEFAULT_TTL_MS = 15 * 60 * 1000; // 15 minutes
@@ -33,6 +35,7 @@ export class MemorySignalStore implements SignalStoreAdapter {
   private rooms: Map<string, SignalingRoomState> = new Map();
   private codeToRoomId: Map<string, string> = new Map();
   private genericKeys: Map<string, { value: string; expiresAt: number }> = new Map();
+  private signalLists: Map<string, { messages: SignalMessage[]; expiresAt: number }> = new Map();
   private ttlMs: number;
   private maxRooms: number;
 
@@ -57,6 +60,12 @@ export class MemorySignalStore implements SignalStoreAdapter {
     for (const [key, entry] of this.genericKeys.entries()) {
       if (now > entry.expiresAt) {
         this.genericKeys.delete(key);
+      }
+    }
+
+    for (const [key, entry] of this.signalLists.entries()) {
+      if (now > entry.expiresAt) {
+        this.signalLists.delete(key);
       }
     }
 
@@ -167,6 +176,8 @@ export class MemorySignalStore implements SignalStoreAdapter {
     if (!room) return false;
     this.codeToRoomId.delete(room.code);
     this.rooms.delete(roomId);
+    this.signalLists.delete(roomId);
+    this.signalLists.delete(room.code);
     return true;
   }
 
@@ -179,6 +190,7 @@ export class MemorySignalStore implements SignalStoreAdapter {
     this.rooms.clear();
     this.codeToRoomId.clear();
     this.genericKeys.clear();
+    this.signalLists.clear();
   }
 
   async getKey(key: string): Promise<string | null> {
@@ -206,6 +218,34 @@ export class MemorySignalStore implements SignalStoreAdapter {
 
   async deleteKey(key: string): Promise<boolean> {
     return this.genericKeys.delete(key);
+  }
+
+  async appendSignal(identifier: string, msg: SignalMessage, ttlSeconds?: number): Promise<void> {
+    const key = identifier.startsWith("room_") ? identifier : normalizeRoomCode(identifier);
+    const ttlMs = ttlSeconds ? ttlSeconds * 1000 : this.ttlMs;
+    const expiresAt = Date.now() + ttlMs;
+    let entry = this.signalLists.get(key);
+    if (!entry || Date.now() > entry.expiresAt) {
+      entry = { messages: [], expiresAt };
+      this.signalLists.set(key, entry);
+    } else {
+      entry.expiresAt = Math.max(entry.expiresAt, expiresAt);
+    }
+    entry.messages.push(msg);
+    if (entry.messages.length > 200) {
+      entry.messages.shift();
+    }
+  }
+
+  async getSignals(identifier: string): Promise<SignalMessage[]> {
+    const key = identifier.startsWith("room_") ? identifier : normalizeRoomCode(identifier);
+    const entry = this.signalLists.get(key);
+    if (!entry) return [];
+    if (Date.now() > entry.expiresAt) {
+      this.signalLists.delete(key);
+      return [];
+    }
+    return [...entry.messages];
   }
 }
 
@@ -384,6 +424,8 @@ export class RedisSignalStore implements SignalStoreAdapter {
     await this.pipeline([
       ["DEL", `quicksend:room:${roomId}`],
       ["DEL", `quicksend:code:${room.code}`],
+      ["DEL", `quicksend:sig:${room.code}`],
+      ["DEL", `quicksend:sig:${roomId}`],
     ]);
 
     return true;
@@ -428,6 +470,35 @@ export class RedisSignalStore implements SignalStoreAdapter {
   async deleteKey(key: string): Promise<boolean> {
     const res = await this.command<number>(["DEL", `quicksend:${key}`]);
     return Boolean(res && res > 0);
+  }
+
+  async appendSignal(identifier: string, msg: SignalMessage, ttlSeconds?: number): Promise<void> {
+    const key = identifier.startsWith("room_") ? identifier : normalizeRoomCode(identifier);
+    const sigKey = `quicksend:sig:${key}`;
+    const ttl = ttlSeconds && ttlSeconds > 0 ? ttlSeconds : this.ttlSeconds;
+    await this.pipeline([
+      ["RPUSH", sigKey, JSON.stringify(msg)],
+      ["EXPIRE", sigKey, ttl],
+    ]);
+  }
+
+  async getSignals(identifier: string): Promise<SignalMessage[]> {
+    const key = identifier.startsWith("room_") ? identifier : normalizeRoomCode(identifier);
+    const sigKey = `quicksend:sig:${key}`;
+    const rawItems = await this.command<unknown[]>(["LRANGE", sigKey, 0, -1]);
+    if (!Array.isArray(rawItems)) return [];
+    const result: SignalMessage[] = [];
+    for (const item of rawItems) {
+      try {
+        const parsed = typeof item === "string" ? JSON.parse(item) : (item as SignalMessage);
+        if (parsed && typeof parsed === "object" && "type" in parsed) {
+          result.push(parsed);
+        }
+      } catch {
+        // ignore malformed message
+      }
+    }
+    return result;
   }
 }
 
@@ -474,4 +545,6 @@ export const signalStore: SignalStoreAdapter = {
   getKey: (key) => getSignalStore().getKey(key),
   setKey: (key, value, ttlSeconds) => getSignalStore().setKey(key, value, ttlSeconds),
   deleteKey: (key) => getSignalStore().deleteKey(key),
+  appendSignal: (identifier, msg, ttlSeconds) => getSignalStore().appendSignal(identifier, msg, ttlSeconds),
+  getSignals: (identifier) => getSignalStore().getSignals(identifier),
 };

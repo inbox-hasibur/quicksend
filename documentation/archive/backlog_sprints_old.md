@@ -1005,3 +1005,21 @@
   - Added clean 4-second zero-peer fallback hint under `RadarPanel` directing users to PIN/QR options when routers split subnets.
 - [x] Unit Testing & Verification (`src/lib/__tests__/iceConfig.test.ts`, `src/components/__tests__/SameNetworkCard.test.tsx`, `src/hooks/__tests__/useWebRTC.test.ts`, `src/app/api/discover/__tests__/route.test.ts`):
   - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 48/48 passing tests across all 4 targeted test suites.
+
+### Fix 23 (2026-11-20): Atomic signal append in Redis, FIFO signaling queue, and WebRTC dual-transport arbitration
+- [x] Atomic Signal Append (`src/lib/signalStore.ts` & `src/app/api/signal/route.ts`):
+  - Added `appendSignal(identifier, msg, ttlSeconds)` and `getSignals(identifier)` to `SignalStoreAdapter` interface, implemented in `MemorySignalStore` and `RedisSignalStore` via `RPUSH` + `EXPIRE` pipeline.
+  - Eliminated the Upstash Redis read-modify-write lost-update race condition where concurrent `POST /api/signal` candidate requests overwrote Offer/Answer/Host candidates in Redis.
+  - Updated `/api/signal` `poll-signals` to read atomically appended signals by code and roomId, merging with deduplicated message lists.
+- [x] FIFO Serialized Signaling Queue (`src/lib/signalingClient.ts`):
+  - Added internal `sendQueue: Promise<void>` in `SignalingClient` chaining outgoing `sendSignal` calls sequentially to avoid HTTP network reordering of offers, answers, and candidates.
+- [x] WebRTC Dual-Transport Arbitration (`src/lib/webrtc/peerJsHelper.ts` & `src/hooks/useWebRTC.ts`):
+  - Prevented PeerJS internal ICE failure from prematurely aborting active HTTP signaling WebRTC connection (`onFirewallBlocked` suppressed on PeerJS ICE failure).
+  - Added `hasCreatedOfferRef` in `useWebRTC` to avoid duplicate offer creation upon multiple `peer-joined` messages.
+  - Prevented raw WebRTC connection failure from aborting transfers when PeerJS connection is open or actively connected.
+- [x] Sender Connecting Label & Diagnostics Hint (`src/components/TransferModal.tsx` & `src/components/SameNetworkCard.tsx`):
+  - Added `role`, `peerName`, and `diagnosticHint` props to `TransferModal`.
+  - Updated connecting label to dynamically display "Connecting to <peerName>..." when in sender role.
+  - Added subtle monospace diagnostic hint on transfer error to inspect ICE candidate states (`host`, `srflx`, `relay`).
+- [x] Unit Testing & Verification (`src/lib/__tests__/signalStore.test.ts`, `src/app/api/signal/__tests__/route.test.ts`, `src/hooks/__tests__/useWebRTC.test.ts`, `src/components/__tests__/SameNetworkCard.test.tsx`, `src/components/__tests__/TransferModal.test.tsx`):
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 51/51 passing tests across targeted test suites.

@@ -1,6 +1,5 @@
 import type { PeerRole } from "@/types/signaling";
 import {
-  FIREWALL_BLOCKED_MESSAGE,
   type PeerJsConnection,
   type PeerJsInstance,
 } from "./types";
@@ -67,7 +66,7 @@ export function wirePeerConnectionEvents(
       } else if (state === "failed") {
         callbacks.clearHandshakeWatchdog();
         callbacks.clearReceiverWatchdogs();
-        callbacks.onFirewallBlocked(FIREWALL_BLOCKED_MESSAGE);
+        callbacks.addLog("PeerJS internal ICE failed; waiting on HTTP signaling fallback");
       }
     };
 

@@ -108,13 +108,17 @@ export async function POST(request: Request) {
           timestamp: Date.now(),
         };
 
-        await signalStore.updateRoom(room.roomId, (r) => {
-          r.receiverJoined = true;
-          r.messages.push(joinMessage);
-          if (r.messages.length > 100) {
-            r.messages.shift();
-          }
-        });
+        await Promise.all([
+          signalStore.appendSignal(room.code, joinMessage),
+          signalStore.appendSignal(room.roomId, joinMessage),
+          signalStore.updateRoom(room.roomId, (r) => {
+            r.receiverJoined = true;
+            r.messages.push(joinMessage);
+            if (r.messages.length > 100) {
+              r.messages.shift();
+            }
+          }),
+        ]);
 
         return NextResponse.json({
           success: true,
@@ -132,6 +136,14 @@ export async function POST(request: Request) {
           );
         }
 
+        const room = await signalStore.getRoom(roomId, "id");
+        if (!room) {
+          return NextResponse.json(
+            { success: false, error: "Room not found or expired" },
+            { status: 404 }
+          );
+        }
+
         const message: SignalMessage = {
           id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
           roomId,
@@ -142,19 +154,10 @@ export async function POST(request: Request) {
           timestamp: Date.now(),
         };
 
-        const updated = await signalStore.updateRoom(roomId, (r) => {
-          r.messages.push(message);
-          if (r.messages.length > 100) {
-            r.messages.shift();
-          }
-        });
-
-        if (!updated) {
-          return NextResponse.json(
-            { success: false, error: "Room not found or expired" },
-            { status: 404 }
-          );
-        }
+        await Promise.all([
+          signalStore.appendSignal(room.code, message),
+          signalStore.appendSignal(room.roomId, message),
+        ]);
 
         return NextResponse.json({ success: true, messageId: message.id });
       }
@@ -176,7 +179,21 @@ export async function POST(request: Request) {
           );
         }
 
-        const relevantMessages = room.messages.filter(
+        const [signalsByCode, signalsById] = await Promise.all([
+          signalStore.getSignals(room.code),
+          signalStore.getSignals(room.roomId),
+        ]);
+
+        const seenIds = new Set<string>();
+        const allMessages: SignalMessage[] = [];
+        for (const msg of [...room.messages, ...signalsByCode, ...signalsById]) {
+          if (msg && msg.id && !seenIds.has(msg.id)) {
+            seenIds.add(msg.id);
+            allMessages.push(msg);
+          }
+        }
+
+        const relevantMessages = allMessages.filter(
           (m) => m.targetRole === role && m.timestamp > afterTimestamp
         );
 

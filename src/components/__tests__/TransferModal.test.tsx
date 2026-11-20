@@ -428,4 +428,54 @@ describe("TransferModal Component", () => {
 
     expect(onRelay).toHaveBeenCalledTimes(1);
   });
+
+  it("should show sender connecting label and render diagnostic hint on error", async () => {
+    const connectingProgress: TransferProgressState = {
+      status: "connecting",
+      itemType: "file",
+      bytesTransferred: 0,
+      totalBytes: 0,
+      progressPercentage: 0,
+      speedBps: 0,
+    };
+
+    await act(async () => {
+      root.render(
+        <TransferModal
+          progress={connectingProgress}
+          role="sender"
+          peerName="Pixel 8"
+          onAccept={vi.fn()}
+          onReject={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain("Connecting to Pixel 8...");
+
+    const errorProgress: TransferProgressState = {
+      status: "error",
+      itemType: "file",
+      bytesTransferred: 0,
+      totalBytes: 0,
+      progressPercentage: 0,
+      speedBps: 0,
+      errorMessage: "Connection timed out",
+    };
+
+    await act(async () => {
+      root.render(
+        <TransferModal
+          progress={errorProgress}
+          diagnosticHint="ICE: failed • host: 2, srflx: 1, relay: 0"
+          onAccept={vi.fn()}
+          onReject={vi.fn()}
+          onClose={vi.fn()}
+        />
+      );
+    });
+
+    expect(container.textContent).toContain("ICE: failed • host: 2, srflx: 1, relay: 0");
+  });
 });

@@ -24,6 +24,9 @@ export interface TransferModalProps {
   progress: TransferProgressState;
   isOpen?: boolean;
   roomCode?: string;
+  role?: "sender" | "receiver" | null;
+  peerName?: string;
+  diagnosticHint?: string;
   onAccept: () => void;
   onReject: () => void;
   onClose: () => void;
@@ -47,6 +50,9 @@ export function TransferModal({
   progress,
   isOpen,
   roomCode,
+  role,
+  peerName,
+  diagnosticHint,
   onAccept,
   onReject,
   onClose,
@@ -237,7 +243,11 @@ export function TransferModal({
           ) : (
             <div className="p-4 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-center space-y-1">
               <p className="font-bold text-sm text-[var(--text)]">
-                {roomCode ? `Connecting to sender (${formatRoomCode(roomCode)})...` : "Connecting to sender..."}
+                {role === "sender"
+                  ? `Connecting to ${peerName || "receiver"}...`
+                  : roomCode
+                  ? `Connecting to sender (${formatRoomCode(roomCode)})...`
+                  : "Connecting to sender..."}
               </p>
               <p className="text-xs text-[var(--text-muted)]">
                 Establishing direct peer connection...
@@ -248,6 +258,15 @@ export function TransferModal({
           {/* 0. Connecting view */}
           {progress.status === "connecting" && (
             <div className="space-y-3 pt-1">
+              {(Boolean(progress.fileName) || (progress.totalBytes > 0 && progress.itemType === "file") || Boolean(progress.textContent)) && (
+                <p className="text-xs text-center text-[var(--text-muted)]">
+                  {role === "sender"
+                    ? `Connecting to ${peerName || "receiver"}...`
+                    : roomCode
+                    ? `Connecting to sender (${formatRoomCode(roomCode)})...`
+                    : "Connecting to sender..."}
+                </p>
+              )}
               <button
                 type="button"
                 data-testid="cancel-transfer-btn"
@@ -540,7 +559,14 @@ export function TransferModal({
             <div className="space-y-3">
               <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-300 text-xs">
                 <AlertCircle className="h-5 w-5 shrink-0 text-amber-500 mt-0.5" />
-                <span>{progress.errorMessage || "Transfer was declined or interrupted."}</span>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <span>{progress.errorMessage || "Transfer was declined or interrupted."}</span>
+                  {progress.status === "error" && diagnosticHint && (
+                    <p className="font-mono text-[10px] opacity-75 break-all text-[var(--text-muted)]">
+                      {diagnosticHint}
+                    </p>
+                  )}
+                </div>
               </div>
               {onRelay && isRelayAvailable && (
                 <button

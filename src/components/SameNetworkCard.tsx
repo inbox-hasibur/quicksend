@@ -440,6 +440,9 @@ export function SameNetworkCard() {
       {/* Live WebRTC Transfer Modal */}
       <TransferModal
         progress={progress}
+        role={rtcRole}
+        peerName={targetPeer?.name}
+        diagnosticHint={`ICE: ${diagnostics.iceState} • host: ${diagnostics.candidateCounts.host}, srflx: ${diagnostics.candidateCounts.srflx}, relay: ${diagnostics.candidateCounts.relay}`}
         onAccept={acceptIncomingTransfer}
         onReject={rejectIncomingTransfer}
         onClose={handleModalClose}

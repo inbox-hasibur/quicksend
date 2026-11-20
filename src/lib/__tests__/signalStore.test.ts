@@ -169,6 +169,22 @@ describe("SignalStore - MemorySignalStore", () => {
       Date.now = originalNow;
     }
   });
+
+  it("should append signals and retrieve them in MemorySignalStore", async () => {
+    const dummyMsg = {
+      id: "msg_mem_1",
+      roomId: "room_mem",
+      senderRole: "sender" as const,
+      targetRole: "receiver" as const,
+      type: "offer" as const,
+      timestamp: Date.now(),
+    };
+
+    await store.appendSignal("MEMROOM", dummyMsg);
+    const signals = await store.getSignals("MEMROOM");
+    expect(signals).toHaveLength(1);
+    expect(signals[0].id).toBe("msg_mem_1");
+  });
 });
 
 describe("SignalStore - RedisSignalStore (REST Mode with mocked fetch)", () => {
@@ -297,7 +313,7 @@ describe("SignalStore - RedisSignalStore (REST Mode with mocked fetch)", () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => [{ result: 1 }, { result: 1 }],
+        json: async () => [{ result: 1 }, { result: 1 }, { result: 1 }, { result: 1 }],
       });
 
     const store = new RedisSignalStore(900);
@@ -311,6 +327,8 @@ describe("SignalStore - RedisSignalStore (REST Mode with mocked fetch)", () => {
         body: JSON.stringify([
           ["DEL", "quicksend:room:room_del_123"],
           ["DEL", "quicksend:code:DELREDIS"],
+          ["DEL", "quicksend:sig:DELREDIS"],
+          ["DEL", "quicksend:sig:room_del_123"],
         ]),
       })
     );
@@ -372,5 +390,42 @@ describe("SignalStore - RedisSignalStore (REST Mode with mocked fetch)", () => {
         body: JSON.stringify(["SET", "quicksend:fallback_key", "val_3"]),
       })
     );
+  });
+
+  it("should append signals and retrieve signals from Redis", async () => {
+    const store = new RedisSignalStore(900);
+    const dummyMsg = {
+      id: "msg_test_1",
+      roomId: "room_1",
+      senderRole: "sender" as const,
+      targetRole: "receiver" as const,
+      type: "offer" as const,
+      timestamp: Date.now(),
+    };
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ result: 1 }, { result: "OK" }],
+    });
+
+    await store.appendSignal("ROOM123", dummyMsg);
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://mock-redis.upstash.io/pipeline",
+      expect.objectContaining({
+        body: JSON.stringify([
+          ["RPUSH", "quicksend:sig:ROOM123", JSON.stringify(dummyMsg)],
+          ["EXPIRE", "quicksend:sig:ROOM123", 900],
+        ]),
+      })
+    );
+
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ result: [JSON.stringify(dummyMsg)] }),
+    });
+
+    const signals = await store.getSignals("ROOM123");
+    expect(signals).toHaveLength(1);
+    expect(signals[0].id).toBe("msg_test_1");
   });
 });

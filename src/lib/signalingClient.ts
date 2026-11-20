@@ -6,6 +6,7 @@ export class SignalingClient {
   private pollInterval: NodeJS.Timeout | null = null;
   private lastTimestamp = 0;
   private isPolling = false;
+  private sendQueue: Promise<void> = Promise.resolve();
 
   async createRoom(customCode?: string): Promise<{ roomId: string; code: string }> {
     const res = await fetch("/api/signal", {
@@ -51,23 +52,30 @@ export class SignalingClient {
     }
 
     const defaultTarget: PeerRole = this.role === "sender" ? "receiver" : "sender";
-    const res = await fetch("/api/signal", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "send-signal",
-        roomId: this.roomId,
-        senderRole: this.role,
-        targetRole: targetRole || defaultTarget,
-        type,
-        payload,
-      }),
-    });
+    const sendTask = async () => {
+      const res = await fetch("/api/signal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "send-signal",
+          roomId: this.roomId,
+          senderRole: this.role,
+          targetRole: targetRole || defaultTarget,
+          type,
+          payload,
+        }),
+      });
 
-    const data = await res.json();
-    if (!data.success) {
-      throw new Error(data.error || "Failed to deliver signal");
-    }
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Failed to deliver signal");
+      }
+    };
+
+    // Chain outgoing signals sequentially to eliminate lost-update race conditions
+    const next = this.sendQueue.then(sendTask, sendTask);
+    this.sendQueue = next.catch(() => {});
+    return next;
   }
 
   startPolling(onMessage: (message: SignalMessage) => void, intervalMs = 600): void {
@@ -116,6 +124,7 @@ export class SignalingClient {
 
   async leaveRoom(): Promise<void> {
     this.stopPolling();
+    this.sendQueue = Promise.resolve();
     if (this.roomId) {
       try {
         await fetch("/api/signal", {

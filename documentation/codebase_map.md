@@ -429,13 +429,13 @@ flowchart TD
 
 #### `src/components/TransferModal.tsx`
 - **Purpose:** Multi-state transfer progress dialog with universal cancellation:
-  1. *Connecting:* Early modal display during connection establishment with clear "Cancel Transfer" button.
+  1. *Connecting:* Early modal display during connection establishment with clear "Cancel Transfer" button, dynamic sender connecting label ("Connecting to <peerName>..."), and connection status indicator.
   2. *Waiting for Acceptance:* Receiver prompt with file/text preview and Accept / Cancel Transfer actions.
   3. *Transferring:* Live progress bar, throughput speed (MB/s), byte counts, and active "Cancel Transfer" action.
   4. *Completed:* Auto-download confirmation for files, or one-click copy button for text snippets.
-  5. *Error / Declined:* Informative status feedback with immediate dismiss via close button or Escape key, plus optional "Send via encrypted cloud relay" fallback trigger.
+  5. *Error / Declined:* Informative status feedback with subtle monospace diagnostic hints (ICE state, host/srflx/relay candidate counts), immediate dismiss via close button or Escape key, plus optional "Send via encrypted cloud relay" fallback trigger.
   6. *Encrypted Cloud Relay Receive:* Displays encrypted payload card, prefilled relay code input, decrypt progress, and error feedback.
-- **Exports:** `TransferModal(props: TransferModalProps): JSX.Element | null`
+- **Exports:** `TransferModal(props: TransferModalProps): JSX.Element | null`, `TransferModalProps`
 
 #### `src/components/ServiceWorkerRegister.tsx`
 - **Purpose:** Registers `/sw.js` in production environments and logs service worker registration status.
@@ -530,7 +530,7 @@ flowchart TD
 - **Exports:** `getDeviceProfile(): DeviceProfile`, `saveDeviceProfile(profile: DeviceProfile): void`, `AVATAR_PRESETS`, `DeviceProfile`, `AvatarPreset`, `DeviceFormFactor`.
 
 #### `src/lib/signalStore.ts`
-- **Purpose:** Dual-mode storage adapter for ephemeral signaling rooms. Seamlessly switches between zero-dependency Redis REST mode (using native `fetch` with Upstash Redis / Vercel KV REST API with trailing slash URL sanitization, command error propagation, and fallback `SET` on unsupported `KEEPTTL`) and in-memory TTL mode with capacity guard and automatic 15-minute pruning.
+- **Purpose:** Dual-mode storage adapter for ephemeral signaling rooms. Seamlessly switches between zero-dependency Redis REST mode (using native `fetch` with Upstash Redis / Vercel KV REST API with trailing slash URL sanitization, atomic signal list append via `RPUSH` + `EXPIRE` pipeline to eliminate lost updates, command error propagation, and fallback `SET` on unsupported `KEEPTTL`) and in-memory TTL mode with capacity guard, atomic signal lists, and automatic 15-minute pruning.
 - **Exports:** `signalStore`, `MemorySignalStore`, `RedisSignalStore`, `isRedisConfigured`, `getSignalStore`.
 
 #### `src/lib/iceConfig.ts`
@@ -566,7 +566,7 @@ flowchart TD
 - **Exports:** `textToNibbles`, `nibblesToText`, `nibbleToFrequency`, `frequencyToNibble`, `classifyTone`, `ULTRASONIC_PRESETS`, `UltrasonicConfig`.
 
 #### `src/lib/signalingClient.ts`
-- **Purpose:** Client-side HTTP polling signaling engine coordinating with `/api/signal`. Manages message timestamps, room join notifications, and signal transmission.
+- **Purpose:** Client-side HTTP polling signaling engine coordinating with `/api/signal`. Manages message timestamps, room join notifications, and signal transmission serialized via an internal FIFO `sendQueue` to prevent network race conditions.
 - **Exports:** `SignalingClient` class.
 
 #### `src/lib/modeAvailability.ts`
