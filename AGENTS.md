@@ -24,6 +24,16 @@ NEVER edit, refactor, or reformat any file belonging to a LOCKED channel unless 
 - `src/lib/relayCrypto.ts`, `src/lib/relayLimits.ts`, `src/lib/relayChunks.ts`, `src/lib/upstashBlob.ts`
 - `src/app/api/relay/**`
 
+### Mode 2: Same Wi-Fi — LOCKED (Verified Working)
+- `src/components/SameNetworkCard.tsx`
+- `src/components/LanDirectFallback.tsx`
+- `src/components/RadarPanel.tsx`
+- `src/components/DirectConnectPanel.tsx`
+- `src/hooks/useLocalDiscovery.ts`
+- `src/hooks/useWebRTC.ts` and `src/lib/webrtc/**`
+- `src/lib/signalingClient.ts`, `src/lib/signalStore.ts`, `src/lib/iceConfig.ts`
+- `src/app/api/discover/**` and `src/app/api/signal/**`
+
 ---
 
 ## 1. Git Commit Message Rule
