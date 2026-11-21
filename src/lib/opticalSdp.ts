@@ -5,13 +5,95 @@ interface OpticalSdpPackage {
 }
 
 /**
- * Strips non-essential SDP attributes (e.g. extraneous codecs) to maximize QR scannability.
+ * 32-character unambiguous uppercase alphabet excluding 0, 1, O, I.
+ */
+export const BASE32_ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+
+const B32_LOOKUP: Record<string, number> = {};
+for (let i = 0; i < BASE32_ALPHABET.length; i++) {
+  B32_LOOKUP[BASE32_ALPHABET[i]] = i;
+}
+
+/**
+ * Strips all spaces, hyphens, and non-alphabet characters, returning clean uppercase alphanumeric characters.
+ */
+export function stripHandshakeFormatting(input: string): string {
+  if (!input) return "";
+  return input.toUpperCase().replace(/[^23456789ABCDEFGHJKLMNPQRSTUVWXYZ]/g, "");
+}
+
+/**
+ * Formats a raw handshake code into clean 4-character hyphenated blocks:
+ * e.g. "Q4AB - CDEF - GHJK - ..."
+ */
+export function formatHandshakeCode(raw: string): string {
+  if (!raw) return "";
+  const clean = stripHandshakeFormatting(raw);
+  if (!clean) return "";
+
+  const chunks: string[] = [];
+  for (let i = 0; i < clean.length; i += 4) {
+    chunks.push(clean.slice(i, i + 4));
+  }
+  return chunks.join(" - ");
+}
+
+export function base32Encode(bytes: Uint8Array): string {
+  let bits = 0;
+  let value = 0;
+  let output = "";
+
+  for (let i = 0; i < bytes.length; i++) {
+    value = (value << 8) | bytes[i];
+    bits += 8;
+    while (bits >= 5) {
+      output += BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+
+  if (bits > 0) {
+    output += BASE32_ALPHABET[(value << (5 - bits)) & 31];
+  }
+
+  return output;
+}
+
+export function base32Decode(str: string): Uint8Array {
+  const clean = stripHandshakeFormatting(str);
+  let bits = 0;
+  let value = 0;
+  const bytes: number[] = [];
+
+  for (let i = 0; i < clean.length; i++) {
+    const val = B32_LOOKUP[clean[i]];
+    if (val === undefined) continue;
+    value = (value << 5) | val;
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+
+  return new Uint8Array(bytes);
+}
+
+export function computeByteChecksum(bytes: Uint8Array, length: number): number {
+  let sum = 0x5a;
+  for (let i = 0; i < length; i++) {
+    sum = (sum * 31 + bytes[i]) & 0xff;
+  }
+  return sum;
+}
+
+/**
+ * Strips non-essential SDP attributes to maximize QR scannability.
  */
 export function compactSdp(sdp: string): string {
   return sdp
     .split(/\r?\n/)
     .filter((line) => {
-      // Keep only vital WebRTC connection lines
       return (
         line.startsWith("v=") ||
         line.startsWith("o=") ||
@@ -70,16 +152,224 @@ function getCandidatePriority(ip: string): number {
   return 6;
 }
 
+function packSdpToBytes(
+  type: "offer" | "answer",
+  ufrag: string,
+  pwd: string,
+  fpHex64: string,
+  cands: ParsedCandidate[]
+): Uint8Array {
+  const textEncoder = new TextEncoder();
+  const ufragBytes = textEncoder.encode(ufrag);
+  const pwdBytes = textEncoder.encode(pwd);
+
+  // Convert 64 hex characters to 32 binary bytes
+  const fpBytes = new Uint8Array(32);
+  const cleanFp = fpHex64.replace(/[^0-9a-fA-F]/g, "").padStart(64, "0").slice(0, 64);
+  for (let i = 0; i < 32; i++) {
+    fpBytes[i] = parseInt(cleanFp.slice(i * 2, i * 2 + 2), 16);
+  }
+
+  // Use up to 2 best host candidates
+  const topCands = cands.slice(0, 2);
+
+  // Calculate buffer size
+  let candBytesLen = 0;
+  for (const c of topCands) {
+    const isIpv4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(c.ip);
+    if (isIpv4) {
+      candBytesLen += 7; // 1 type + 4 ip + 2 port
+    } else {
+      const hostBytes = textEncoder.encode(c.ip);
+      candBytesLen += 4 + hostBytes.length; // 1 type + 2 port + 1 len + hostLen
+    }
+  }
+
+  const totalLen =
+    1 + // header
+    1 + ufragBytes.length + // ufrag len + bytes
+    1 + pwdBytes.length + // pwd len + bytes
+    32 + // fingerprint
+    candBytesLen + // candidates
+    1; // checksum
+
+  const buf = new Uint8Array(totalLen);
+  let pos = 0;
+
+  // Header byte: bit 7 = isAnswer, bit 6-5 = version (0), bit 4-0 = candCount
+  const isAnswer = type === "answer";
+  buf[pos++] = (isAnswer ? 0x80 : 0x00) | (topCands.length & 0x1f);
+
+  // ufrag
+  buf[pos++] = ufragBytes.length;
+  buf.set(ufragBytes, pos);
+  pos += ufragBytes.length;
+
+  // pwd
+  buf[pos++] = pwdBytes.length;
+  buf.set(pwdBytes, pos);
+  pos += pwdBytes.length;
+
+  // fingerprint (32 bytes)
+  buf.set(fpBytes, pos);
+  pos += 32;
+
+  // Candidates
+  for (const c of topCands) {
+    const isIpv4 = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(c.ip);
+    if (isIpv4) {
+      buf[pos++] = c.proto === "tcp" ? 0x02 : 0x01; // 1 = IPv4 UDP, 2 = IPv4 TCP
+      const octets = c.ip.split(".").map(Number);
+      buf[pos++] = octets[0];
+      buf[pos++] = octets[1];
+      buf[pos++] = octets[2];
+      buf[pos++] = octets[3];
+      buf[pos++] = (c.port >> 8) & 0xff;
+      buf[pos++] = c.port & 0xff;
+    } else {
+      const hostBytes = textEncoder.encode(c.ip);
+      buf[pos++] = c.proto === "tcp" ? 0x04 : 0x03; // 3 = Host UDP, 4 = Host TCP
+      buf[pos++] = (c.port >> 8) & 0xff;
+      buf[pos++] = c.port & 0xff;
+      buf[pos++] = hostBytes.length;
+      buf.set(hostBytes, pos);
+      pos += hostBytes.length;
+    }
+  }
+
+  // Trailing 1-byte checksum
+  const checksum = computeByteChecksum(buf, pos);
+  buf[pos++] = checksum;
+
+  return buf;
+}
+
+function unpackBytesToSdp(bytes: Uint8Array): {
+  desc: RTCSessionDescriptionInit;
+  candidates: RTCIceCandidateInit[];
+} {
+  const textDecoder = new TextDecoder();
+  let pos = 0;
+
+  if (bytes.length < 36) {
+    throw new Error("Code has a typo — please double-check");
+  }
+
+  const header = bytes[pos++];
+  const isAnswer = (header & 0x80) !== 0;
+  const type: "offer" | "answer" = isAnswer ? "answer" : "offer";
+  const candCount = header & 0x1f;
+
+  const ufragLen = bytes[pos++];
+  if (pos + ufragLen > bytes.length) throw new Error("Code has a typo — please double-check");
+  const ufrag = textDecoder.decode(bytes.slice(pos, pos + ufragLen));
+  pos += ufragLen;
+
+  const pwdLen = bytes[pos++];
+  if (pos + pwdLen > bytes.length) throw new Error("Code has a typo — please double-check");
+  const pwd = textDecoder.decode(bytes.slice(pos, pos + pwdLen));
+  pos += pwdLen;
+
+  if (pos + 32 > bytes.length) throw new Error("Code has a typo — please double-check");
+  const fpBytes = bytes.slice(pos, pos + 32);
+  pos += 32;
+
+  let fpHex = "";
+  for (let i = 0; i < 32; i++) {
+    fpHex += fpBytes[i].toString(16).padStart(2, "0").toUpperCase();
+  }
+  const colonFp = fpHex.match(/.{1,2}/g)?.join(":") || fpHex;
+
+  const candidateObjects: RTCIceCandidateInit[] = [];
+  for (let i = 0; i < candCount; i++) {
+    if (pos >= bytes.length) throw new Error("Code has a typo — please double-check");
+    const candType = bytes[pos++];
+    if (candType === 1 || candType === 2) {
+      if (pos + 6 > bytes.length) throw new Error("Code has a typo — please double-check");
+      const ip = `${bytes[pos]}.${bytes[pos + 1]}.${bytes[pos + 2]}.${bytes[pos + 3]}`;
+      pos += 4;
+      const port = (bytes[pos] << 8) | bytes[pos + 1];
+      pos += 2;
+      const proto = candType === 2 ? "TCP" : "UDP";
+      const prio = 2130706431 - i;
+      candidateObjects.push({
+        candidate: `candidate:${i + 1} 1 ${proto} ${prio} ${ip} ${port} typ host generation 0`,
+        sdpMid: "0",
+        sdpMLineIndex: 0,
+      });
+    } else if (candType === 3 || candType === 4) {
+      if (pos + 3 > bytes.length) throw new Error("Code has a typo — please double-check");
+      const port = (bytes[pos] << 8) | bytes[pos + 1];
+      pos += 2;
+      const hostLen = bytes[pos++];
+      if (pos + hostLen > bytes.length) throw new Error("Code has a typo — please double-check");
+      const ip = textDecoder.decode(bytes.slice(pos, pos + hostLen));
+      pos += hostLen;
+      const proto = candType === 4 ? "TCP" : "UDP";
+      const prio = 2130706431 - i;
+      candidateObjects.push({
+        candidate: `candidate:${i + 1} 1 ${proto} ${prio} ${ip} ${port} typ host generation 0`,
+        sdpMid: "0",
+        sdpMLineIndex: 0,
+      });
+    }
+  }
+
+  if (pos >= bytes.length) {
+    throw new Error("Code has a typo — please double-check");
+  }
+
+  const expectedChecksum = bytes[pos];
+  const calculatedChecksum = computeByteChecksum(bytes, pos);
+  if (expectedChecksum !== calculatedChecksum) {
+    throw new Error("Code has a typo — please double-check");
+  }
+
+  // Strict RFC 4566 / JSEP standard order
+  const sdpLines: string[] = [
+    "v=0",
+    "o=- 1234567890 2 IN IP4 127.0.0.1",
+    "s=-",
+    "t=0 0",
+    "a=group:BUNDLE 0",
+    "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+    "c=IN IP4 0.0.0.0",
+    `a=ice-ufrag:${ufrag}`,
+    `a=ice-pwd:${pwd}`,
+    "a=ice-options:trickle",
+    `a=fingerprint:sha-256 ${colonFp}`,
+    `a=setup:${type === "answer" ? "active" : "actpass"}`,
+    "a=mid:0",
+    "a=sctp-port:5000",
+    "a=max-message-size:262144",
+  ];
+
+  for (const c of candidateObjects) {
+    sdpLines.push(`a=${c.candidate}`);
+  }
+  sdpLines.push("a=end-of-candidates");
+
+  const sdp = sdpLines.join("\r\n") + "\r\n";
+
+  return {
+    desc: {
+      type,
+      sdp,
+    },
+    candidates: candidateObjects,
+  };
+}
+
 /**
- * Encodes an RTCSessionDescription and optional host ICE candidates into a compact QS3 string.
- * Format: QS3:<type>|<ufrag>|<pwd>|<fpHex64>|<setup>|<mid>|<sctpPort>|<cands>
- * Typically ~170-240 characters total for single-static QR scanning.
+ * Encodes an RTCSessionDescription and optional host ICE candidates into an ultra-compact binary Base32 Q4 string.
+ * Format: Q4<Base32(rawBytes)> with trailing 1-byte checksum.
+ * ~110-135 alphanumeric characters total, case-insensitive, zero colons/pipes.
  */
 export function encodeOpticalSdp(
   desc: RTCSessionDescriptionInit,
   candidates: RTCIceCandidateInit[] = []
 ): string {
-  const typeChar = desc.type === "answer" ? "a" : "o";
+  const type = desc.type === "answer" ? "answer" : "offer";
   const sdp = desc.sdp || "";
   const lines = sdp.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
@@ -98,26 +388,7 @@ export function encodeOpticalSdp(
       .toUpperCase();
   }
 
-  const setupLine = lines.find((l) => l.startsWith("a=setup:"));
-  const setup = setupLine
-    ? setupLine.slice("a=setup:".length).trim()
-    : desc.type === "answer"
-    ? "active"
-    : "actpass";
-
-  const midLine = lines.find((l) => l.startsWith("a=mid:"));
-  const mid = midLine ? midLine.slice("a=mid:".length).trim() : "0";
-
-  const sctpLine = lines.find(
-    (l) => l.startsWith("a=sctp-port:") || l.startsWith("a=sctpmap:")
-  );
-  let sctpPort = "5000";
-  if (sctpLine) {
-    const match = sctpLine.match(/(?:a=sctp-port:|a=sctpmap:)(\d+)/);
-    if (match) sctpPort = match[1];
-  }
-
-  // Collect host candidates from both candidates parameter and desc.sdp
+  // Collect host candidates
   const candidatePool: ParsedCandidate[] = [];
 
   for (const c of candidates) {
@@ -149,12 +420,9 @@ export function encodeOpticalSdp(
     (a, b) => getCandidatePriority(a.ip) - getCandidatePriority(b.ip)
   );
 
-  const topCands = uniqueCands.slice(0, 4);
-  const candsStr = topCands
-    .map((c) => `${c.ip},${c.port},${c.proto}`)
-    .join(";");
-
-  return `QS3:${typeChar}|${ufrag}|${pwd}|${fpHex64}|${setup}|${mid}|${sctpPort}|${candsStr}`;
+  const packedBytes = packSdpToBytes(type, ufrag, pwd, fpHex64, uniqueCands);
+  const b32 = base32Encode(packedBytes);
+  return `Q4${b32}`;
 }
 
 /**
@@ -190,17 +458,19 @@ export function isOpticalFrame(payload: string): boolean {
  * Checks whether a scanned QR payload is an optical SDP signaling message or frame.
  */
 export function isOpticalSdp(payload: string): boolean {
+  if (typeof payload !== "string") return false;
+  const clean = stripHandshakeFormatting(payload);
   return (
-    typeof payload === "string" &&
-    (payload.startsWith("QS3:") ||
-      payload.startsWith("OPTSDP:") ||
-      isOpticalFrame(payload))
+    clean.startsWith("Q4") ||
+    payload.startsWith("QS3:") ||
+    payload.startsWith("OPTSDP:") ||
+    isOpticalFrame(payload)
   );
 }
 
 /**
  * Decodes an optical SDP payload back into an RTCSessionDescriptionInit and host candidates.
- * Supports compact QS3 format and legacy OPTSDP base64 format.
+ * Supports compact Q4 Base32, QS3 format, and legacy OPTSDP base64 format.
  */
 export function decodeOpticalSdp(
   qrPayload: string
@@ -215,6 +485,15 @@ export function decodeOpticalSdp(
     }
   }
 
+  // 1. Check for Q4 compact binary Base32 format (case-insensitive, formatting stripped)
+  const stripped = stripHandshakeFormatting(cleanPayload);
+  if (stripped.startsWith("Q4")) {
+    const b32 = stripped.slice(2);
+    const bytes = base32Decode(b32);
+    return unpackBytesToSdp(bytes);
+  }
+
+  // 2. Check for QS3 pipe-delimited format (backwards compatibility)
   if (cleanPayload.startsWith("QS3:")) {
     const body = cleanPayload.slice(4);
     const [typeChar, ufrag, pwd, fpHex64, setupVal, midVal, sctpPortVal, candsStr] =
@@ -247,8 +526,6 @@ export function decodeOpticalSdp(
       });
     }
 
-    // Strict RFC 4566 / JSEP standard order:
-    // Session description lines first, then media description (m=application), then media attributes
     const sdpLines: string[] = [
       "v=0",
       "o=- 1234567890 2 IN IP4 127.0.0.1",
@@ -283,6 +560,7 @@ export function decodeOpticalSdp(
     };
   }
 
+  // 3. Check for OPTSDP base64 format (backwards compatibility)
   if (cleanPayload.startsWith("OPTSDP:")) {
     const b64 = cleanPayload.slice(7);
     let jsonStr = "";
@@ -302,7 +580,7 @@ export function decodeOpticalSdp(
     };
   }
 
-  throw new Error("Invalid optical SDP payload: missing QS3 or OPTSDP prefix");
+  throw new Error("Invalid optical SDP payload: unrecognized code format");
 }
 
 export interface FrameCollectorResult {
@@ -313,8 +591,6 @@ export interface FrameCollectorResult {
 
 /**
  * Incremental optical frame collector for multi-frame QR streams.
- * Accepts scanned frames in any arbitrary order, ignores duplicates,
- * validates hash consistency, and reassembles once all frames are captured.
  */
 export class OpticalFrameCollector {
   private currentHash: string | null = null;
@@ -335,8 +611,9 @@ export class OpticalFrameCollector {
   }
 
   addFrame(rawFrame: string): FrameCollectorResult {
-    // If a direct raw string was scanned (e.g. from copy-paste or single-QR scan)
-    if (rawFrame.startsWith("QS3:") || rawFrame.startsWith("OPTSDP:")) {
+    // If a direct raw string was scanned or typed
+    const stripped = stripHandshakeFormatting(rawFrame);
+    if (stripped.startsWith("Q4") || rawFrame.startsWith("QS3:") || rawFrame.startsWith("OPTSDP:")) {
       return {
         complete: true,
         progress: { current: 1, total: 1 },
@@ -394,13 +671,11 @@ export class OpticalFrameCollector {
     };
 
     if (this.frames.size === this.totalFrames) {
-      // Reassemble in order 1..total
       let reassembled = "";
       for (let i = 1; i <= this.totalFrames; i++) {
         reassembled += this.frames.get(i) || "";
       }
 
-      // Verify reassembled hash matches batch hash
       const reassembledHash = computeShortHash(reassembled);
       if (reassembledHash !== this.currentHash) {
         this.reset();

@@ -95,7 +95,7 @@ flowchart TD
         QuadDecode["quadDecode.ts (Multi-Region Grid Cropping & Decoding)"]
         OptRecovery["opticalRecovery.ts (Word Recovery Codes with Parity Checksum)"]
         OptStream["opticalDataStream.ts (Base45 Optical Chunker & XOR Parity FEC)"]
-        OptSdp["opticalSdp.ts (QS3 Structured WebRTC SDP Codec & Optical Splitter)"]
+        OptSdp["opticalSdp.ts (Q4 Binary Base32 WebRTC Codec & 4-Char Formatter)"]
         TransferEst["transferEstimate.ts (Channel Transfer Time & Duration Formatter)"]
         WifiQr["wifiQr.ts (WIFI:S:... QR Formatter & Android Intent Shortcuts)"]
         CodeGen["codeGenerator.ts (generateRoomCode, formatRoomCode, normalizeRoomCode)"]
@@ -400,8 +400,8 @@ flowchart TD
 - **Exports:** `FileTypeBadge({ name, mimeType, className }: FileTypeBadgeProps): JSX.Element`, `getFileTypeInfo`.
 
 #### `src/components/OpticalHandshakeModal.tsx`
-- **Purpose:** Standalone visual modal for 100% zero-internet optical WebRTC signaling. Displays compressed Offer/Answer QR codes and launches the camera scanner to exchange SDP descriptions directly across device screens.
-- **Exports:** `OpticalHandshakeModal({ isOpen, role, localPayloadQr, onOfferScanned, onAnswerScanned, onClose }: OpticalHandshakeModalProps): JSX.Element | null`
+- **Purpose:** Standalone visual modal for 100% zero-internet optical WebRTC signaling. Displays single static Offer/Answer QR codes, visible compact code display formatted in 4-character blocks (`XXXX - XXXX - ...`) with 1-click copy, camera scanner launching, smooth auto-formatting manual typing input (`Connect` button), and live connecting status indicator during handshake completion.
+- **Exports:** `OpticalHandshakeModal({ isOpen, role, localPayloadQr, onOfferScanned, onAnswerScanned, onClose, isConnecting }: OpticalHandshakeModalProps): JSX.Element | null`
 
 #### `src/components/QRCodeDisplay.tsx`
 - **Purpose:** High-contrast QR code renderer powered by `qrcode.react` (`QRCodeSVG`). Displays the dynamic room URL, 6-digit PIN with center hyphen, and one-click copy buttons.
@@ -510,8 +510,8 @@ flowchart TD
 - **Exports:** `encodeFileToOpticalFrames`, `encodeTextToOpticalFrames`, `buildParityFrames`, `getTotalFrameCount`, `parseOpticalDataFrame`, `computePayloadHash`, `OpticalDataCollector`, `OPTICAL_CHUNK_PRESETS`, `splitFirstN`.
 
 #### `src/lib/opticalSdp.ts`
-- **Purpose:** WebRTC SDP compressor, host candidate filter, multi-frame sequenced QR frame splitter (`splitOpticalFrames`), and incremental stream collector (`OpticalFrameCollector`) supporting animated QR carousels, out-of-order frame reassembly, and camera-free manual copy/paste.
-- **Exports:** `compactSdp`, `encodeOpticalSdp`, `decodeOpticalSdp`, `isOpticalSdp`, `isOpticalFrame`, `splitOpticalFrames`, `computeShortHash`, `OpticalFrameCollector`.
+- **Purpose:** Ultra-compact binary WebRTC SDP codec, host candidate filter, and unambiguous Base32 alphanumeric encoder/decoder. Packs mandatory SDP fields (ufrag, pwd, 32-byte DTLS fingerprint, up to 2 host candidates, and 1-byte checksum) into `Q4...` strings (~120-135 characters) with zero colons or pipes, case-insensitive decoding, single-character typo error detection, clean 4-character block formatter (`formatHandshakeCode`), and backwards compatibility for `QS3:` and `OPTSDP:`. Also provides multi-frame sequenced QR frame splitting (`splitOpticalFrames`) and incremental stream collector (`OpticalFrameCollector`).
+- **Exports:** `compactSdp`, `encodeOpticalSdp`, `decodeOpticalSdp`, `isOpticalSdp`, `isOpticalFrame`, `splitOpticalFrames`, `computeShortHash`, `OpticalFrameCollector`, `formatHandshakeCode`, `stripHandshakeFormatting`, `base32Encode`, `base32Decode`, `computeByteChecksum`, `BASE32_ALPHABET`.
 
 #### `src/lib/transferEstimate.ts`
 - **Purpose:** Universal transfer time estimation engine providing baseline transfer speeds per channel, live measured throughput overrides, optical camera frame calculations (with `framesPerTick` multiplier for 2x2 Grid mode), and human-friendly duration formatting.

@@ -7,10 +7,13 @@ import {
   isOpticalFrame,
   splitOpticalFrames,
   computeShortHash,
+  formatHandshakeCode,
+  stripHandshakeFormatting,
+  BASE32_ALPHABET,
   OpticalFrameCollector,
 } from "@/lib/opticalSdp";
 
-describe("opticalSdp QS3 compact codec and roundtrip encoder", () => {
+describe("opticalSdp Q4 compact binary Base32 codec and roundtrip encoder", () => {
   const sampleChromiumSdp = [
     "v=0",
     "o=- 7183920194820192831 2 IN IP4 127.0.0.1",
@@ -39,7 +42,7 @@ describe("opticalSdp QS3 compact codec and roundtrip encoder", () => {
     expect(compacted).toContain("m=application");
   });
 
-  it("should encode real Chromium DataChannel SDP to compact QS3 under 300 characters", () => {
+  it("should encode real Chromium DataChannel SDP to compact Q4 under 150 characters with zero colons or pipes", () => {
     const desc: RTCSessionDescriptionInit = {
       type: "offer",
       sdp: sampleChromiumSdp,
@@ -69,20 +72,18 @@ describe("opticalSdp QS3 compact codec and roundtrip encoder", () => {
       srflxCandidate,
     ]);
 
-    // Format verification: QS3:<type>|<ufrag>|<pwd>|<fpHex64>|<setup>|<mid>|<sctpPort>|<cands>
-    expect(encoded).toMatch(/^QS3:o\|/);
+    // Format verification: starts with Q4 prefix
+    expect(encoded).toMatch(/^Q4/);
     expect(isOpticalSdp(encoded)).toBe(true);
 
-    // Highly compact size (< 300 characters, ideal for single static QR code)
-    expect(encoded.length).toBeLessThan(300);
+    // Purely alphanumeric: ZERO colons, pipes, or commas!
+    expect(encoded).not.toMatch(/[:|,\s]/);
 
-    // Filtered: only host candidates should be included, srflx must be ignored
-    expect(encoded).toContain("192.168.1.50,5000,udp");
-    expect(encoded).toContain("phone.local,5001,udp");
-    expect(encoded).not.toContain("203.0.113.1");
+    // Highly compact size (< 150 characters, ideal for single static QR code and typing)
+    expect(encoded.length).toBeLessThan(150);
   });
 
-  it("should decode QS3 to valid RFC 4566 SDP placing m=application strictly BEFORE a=max-message-size", () => {
+  it("should decode Q4 to valid RFC 4566 SDP placing m=application strictly BEFORE a=max-message-size", () => {
     const desc: RTCSessionDescriptionInit = {
       type: "offer",
       sdp: sampleChromiumSdp,
@@ -134,7 +135,7 @@ describe("opticalSdp QS3 compact codec and roundtrip encoder", () => {
     expect(sdp).toContain("a=end-of-candidates");
   });
 
-  it("should prioritize private LAN IPv4 candidates first and limit to 4", () => {
+  it("should prioritize private LAN IPv4 candidates first and limit to 2", () => {
     const desc: RTCSessionDescriptionInit = {
       type: "offer",
       sdp: sampleChromiumSdp,
@@ -151,12 +152,10 @@ describe("opticalSdp QS3 compact codec and roundtrip encoder", () => {
     const encoded = encodeOpticalSdp(desc, candidates);
     const decoded = decodeOpticalSdp(encoded);
 
-    // Highest priority private IPv4 candidates must be placed first
+    // Highest priority private IPv4 candidates must be placed first, limited to 2
+    expect(decoded.candidates.length).toBe(2);
     expect(decoded.candidates[0].candidate).toContain("192.168.1.50");
     expect(decoded.candidates[1].candidate).toContain("10.0.0.5");
-    expect(decoded.candidates[2].candidate).toContain("172.20.1.1");
-    // Max 4 candidates
-    expect(decoded.candidates.length).toBeLessThanOrEqual(4);
   });
 
   it("should encode and decode answer descriptions correctly", () => {
@@ -171,13 +170,70 @@ describe("opticalSdp QS3 compact codec and roundtrip encoder", () => {
     };
 
     const encoded = encodeOpticalSdp(desc);
-    expect(encoded).toMatch(/^QS3:a\|/);
+    expect(encoded).toMatch(/^Q4/);
 
     const decoded = decodeOpticalSdp(encoded);
     expect(decoded.desc.type).toBe("answer");
     expect(decoded.desc.sdp).toContain("a=setup:active");
     expect(decoded.desc.sdp).toContain("a=ice-ufrag:answerUfrag");
     expect(decoded.desc.sdp).toContain("a=ice-pwd:answerPwd");
+  });
+
+  it("should detect single-character typos and throw clear error", () => {
+    const desc: RTCSessionDescriptionInit = {
+      type: "offer",
+      sdp: sampleChromiumSdp,
+    };
+    const encoded = encodeOpticalSdp(desc);
+
+    // Tamper with one character in the middle
+    const tamperedChar = encoded[15] === "2" ? "3" : "2";
+    const tampered = encoded.slice(0, 15) + tamperedChar + encoded.slice(16);
+
+    expect(() => decodeOpticalSdp(tampered)).toThrow("Code has a typo — please double-check");
+  });
+
+  it("should support case-insensitive decoding and ignore hyphens and spaces", () => {
+    const desc: RTCSessionDescriptionInit = {
+      type: "offer",
+      sdp: sampleChromiumSdp,
+    };
+    const encoded = encodeOpticalSdp(desc);
+    const formatted = formatHandshakeCode(encoded);
+
+    expect(formatted).toContain(" - ");
+
+    // Decode lowercase formatted string
+    const decoded = decodeOpticalSdp(formatted.toLowerCase());
+    expect(decoded.desc.type).toBe("offer");
+    expect(decoded.desc.sdp).toContain("a=ice-ufrag:xyz123");
+  });
+
+  it("should format and strip handshake codes correctly", () => {
+    expect(formatHandshakeCode("Q4ABCDEFGHJK")).toBe("Q4AB - CDEF - GHJK");
+    expect(stripHandshakeFormatting("q4ab - cdef - ghjk!")).toBe("Q4ABCDEFGHJK");
+
+    // Strips ambiguous characters 0, 1, O, I
+    expect(stripHandshakeFormatting("Q401OIZ")).toBe("Q4Z");
+    expect(BASE32_ALPHABET).not.toContain("0");
+    expect(BASE32_ALPHABET).not.toContain("1");
+    expect(BASE32_ALPHABET).not.toContain("O");
+    expect(BASE32_ALPHABET).not.toContain("I");
+    expect(BASE32_ALPHABET.length).toBe(32);
+  });
+
+  it("should preserve backward compatibility with QS3 pipe-delimited format", () => {
+    const qs3Payload =
+      "QS3:o|testufrag|testpwd|00112233445566778899AABBCCDDEEFF00112233445566778899AABBCCDDEEFF|actpass|0|5000|192.168.1.50,5000,udp";
+
+    expect(isOpticalSdp(qs3Payload)).toBe(true);
+
+    const decoded = decodeOpticalSdp(qs3Payload);
+    expect(decoded.desc.type).toBe("offer");
+    expect(decoded.desc.sdp).toContain("a=ice-ufrag:testufrag");
+    expect(decoded.desc.sdp).toContain("a=ice-pwd:testpwd");
+    expect(decoded.candidates).toHaveLength(1);
+    expect(decoded.candidates[0].candidate).toContain("192.168.1.50 5000 typ host");
   });
 
   it("should preserve backward compatibility with legacy OPTSDP base64 payloads", () => {
@@ -205,9 +261,9 @@ describe("opticalSdp QS3 compact codec and roundtrip encoder", () => {
     expect(decoded.candidates[0].candidate).toContain("192.168.1.50");
   });
 
-  it("should throw error when decoding non-QS3 non-OPTSDP payload", () => {
+  it("should throw error when decoding unrecognized payload", () => {
     expect(() => decodeOpticalSdp("INVALID_STRING")).toThrow(
-      "missing QS3 or OPTSDP prefix"
+      "Invalid optical SDP payload: unrecognized code format"
     );
   });
 });
@@ -244,7 +300,7 @@ describe("Multi-Frame Sequenced Optical SDP & OpticalFrameCollector", () => {
     });
   });
 
-  it("should accept raw un-chunked QS3 string immediately in collector", () => {
+  it("should accept raw un-chunked Q4 string immediately in collector", () => {
     const collector = new OpticalFrameCollector();
     const result = collector.addFrame(dummyPayload);
     expect(result.complete).toBe(true);

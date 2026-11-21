@@ -1092,3 +1092,19 @@
   - Added responsive manual installation guide modal for iOS and unsupported desktop/mobile browsers.
 - [x] Backlog & Roadmap Update (`documentation/backlog.md`):
   - Added native Android / Play Store wrapper (TWA / Capacitor) item to Future Backlog / Icebox.
+
+### Fix 30 (2026-11-21): Ultra-compact Q4 binary Base32 WebRTC handshake codec & 4-char formatted typing
+- [x] Ultra-Compact Binary Base32 Codec (`src/lib/opticalSdp.ts`):
+  - Designed unambiguous 32-character uppercase alphabet (`23456789ABCDEFGHJKLMNPQRSTUVWXYZ` excluding `0, 1, O, I`) preventing typing ambiguity.
+  - Packed mandatory SDP session fields into raw binary bytes (~75 bytes): header byte (version + offer/answer + candCount), ufrag/pwd bytes, 32-byte binary SHA-256 fingerprint, up to 2 host candidates (IPv4 packed into 7 bytes: 1 type + 4 octets + 2 port), and 1-byte rolling polynomial checksum.
+  - Base32-encoded into `Q4...` strings (~120-135 alphanumeric chars total) with ZERO colons, pipes, or commas, case-insensitive decoding, and immediate single-character typo detection throwing `"Code has a typo — please double-check"`.
+  - Added `formatHandshakeCode` (groups into `XXXX - XXXX - ...`) and `stripHandshakeFormatting` (strips spaces/hyphens and non-alphabet chars, auto-uppercasing).
+  - Maintained 100% backward compatibility with `QS3:` and `OPTSDP:` payloads.
+- [x] Modal UI & Auto-Formatting Manual Input (`src/components/OpticalHandshakeModal.tsx`):
+  - Positioned single static QR code at the top with a subtle visible code display card directly below it, displaying `formatHandshakeCode(localPayloadQr)` with 1-click Copy button.
+  - Rendered auto-formatting manual typing input on Sender Step 2 (below "Step 2: Scan Receiver's QR") and Receiver Step 1 (below "Launch Camera Scanner") with primary `Connect` button and Enter key submission.
+  - Added live connecting state indicator ("Connecting over Wi-Fi Hotspot...") upon answer submission until DataChannel connection opens.
+- [x] Unit Testing & Verification (`src/lib/__tests__/opticalSdp.test.ts` & `src/components/__tests__/HotspotAssistantCard.test.tsx`):
+  - Tested Q4 encoding/decoding round-trip (<150 chars, zero colons/pipes, RFC 4566 section ordering, candidate filtering).
+  - Tested 1-char typo error detection and case-insensitive hyphen-ignoring decoding.
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 22/22 tests passing across both targeted test suites.
