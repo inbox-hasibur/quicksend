@@ -339,6 +339,7 @@ quicksend/
     │   ├── useNearbyShare.ts
     │   ├── useNetworkStatus.ts
     │   ├── useOfflineHotspotRTC.ts
+    │   ├── usePwaInstall.ts
     │   ├── useQuadScanner.ts
     │   ├── useRelayTransfer.ts
     │   ├── useTheme.ts

@@ -134,3 +134,4 @@ For the complete, granular step-by-step checklist of historical engineering iter
 
 ## Future Backlog / Icebox
 - [ ] Optional Multi-Provider Cloud Relay Fallback (e.g., UploadThing) if Upstash Blob monthly free transfer quota is exceeded.
+- [ ] Native Android / Play Store Wrapper (TWA / Capacitor local HTTP server plugin for 1-step zero-internet SHAREit-style Hotspot discovery).

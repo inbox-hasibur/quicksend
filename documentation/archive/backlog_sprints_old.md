@@ -1080,3 +1080,15 @@
   - Upgraded Receiver Step 2 guidance to crystal-clear instructions: "STEP 2 OF 2: FINAL STEP" with subtitle guiding user to scan code using the sender phone's Step 2 button.
 - [x] Unit Testing & Verification (`src/components/__tests__/HotspotAssistantCard.test.tsx`):
   - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 4/4 passing tests in `HotspotAssistantCard.test.tsx`.
+
+### Fix 29 (2026-11-21): Universal PWA install hook and AppHeader Install App pill
+- [x] PWA Installation Hook (`src/hooks/usePwaInstall.ts`):
+  - Created client hook detecting standalone/installed display mode (`display-mode: standalone` and `navigator.standalone`).
+  - Implemented event handlers for `beforeinstallprompt` (capturing deferred prompt) and `appinstalled`.
+  - Added iOS Safari device detection for 2-step manual installation guide ("Share -> Add to Home Screen").
+  - Exported `promptInstall` triggering native OS install dialog or opening compact manual guidance modal for browsers without `beforeinstallprompt`.
+- [x] AppHeader Install App Pill (`src/components/AppHeader.tsx`):
+  - Added sleek compact `Install App` pill button with Download icon next to ThemeToggle, automatically hidden when app is already installed.
+  - Added responsive manual installation guide modal for iOS and unsupported desktop/mobile browsers.
+- [x] Backlog & Roadmap Update (`documentation/backlog.md`):
+  - Added native Android / Play Store wrapper (TWA / Capacitor) item to Future Backlog / Icebox.

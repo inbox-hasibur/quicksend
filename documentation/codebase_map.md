@@ -51,7 +51,7 @@ flowchart TD
     end
 
     subgraph Src_Components["src/components/ (UI & Presentation Components)"]
-        AppHdr["AppHeader.tsx (Logo, QuickSend Reset Link, History Counter, ThemeToggle)"]
+        AppHdr["AppHeader.tsx (Logo, QuickSend Reset Link, Install App Pill, ThemeToggle)"]
         ModeSel["ModeSelector.tsx (6-Channel Grid, Active Workspace, return pill)"]
         ThemeTgl["ThemeToggle.tsx (Tactile Light/Dark Mode Switcher)"]
         HistoryMod["TransferHistoryModal.tsx (Session Transfer Drawer)"]
@@ -86,6 +86,7 @@ flowchart TD
         UseThm["useTheme.ts (useTheme: Light / Dark Mode Controller)"]
         UseHist["useTransferHistory.ts (useTransferHistory: Ephemeral Session Storage)"]
         UseOfflineRTC["useOfflineHotspotRTC.ts (Offline Hotspot WebRTC Hook via Optical QR SDP)"]
+        UsePwa["usePwaInstall.ts (usePwaInstall: PWA Standalone Detection & Install Trigger)"]
     end
 
     subgraph Src_Lib["src/lib/ (Protocols, Pure Logic & Utilities)"]
@@ -128,6 +129,7 @@ flowchart TD
 
     AppHdr --> ThemeTgl
     AppHdr --> HistoryMod
+    AppHdr --> UsePwa
     ThemeTgl --> UseThm
     HistoryMod --> UseHist
 
