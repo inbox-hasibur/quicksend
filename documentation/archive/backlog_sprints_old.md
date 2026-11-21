@@ -1023,3 +1023,13 @@
   - Added subtle monospace diagnostic hint on transfer error to inspect ICE candidate states (`host`, `srflx`, `relay`).
 - [x] Unit Testing & Verification (`src/lib/__tests__/signalStore.test.ts`, `src/app/api/signal/__tests__/route.test.ts`, `src/hooks/__tests__/useWebRTC.test.ts`, `src/components/__tests__/SameNetworkCard.test.tsx`, `src/components/__tests__/TransferModal.test.tsx`):
   - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 51/51 passing tests across targeted test suites.
+
+### Fix 24 (2026-11-21): Offline Hotspot WebRTC hook with optical QR SDP exchange
+- [x] Self-Contained Offline WebRTC Hook (`src/hooks/useOfflineHotspotRTC.ts`):
+  - Created lean (<260 lines) WebRTC hook configured with `iceServers: []` for 100% offline local Wi-Fi Hotspot transfers with zero STUN/TURN or signaling servers.
+  - Implemented `waitForIceGathering` ensuring host candidates are gathered and included in local SDP prior to QR optical encoding.
+  - Implemented `createOfflineOffer`, `completeOfflineAnswer`, and `acceptOfflineOffer` round-trip powered by `opticalSdp.ts` (`OPTSDP:` base64 encoding).
+  - Integrated binary chunk backpressure streaming (`streamBlobChunks`), receiver acceptance workflow, >100MB disk streaming writer support, and automatic transfer history logging with mode `"Hotspot"`.
+- [x] Unit Testing & Verification (`src/hooks/__tests__/useOfflineHotspotRTC.test.ts`):
+  - Added unit test suite covering `waitForIceGathering` resolution conditions, full optical SDP exchange round-trip, DataChannel acceptance/rejection flow, and clean teardown.
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 7/7 passing tests in `src/hooks/__tests__/useOfflineHotspotRTC.test.ts`.

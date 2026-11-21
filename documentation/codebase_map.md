@@ -469,6 +469,10 @@ flowchart TD
 - **Purpose:** Isolated lifecycle and DOM manager for `html5-qrcode`. Completely separates scanner DOM manipulations from React reconciliation to prevent fatal `removeChild` DOM errors. Supports 2-tick rAF layout settling, zero-dimension prevention, sequential fallback constraints, camera device enumeration, and 3s video playing watchdog.
 - **Exports:** `useHtml5Scanner(): UseHtml5ScannerReturn`, `UseHtml5ScannerReturn`
 
+#### `src/hooks/useOfflineHotspotRTC.ts`
+- **Purpose:** Self-contained 100% offline WebRTC transfer hook designed for direct Wi-Fi Hotspot connections using optical QR SDP exchange (`opticalSdp.ts`). Operates with zero internet access, zero STUN/TURN servers (`iceServers: []`), and zero signaling servers. Features `waitForIceGathering` for embedding host candidates into QR payloads, `createOfflineOffer`, `completeOfflineAnswer`, `acceptOfflineOffer`, 16KB chunk streaming with backpressure (`streamBlobChunks`), receiver acceptance workflow, >100MB disk streaming writer support, and automatic transfer history logging with mode `"Hotspot"`.
+- **Exports:** `useOfflineHotspotRTC()`, `waitForIceGathering`.
+
 #### `src/hooks/useQuadScanner.ts`
 - **Purpose:** Multi-layout camera scanner hook supporting 1x1, 2x2, and 2x3 grid decoding. Captures video via `getUserMedia`, runs 10fps loop, and decodes frames using native `BarcodeDetector` or `jsQR` multi-region splitting (`decodeGrid`) with auto-layout candidate rotation starting with 1x1 single QR. Reuses a single offscreen `<canvas>` with 720p dimension capping to completely prevent memory spikes and browser tab crashes on mobile devices.
 - **Exports:** `useQuadScanner(): UseQuadScannerReturn`, `pickLayout`, `UseQuadScannerReturn`.
@@ -660,6 +664,7 @@ flowchart TD
 | `src/hooks/__tests__/nearbyShare.test.ts` | `useNearbyShare.ts` | Web Share API payload delegation, file support detection, and BLE hardware scanner status. |
 | `src/hooks/__tests__/useHtml5Scanner.test.ts` | `useHtml5Scanner.ts` | Single-stream camera scanner lifecycle, canvas rendering, and robust DOM error cleanup. |
 | `src/hooks/__tests__/useLocalDiscovery.test.tsx` | `useLocalDiscovery.ts` | Subnet discovery polling, peer list diffing, 4-digit PIN registration, and incoming beams. |
+| `src/hooks/__tests__/useOfflineHotspotRTC.test.ts` | `useOfflineHotspotRTC.ts` | Pure local ICE gathering without STUN, optical offer/answer QR SDP exchange round-trip, DataChannel transfer acceptance/rejection, and clean teardown. |
 | `src/hooks/__tests__/useQuadScanner.test.ts` | `useQuadScanner.ts` | Multi-quadrant scanner initialization, layout rotation, canvas recycling, and track cleanup. |
 | `src/hooks/__tests__/useRelayTransfer.test.ts` | `useRelayTransfer.ts` | Status fetching, polling cancellation, 10 MiB 2-chunk upload, chunk failure retry & backoff, 4-failure error reporting, offline pause/online resume, wrong relay code error guard without calling complete, cancel cleanup, and >100MB disk streaming writer invocation. |
 | `src/hooks/__tests__/useTheme.test.tsx` | `useTheme.ts` | Dark/light theme state toggling, class application to document root, and localStorage persistence. |

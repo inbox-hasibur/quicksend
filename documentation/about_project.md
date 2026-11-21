@@ -329,6 +329,7 @@ quicksend/
     │   │   ├── nearbyShare.test.ts
     │   │   ├── useHtml5Scanner.test.ts
     │   │   ├── useLocalDiscovery.test.tsx
+    │   │   ├── useOfflineHotspotRTC.test.ts
     │   │   ├── useQuadScanner.test.ts
     │   │   ├── useRelayTransfer.test.ts
     │   │   ├── useTheme.test.tsx
@@ -338,6 +339,7 @@ quicksend/
     │   ├── useLocalDiscovery.ts
     │   ├── useNearbyShare.ts
     │   ├── useNetworkStatus.ts
+    │   ├── useOfflineHotspotRTC.ts
     │   ├── useQuadScanner.ts
     │   ├── useRelayTransfer.ts
     │   ├── useTheme.ts
