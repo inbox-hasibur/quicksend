@@ -9,7 +9,7 @@ interface OpticalSdpPackage {
  */
 export function compactSdp(sdp: string): string {
   return sdp
-    .split("\r\n")
+    .split(/\r?\n/)
     .filter((line) => {
       // Keep only vital WebRTC connection lines
       return (
@@ -43,26 +43,118 @@ export function computeShortHash(str: string): string {
   return Math.abs(hash).toString(16).padStart(6, "0").slice(0, 6);
 }
 
+interface ParsedCandidate {
+  ip: string;
+  port: number;
+  proto: string;
+}
+
+function parseHostCandidate(raw: string): ParsedCandidate | null {
+  const str = raw.replace(/^a=/, "").trim();
+  const match = str.match(/candidate:\S+\s+\d+\s+(\w+)\s+\S+\s+(\S+)\s+(\d+)\s+typ\s+host/i);
+  if (!match) return null;
+  const proto = match[1].toLowerCase();
+  const ip = match[2];
+  const port = parseInt(match[3], 10);
+  if (isNaN(port) || port <= 0 || port > 65535) return null;
+  return { ip, port, proto };
+}
+
+function getCandidatePriority(ip: string): number {
+  if (/^192\.168\./.test(ip)) return 0;
+  if (/^10\./.test(ip)) return 1;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)) return 2;
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip)) return 3;
+  if (ip.endsWith(".local")) return 4;
+  if (ip.includes(":")) return 5;
+  return 6;
+}
+
 /**
- * Encodes an RTCSessionDescription and optional host ICE candidates into a compact string for QR rendering.
+ * Encodes an RTCSessionDescription and optional host ICE candidates into a compact QS3 string.
+ * Format: QS3:<type>|<ufrag>|<pwd>|<fpHex64>|<setup>|<mid>|<sctpPort>|<cands>
+ * Typically ~170-240 characters total for single-static QR scanning.
  */
 export function encodeOpticalSdp(
   desc: RTCSessionDescriptionInit,
   candidates: RTCIceCandidateInit[] = []
 ): string {
-  const compacted = desc.sdp ? compactSdp(desc.sdp) : "";
-  const pkg: OpticalSdpPackage = {
-    type: desc.type as "offer" | "answer",
-    sdp: compacted,
-    candidates: candidates.filter((c) => c.candidate && c.candidate.includes("typ host")),
-  };
+  const typeChar = desc.type === "answer" ? "a" : "o";
+  const sdp = desc.sdp || "";
+  const lines = sdp.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
-  const jsonStr = JSON.stringify(pkg);
-  // Base64 encode for clean QR character set
-  if (typeof btoa !== "undefined") {
-    return `OPTSDP:${btoa(unescape(encodeURIComponent(jsonStr)))}`;
+  const ufragLine = lines.find((l) => l.startsWith("a=ice-ufrag:"));
+  const ufrag = ufragLine ? ufragLine.slice("a=ice-ufrag:".length).trim() : "";
+
+  const pwdLine = lines.find((l) => l.startsWith("a=ice-pwd:"));
+  const pwd = pwdLine ? pwdLine.slice("a=ice-pwd:".length).trim() : "";
+
+  const fpLine = lines.find((l) => l.startsWith("a=fingerprint:"));
+  let fpHex64 = "";
+  if (fpLine) {
+    fpHex64 = fpLine
+      .replace(/^a=fingerprint:\S+\s+/, "")
+      .replace(/[^0-9a-fA-F]/g, "")
+      .toUpperCase();
   }
-  return `OPTSDP:${Buffer.from(jsonStr, "utf-8").toString("base64")}`;
+
+  const setupLine = lines.find((l) => l.startsWith("a=setup:"));
+  const setup = setupLine
+    ? setupLine.slice("a=setup:".length).trim()
+    : desc.type === "answer"
+    ? "active"
+    : "actpass";
+
+  const midLine = lines.find((l) => l.startsWith("a=mid:"));
+  const mid = midLine ? midLine.slice("a=mid:".length).trim() : "0";
+
+  const sctpLine = lines.find(
+    (l) => l.startsWith("a=sctp-port:") || l.startsWith("a=sctpmap:")
+  );
+  let sctpPort = "5000";
+  if (sctpLine) {
+    const match = sctpLine.match(/(?:a=sctp-port:|a=sctpmap:)(\d+)/);
+    if (match) sctpPort = match[1];
+  }
+
+  // Collect host candidates from both candidates parameter and desc.sdp
+  const candidatePool: ParsedCandidate[] = [];
+
+  for (const c of candidates) {
+    if (c.candidate) {
+      const parsed = parseHostCandidate(c.candidate);
+      if (parsed) candidatePool.push(parsed);
+    }
+  }
+
+  for (const l of lines) {
+    if (l.startsWith("a=candidate:")) {
+      const parsed = parseHostCandidate(l);
+      if (parsed) candidatePool.push(parsed);
+    }
+  }
+
+  // Deduplicate and prioritize host candidates (LAN private IPv4 first)
+  const seen = new Set<string>();
+  const uniqueCands: ParsedCandidate[] = [];
+  for (const cand of candidatePool) {
+    const key = `${cand.ip}:${cand.port}:${cand.proto}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueCands.push(cand);
+    }
+  }
+
+  uniqueCands.sort(
+    (a, b) => getCandidatePriority(a.ip) - getCandidatePriority(b.ip)
+  );
+
+  const topCands = uniqueCands.slice(0, 4);
+  const candsStr = topCands
+    .map((c) => `${c.ip},${c.port},${c.proto}`)
+    .join(";");
+
+  return `QS3:${typeChar}|${ufrag}|${pwd}|${fpHex64}|${setup}|${mid}|${sctpPort}|${candsStr}`;
 }
 
 /**
@@ -100,17 +192,20 @@ export function isOpticalFrame(payload: string): boolean {
 export function isOpticalSdp(payload: string): boolean {
   return (
     typeof payload === "string" &&
-    (payload.startsWith("OPTSDP:") || isOpticalFrame(payload))
+    (payload.startsWith("QS3:") ||
+      payload.startsWith("OPTSDP:") ||
+      isOpticalFrame(payload))
   );
 }
 
 /**
  * Decodes an optical SDP payload back into an RTCSessionDescriptionInit and host candidates.
+ * Supports compact QS3 format and legacy OPTSDP base64 format.
  */
 export function decodeOpticalSdp(
   qrPayload: string
 ): { desc: RTCSessionDescriptionInit; candidates: RTCIceCandidateInit[] } {
-  let cleanPayload = qrPayload;
+  let cleanPayload = qrPayload.trim();
 
   // If a single-frame wrapper is passed directly, unwrap it
   if (isOpticalFrame(cleanPayload)) {
@@ -120,26 +215,94 @@ export function decodeOpticalSdp(
     }
   }
 
-  if (!cleanPayload.startsWith("OPTSDP:")) {
-    throw new Error("Invalid optical SDP payload: missing OPTSDP prefix");
+  if (cleanPayload.startsWith("QS3:")) {
+    const body = cleanPayload.slice(4);
+    const [typeChar, ufrag, pwd, fpHex64, setupVal, midVal, sctpPortVal, candsStr] =
+      body.split("|");
+
+    const type: "offer" | "answer" = typeChar === "a" ? "answer" : "offer";
+    const mid = midVal || "0";
+    const sctpPort = sctpPortVal || "5000";
+    const setup = setupVal || (type === "answer" ? "active" : "actpass");
+    const colonFp =
+      (fpHex64 || "")
+        .match(/.{1,2}/g)
+        ?.join(":")
+        .toUpperCase() || fpHex64;
+
+    const candidateObjects: RTCIceCandidateInit[] = [];
+    if (candsStr) {
+      const candEntries = candsStr.split(/[;/]/).map((s) => s.trim()).filter(Boolean);
+      candEntries.forEach((entry, idx) => {
+        const [ip, portStr, protoStr] = entry.split(",");
+        const port = parseInt(portStr, 10) || 5000;
+        const proto = (protoStr || "udp").toUpperCase();
+        const prio = 2130706431 - idx;
+        const candStr = `candidate:${idx + 1} 1 ${proto} ${prio} ${ip} ${port} typ host generation 0`;
+        candidateObjects.push({
+          candidate: candStr,
+          sdpMid: mid,
+          sdpMLineIndex: 0,
+        });
+      });
+    }
+
+    // Strict RFC 4566 / JSEP standard order:
+    // Session description lines first, then media description (m=application), then media attributes
+    const sdpLines: string[] = [
+      "v=0",
+      "o=- 1234567890 2 IN IP4 127.0.0.1",
+      "s=-",
+      "t=0 0",
+      `a=group:BUNDLE ${mid}`,
+      "m=application 9 UDP/DTLS/SCTP webrtc-datachannel",
+      "c=IN IP4 0.0.0.0",
+      `a=ice-ufrag:${ufrag || ""}`,
+      `a=ice-pwd:${pwd || ""}`,
+      "a=ice-options:trickle",
+      `a=fingerprint:sha-256 ${colonFp}`,
+      `a=setup:${setup}`,
+      `a=mid:${mid}`,
+      `a=sctp-port:${sctpPort}`,
+      "a=max-message-size:262144",
+    ];
+
+    for (const c of candidateObjects) {
+      sdpLines.push(`a=${c.candidate}`);
+    }
+    sdpLines.push("a=end-of-candidates");
+
+    const sdp = sdpLines.join("\r\n") + "\r\n";
+
+    return {
+      desc: {
+        type,
+        sdp,
+      },
+      candidates: candidateObjects,
+    };
   }
 
-  const b64 = cleanPayload.slice(7);
-  let jsonStr = "";
-  if (typeof atob !== "undefined") {
-    jsonStr = decodeURIComponent(escape(atob(b64)));
-  } else {
-    jsonStr = Buffer.from(b64, "base64").toString("utf-8");
+  if (cleanPayload.startsWith("OPTSDP:")) {
+    const b64 = cleanPayload.slice(7);
+    let jsonStr = "";
+    if (typeof atob !== "undefined") {
+      jsonStr = decodeURIComponent(escape(atob(b64)));
+    } else {
+      jsonStr = Buffer.from(b64, "base64").toString("utf-8");
+    }
+
+    const pkg: OpticalSdpPackage = JSON.parse(jsonStr);
+    return {
+      desc: {
+        type: pkg.type,
+        sdp: pkg.sdp,
+      },
+      candidates: pkg.candidates || [],
+    };
   }
 
-  const pkg: OpticalSdpPackage = JSON.parse(jsonStr);
-  return {
-    desc: {
-      type: pkg.type,
-      sdp: pkg.sdp,
-    },
-    candidates: pkg.candidates || [],
-  };
+  throw new Error("Invalid optical SDP payload: missing QS3 or OPTSDP prefix");
 }
 
 export interface FrameCollectorResult {
@@ -172,8 +335,8 @@ export class OpticalFrameCollector {
   }
 
   addFrame(rawFrame: string): FrameCollectorResult {
-    // If a direct raw OPTSDP string was scanned (e.g. from copy-paste)
-    if (rawFrame.startsWith("OPTSDP:")) {
+    // If a direct raw string was scanned (e.g. from copy-paste or single-QR scan)
+    if (rawFrame.startsWith("QS3:") || rawFrame.startsWith("OPTSDP:")) {
       return {
         complete: true,
         progress: { current: 1, total: 1 },

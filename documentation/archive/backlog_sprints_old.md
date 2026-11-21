@@ -1046,3 +1046,17 @@
 - [x] Unit Testing & Verification (`src/components/__tests__/HotspotAssistantCard.test.tsx`):
   - Replaced legacy tests with unit tests asserting removal of fake SSID/password forms, online 1-peer auto-beam, online multi-peer Step 2 transition, offline mode adaptation, and device profile editing.
   - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 6/6 passing tests in `src/components/__tests__/HotspotAssistantCard.test.tsx`.
+
+### Fix 26 (2026-11-21): QS3 structured compact SDP codec & single static hotspot QR
+- [x] Lossless Compact DataChannel SDP Format (`src/lib/opticalSdp.ts`):
+  - Replaced bulky base64 JSON payload with structured `QS3:<type>|<ufrag>|<pwd>|<fpHex64>|<setup>|<mid>|<sctpPort>|<cands>` format (~160-220 characters).
+  - Fixed Chromium and Samsung Browser parsing error (`Failed to parse SessionDescription. a=max-message-size:262144 Invalid SDP line`) by strictly placing session-level lines first (`v=0`, `o=...`, `s=-`, `t=0 0`, `a=group:BUNDLE`), then media section (`m=application 9 UDP/DTLS/SCTP webrtc-datachannel`), and media-level attributes (`a=max-message-size:262144`, `a=ice-*`, `a=fingerprint:sha-256`, `a=setup`, `a=mid`, `a=sctp-port`, `a=candidate:*`) with CRLF line endings.
+  - Filtered and prioritized host candidates, placing private LAN IPv4 addresses (`192.168.*`, `10.*`, `172.16-31.*`) first, ignoring non-host candidates, and limiting to 4 candidates.
+  - Maintained full backward compatibility for decoding legacy `OPTSDP:` payloads.
+- [x] Single Static Hotspot QR Modal (`src/components/OpticalHandshakeModal.tsx`):
+  - When payload is <= 450 characters (which `QS3:` always satisfies), renders ONE crisp static `<QRCodeSVG size={240} level="L" />` with no frame counters, animations, pause/play, or speed controls.
+  - Updated user-friendly copy: Title "Connect via Hotspot QR", Sender Step 1 "Scan this QR on the receiving device" -> Step 2 "Scan Receiver's QR", Receiver Step 1 "Scan Sender's QR" -> Step 2 "Show this QR to Sender".
+  - Tucked collapsible "No camera? Copy / Paste Code" fallback neatly at the bottom.
+- [x] Unit Testing & Verification (`src/lib/__tests__/opticalSdp.test.ts`):
+  - Verified Chromium DataChannel SDP encoding to `QS3:` under 300 characters, CRLF line endings, `m=application` before `a=max-message-size`, and candidate prioritization.
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 14/14 passing tests in `src/lib/__tests__/opticalSdp.test.ts`.

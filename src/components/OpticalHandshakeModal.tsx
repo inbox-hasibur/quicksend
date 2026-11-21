@@ -7,7 +7,6 @@ import {
   QrCode,
   X,
   RefreshCw,
-  Eye,
   Play,
   Pause,
   ChevronLeft,
@@ -29,7 +28,7 @@ import {
 interface OpticalHandshakeModalProps {
   isOpen: boolean;
   role: "sender" | "receiver";
-  localPayloadQr?: string; // OPTSDP:... string to display
+  localPayloadQr?: string; // QS3:... or legacy OPTSDP:... string
   onOfferScanned?: (decoded: ReturnType<typeof decodeOpticalSdp>) => void;
   onAnswerScanned?: (decoded: ReturnType<typeof decodeOpticalSdp>) => void;
   onClose: () => void;
@@ -48,7 +47,8 @@ export function OpticalHandshakeModal({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [step, setStep] = useState<"display" | "scan">(role === "sender" ? "display" : "scan");
 
-  // Animated Carousel state
+  // Multi-frame Carousel fallback state (only when payload > 450 chars)
+  const isMultiFrame = Boolean(localPayloadQr && localPayloadQr.length > 450);
   const [currentFrameIndex, setCurrentFrameIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed] = useState<"normal" | "slow">("normal");
@@ -66,17 +66,17 @@ export function OpticalHandshakeModal({
   const [copied, setCopied] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
 
-  // Split local payload into sequenced optical frames (180 chars max for high readability)
+  // Split local payload into sequenced optical frames only if multi-frame needed
   const frames = useMemo(() => {
-    if (!localPayloadQr) return [];
+    if (!localPayloadQr || !isMultiFrame) return [];
     return splitOpticalFrames(localPayloadQr, 180);
-  }, [localPayloadQr]);
+  }, [localPayloadQr, isMultiFrame]);
 
   const activeFrameIndex = frames.length > 0 ? currentFrameIndex % frames.length : 0;
 
-  // Animated cycling interval
+  // Animated cycling interval (only active when multi-frame)
   useEffect(() => {
-    if (!isOpen || step !== "display" || !isPlaying || frames.length <= 1) {
+    if (!isOpen || step !== "display" || !isPlaying || !isMultiFrame || frames.length <= 1) {
       return;
     }
 
@@ -86,7 +86,7 @@ export function OpticalHandshakeModal({
     }, intervalMs);
 
     return () => clearInterval(interval);
-  }, [isOpen, step, isPlaying, speed, frames.length]);
+  }, [isOpen, step, isPlaying, speed, isMultiFrame, frames.length]);
 
   if (!isOpen) return null;
 
@@ -153,13 +153,15 @@ export function OpticalHandshakeModal({
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-hairline)]">
           <div className="flex items-center gap-2.5">
             <div className="p-2 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
-              <Eye className="h-5 w-5" />
+              <QrCode className="h-5 w-5" />
             </div>
             <div>
               <h3 className="font-semibold text-base text-[var(--text)]">
-                Camera-to-Camera Optical Handshake
+                Connect via Hotspot QR
               </h3>
-              <p className="text-xs text-[var(--text-muted)] font-mono">100% Zero-Internet P2P Signaling</p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Direct Wi-Fi transfer • No internet needed
+              </p>
             </div>
           </div>
           <button
@@ -174,17 +176,17 @@ export function OpticalHandshakeModal({
         {/* Content based on Step */}
         {step === "display" && localPayloadQr ? (
           <div className="flex flex-col items-center text-center space-y-4">
-            {/* QR Card */}
+            {/* Single Static QR Code (level="L", size={240}) */}
             <div className="p-3 bg-white rounded-2xl border border-[var(--border-hairline)] shadow-sm relative">
               <QRCodeSVG
-                value={frames[activeFrameIndex] || localPayloadQr}
-                size={220}
+                value={isMultiFrame ? (frames[activeFrameIndex] || localPayloadQr) : localPayloadQr}
+                size={240}
                 level="L"
               />
             </div>
 
-            {/* Carousel Controls (if multi-frame) */}
-            {frames.length > 1 && (
+            {/* Carousel Controls (ONLY rendered if multi-frame > 450 chars) */}
+            {isMultiFrame && frames.length > 1 && (
               <div className="w-full space-y-2">
                 <div className="flex items-center justify-between px-2">
                   <div className="flex items-center gap-1.5">
@@ -252,13 +254,16 @@ export function OpticalHandshakeModal({
               </div>
             )}
 
+            {/* Step Description Copy */}
             <div className="space-y-1">
               <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                {role === "sender" ? "Step 1: Show to Receiver" : "Step 2: Show to Sender"}
-              </span>
-              <p className="text-xs text-neutral-500 max-w-xs leading-relaxed">
                 {role === "sender"
-                  ? "Point the receiver's phone camera at this animated QR code. Once scanned, the receiver will display an Answer QR."
+                  ? "Step 1 of 2: Scan this QR on the receiving device"
+                  : "Step 2 of 2: Show this QR to Sender"}
+              </span>
+              <p className="text-xs text-[var(--text-muted)] max-w-xs leading-relaxed">
+                {role === "sender"
+                  ? "Point the receiver's phone camera at this QR code. Once scanned, tap the button below to scan their response."
                   : "Hold this Answer QR code in front of the sender's camera to establish the direct connection."}
               </p>
             </div>
@@ -271,51 +276,89 @@ export function OpticalHandshakeModal({
                   setScanProgress({ current: 0, total: 0 });
                   setIsScannerOpen(true);
                 }}
-                className="w-full py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
               >
                 <Camera className="h-4 w-4" />
-                <span>Scan Receiver&apos;s Answer QR</span>
+                <span>Step 2: Scan Receiver&apos;s QR</span>
               </button>
             )}
 
-            {/* Webcam-Free Fallback: Copy Code */}
-            <div className="w-full pt-2 border-t border-neutral-100 dark:border-neutral-800">
+            {/* Collapsible Copy / Paste Code Fallback */}
+            <div className="w-full pt-2 border-t border-[var(--border-hairline)] text-left">
               <button
                 type="button"
-                onClick={handleCopyCode}
-                className="w-full py-2 px-3 rounded-xl border border-neutral-200 dark:border-neutral-700 hover:bg-neutral-50 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300 font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                onClick={() => setShowManualFallback(!showManualFallback)}
+                className="w-full py-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text)] flex items-center justify-between cursor-pointer"
               >
-                {copied ? (
-                  <>
-                    <Check className="h-3.5 w-3.5 text-emerald-500" />
-                    <span>Copied Handshake Code!</span>
-                  </>
+                <span>No camera? Copy / Paste Code</span>
+                {showManualFallback ? (
+                  <ChevronUp className="h-4 w-4" />
                 ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5 text-neutral-400" />
-                    <span>No camera? Copy Handshake Code</span>
-                  </>
+                  <ChevronDown className="h-4 w-4" />
                 )}
               </button>
+
+              {showManualFallback && (
+                <div className="mt-2 space-y-2 animate-in fade-in">
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    className="w-full py-2 px-3 rounded-xl border border-[var(--border-hairline)] hover:bg-[var(--surface-subtle)] text-[var(--text)] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        <span>Copied Handshake Code!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5 text-neutral-400" />
+                        <span>Copy This Device&apos;s Handshake Code</span>
+                      </>
+                    )}
+                  </button>
+
+                  <div className="space-y-1.5 pt-1">
+                    <textarea
+                      rows={3}
+                      value={manualCodeInput}
+                      onChange={(e) => setManualCodeInput(e.target.value)}
+                      placeholder="Paste other device's code here (QS3:...)"
+                      className="w-full p-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-[11px] font-mono text-[var(--text)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
+                    />
+                    {manualError && (
+                      <p className="text-[11px] text-red-500 font-medium">{manualError}</p>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleApplyManualCode}
+                      className="w-full py-2 px-3 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                    >
+                      <ClipboardPaste className="h-3.5 w-3.5" />
+                      <span>Apply Handshake Code</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
-          /* SCAN STEP */
+          /* SCAN STEP (Receiver Step 1) */
           <div className="flex flex-col items-center text-center space-y-4 py-2">
-            <div className="p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
+            <div className="p-4 rounded-2xl bg-[var(--surface-subtle)] text-[var(--accent)]">
               <QrCode className="h-10 w-10 animate-pulse" />
             </div>
             <div className="space-y-1">
-              <h4 className="font-semibold text-sm text-neutral-900 dark:text-neutral-100">
-                Scan Sender&apos;s Offer QR Code
+              <h4 className="font-semibold text-sm text-[var(--text)]">
+                Step 1 of 2: Scan Sender&apos;s QR
               </h4>
-              <p className="text-xs text-neutral-500 max-w-xs">
-                Open your camera to scan the optical handshake QR code displayed on the sender&apos;s screen.
+              <p className="text-xs text-[var(--text-muted)] max-w-xs">
+                Open your camera to scan the QR code displayed on the sender&apos;s screen.
               </p>
             </div>
 
-            {scanProgress.total > 0 && (
-              <div className="w-full p-3 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 text-xs font-mono text-indigo-700 dark:text-indigo-300 space-y-1">
+            {scanProgress.total > 1 && (
+              <div className="w-full p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-mono text-amber-700 dark:text-amber-300 space-y-1">
                 <div className="flex items-center justify-between">
                   <span>Captured:</span>
                   <span className="font-bold">
@@ -324,7 +367,7 @@ export function OpticalHandshakeModal({
                 </div>
                 <div className="w-full h-1.5 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
                   <div
-                    className="h-full bg-indigo-600 transition-all duration-150"
+                    className="h-full bg-amber-500 transition-all duration-150"
                     style={{
                       width: `${Math.round((scanProgress.current / scanProgress.total) * 100)}%`,
                     }}
@@ -340,20 +383,20 @@ export function OpticalHandshakeModal({
                 setScanProgress({ current: 0, total: 0 });
                 setIsScannerOpen(true);
               }}
-              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+              className="w-full py-3 px-4 rounded-xl bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg)] font-semibold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
             >
               <Camera className="h-4 w-4" />
               <span>Launch Camera Scanner</span>
             </button>
 
-            {/* Webcam-Free Fallback: Expandable Paste Code */}
+            {/* Collapsible Copy / Paste Code Fallback */}
             <div className="w-full pt-2 border-t border-[var(--border-hairline)] text-left">
               <button
                 type="button"
                 onClick={() => setShowManualFallback(!showManualFallback)}
                 className="w-full py-1.5 text-xs font-semibold text-[var(--text-muted)] hover:text-[var(--text)] flex items-center justify-between cursor-pointer"
               >
-                <span>No camera? Paste Code manually</span>
+                <span>No camera? Copy / Paste Code</span>
                 {showManualFallback ? (
                   <ChevronUp className="h-4 w-4" />
                 ) : (
@@ -367,7 +410,7 @@ export function OpticalHandshakeModal({
                     rows={3}
                     value={manualCodeInput}
                     onChange={(e) => setManualCodeInput(e.target.value)}
-                    placeholder="Paste OPTSDP:... code here"
+                    placeholder="Paste other device's code here (QS3:...)"
                     className="w-full p-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-[11px] font-mono text-[var(--text)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   />
                   {manualError && (
