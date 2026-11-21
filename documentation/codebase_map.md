@@ -58,7 +58,7 @@ flowchart TD
         SWReg["ServiceWorkerRegister.tsx (PWA /sw.js Registration)"]
         InternetCard["InternetSharingCard.tsx (Mode 1 Controller: Zero-Knowledge OTP/QR Cloud Relay)"]
         SameNetCard["SameNetworkCard.tsx (Mode 2 Controller: Local Radar & Device Beaming)"]
-        HotspotCard["HotspotAssistantCard.tsx (Mode 3 Controller: Zero-Scroll Smart Online Auto-Beam & Offline Optical QR Hotspot)"]
+        HotspotCard["HotspotAssistantCard.tsx (Mode 3 Controller: Zero-Scroll 100% Offline Hotspot P2P Controller)"]
         NearbyCard["NearbyShareCard.tsx (Mode 4 Controller: Bluetooth & Native Quick Share)"]
         CameraCard["CameraStreamCard.tsx (Mode 5 Controller: Air-Gapped Optical QR Stream)"]
         CableCard["CableTransferCard.tsx (Mode 6 Controller: Direct Cable & Tethering)"]
@@ -160,9 +160,7 @@ flowchart TD
     SameNetCard --> EstimateBdg
     SameNetCard --> ConnDiag
 
-    HotspotCard --> UseRTC
     HotspotCard --> UseOfflineRTC
-    HotspotCard --> UseLocalDisc
     HotspotCard --> DropzoneComp
     HotspotCard --> OpticalModal
     HotspotCard --> TransferMod

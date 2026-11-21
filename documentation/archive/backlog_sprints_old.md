@@ -1060,3 +1060,15 @@
 - [x] Unit Testing & Verification (`src/lib/__tests__/opticalSdp.test.ts`):
   - Verified Chromium DataChannel SDP encoding to `QS3:` under 300 characters, CRLF line endings, `m=application` before `a=max-message-size`, and candidate prioritization.
   - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 14/14 passing tests in `src/lib/__tests__/opticalSdp.test.ts`.
+
+### Fix 27 (2026-11-21): Unify Mode 3 Wi-Fi Hotspot to 100% offline-capable single static QR flow
+- [x] Streamlined Zero-Scroll Hotspot Card (`src/components/HotspotAssistantCard.tsx`):
+  - Removed `useLocalDiscovery`, `RadarPanel`, `useWebRTC`, and device avatar/name editing completely from Mode 3.
+  - Powered Mode 3 exclusively through `useOfflineHotspotRTC()` and single static QR pairing via `OpticalHandshakeModal`.
+  - Added clean 1-screen header with `Send | Receive` toggle and 1-line helper strip with Android Tethering and Wi-Fi Settings intent links.
+  - Send Tab: Select payload via `Dropzone` with `EstimateBadge` -> click "Send" -> generates offline offer and opens static Offer QR -> automatically closes modal on connect and transmits files/text to `TransferModal`.
+  - Receive Tab: Clean centered card with "Ready to receive over Hotspot" -> click "Scan Sender's QR" -> scans Offer QR -> displays static Answer QR -> automatically opens `TransferModal` on connect.
+  - Full resource teardown on tab switch and modal dismissal (`offlineRtc.cleanup()`).
+- [x] Unit Testing & Verification (`src/components/__tests__/HotspotAssistantCard.test.tsx` & `src/hooks/__tests__/useOfflineHotspotRTC.test.ts`):
+  - Verified Send and Receive workflows, Dropzone button enablement, modal launching, and session cleanup.
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and all 11 tests passing across both test suites (4/4 in `HotspotAssistantCard.test.tsx` and 7/7 in `useOfflineHotspotRTC.test.ts`).

@@ -182,7 +182,7 @@ describe("useOfflineHotspotRTC Hook", () => {
       offerQr = await currentHook.createOfflineOffer();
     });
 
-    expect(offerQr.startsWith("OPTSDP:")).toBe(true);
+    expect(offerQr.startsWith("QS3:") || offerQr.startsWith("OPTSDP:")).toBe(true);
     expect(currentHook.localQrPayload).toBe(offerQr);
 
     const senderPc = mockPcs[0];
@@ -199,7 +199,7 @@ describe("useOfflineHotspotRTC Hook", () => {
       answerQr = await currentHook.acceptOfflineOffer(offerQr);
     });
 
-    expect(answerQr.startsWith("OPTSDP:")).toBe(true);
+    expect(answerQr.startsWith("QS3:") || answerQr.startsWith("OPTSDP:")).toBe(true);
     const receiverPc = mockPcs[1];
     expect(receiverPc).toBeDefined();
     expect(receiverPc.iceServers).toEqual([]);

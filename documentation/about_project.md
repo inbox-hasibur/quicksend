@@ -69,13 +69,13 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 
 ---
 
-### Mode 3: Share via Wi-Fi + Hotspot (Zero-Scroll Smart Online Auto-Beam & Offline Optical QR Hotspot)
-- **Primary Use Case:** Direct peer-to-peer transfer between devices sharing a mobile hotspot or portable Wi-Fi AP.
-- **Smart Online vs. 100% Offline Architecture:**
-  - **Step 1 (Select & Send):** Select files or text via `Dropzone` with real-time transfer duration estimate (`EstimateBadge`).
-  - **Instant 1-Tap Auto-Beam (Online):** When mobile data/internet is active, if exactly 1 device is discovered on the hotspot, tapping "Send" immediately initiates WebRTC session establishment and beams files with zero extra steps. When multiple devices are connected, smoothly steps into the live `RadarPanel` with a "Change files" back button.
-  - **100% Offline Zero-Internet QR Pairing (`!isOnline`):** Automatically detects lack of cellular data / internet connectivity (`navigator.onLine === false`) and switches into direct optical QR pairing mode via `useOfflineHotspotRTC`. The sender displays an animated/compressed `OPTSDP:` offer QR code, while the receiver scans it using their camera to establish an isolated local LAN WebRTC DataChannel without needing any external signaling or STUN/TURN servers.
-  - **Zero-Friction UX:** Removed artificial SSID/password forms and complex PIN submenus, providing a clean 1-line helper bar with native Android Tethering and Wi-Fi settings shortcuts (`ANDROID_INTENTS.TETHER_SETTINGS`, `ANDROID_INTENTS.WIFI_SETTINGS`).
+### Mode 3: Share via Wi-Fi + Hotspot (Zero-Scroll 100% Offline Hotspot P2P)
+- **Primary Use Case:** Direct peer-to-peer transfer between devices sharing a mobile hotspot or portable Wi-Fi AP, completely independent of internet connectivity or cellular data.
+- **Unified 100% Offline Optical QR Architecture:**
+  - **Identical Experience on Both Devices:** Eliminates the online/offline mismatch where one device had mobile data on while the other did not. Both devices now share the exact same clean, deterministic flow powered exclusively by `useOfflineHotspotRTC` and single static `QS3:` QR exchange via `OpticalHandshakeModal`. (Mode 2 `Same Wi-Fi` remains dedicated for online local LAN Radar discovery).
+  - **Sender Flow:** Select files or text via `Dropzone` with `EstimateBadge`, tap "Send", and display 1 static Offer QR. Tap "Step 2: Scan Receiver's QR", scan the receiver's static Answer QR, and the WebRTC DataChannel connection establishes instantly with auto-send into `TransferModal`.
+  - **Receiver Flow:** Tap "Scan Sender's QR", scan the sender's single Offer QR, display 1 static Answer QR for the sender to scan, and accept the incoming transfer in `TransferModal`.
+  - **Zero-Friction UX:** Zero artificial SSID/password forms, no complex PIN submenus, and a 1-line helper bar with native Android Tethering and Wi-Fi settings shortcuts (`ANDROID_INTENTS.TETHER_SETTINGS`, `ANDROID_INTENTS.WIFI_SETTINGS`).
 
 ---
 
