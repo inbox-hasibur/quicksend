@@ -58,7 +58,7 @@ flowchart TD
         SWReg["ServiceWorkerRegister.tsx (PWA /sw.js Registration)"]
         InternetCard["InternetSharingCard.tsx (Mode 1 Controller: Zero-Knowledge OTP/QR Cloud Relay)"]
         SameNetCard["SameNetworkCard.tsx (Mode 2 Controller: Local Radar & Device Beaming)"]
-        HotspotCard["HotspotAssistantCard.tsx (Mode 3 Controller: Hotspot QR & Wizard)"]
+        HotspotCard["HotspotAssistantCard.tsx (Mode 3 Controller: Zero-Scroll Smart Online Auto-Beam & Offline Optical QR Hotspot)"]
         NearbyCard["NearbyShareCard.tsx (Mode 4 Controller: Bluetooth & Native Quick Share)"]
         CameraCard["CameraStreamCard.tsx (Mode 5 Controller: Air-Gapped Optical QR Stream)"]
         CableCard["CableTransferCard.tsx (Mode 6 Controller: Direct Cable & Tethering)"]
@@ -85,6 +85,7 @@ flowchart TD
         UseHtml5Scan["useHtml5Scanner.ts (Isolated html5-qrcode Lifecycle Controller)"]
         UseThm["useTheme.ts (useTheme: Light / Dark Mode Controller)"]
         UseHist["useTransferHistory.ts (useTransferHistory: Ephemeral Session Storage)"]
+        UseOfflineRTC["useOfflineHotspotRTC.ts (Offline Hotspot WebRTC Hook via Optical QR SDP)"]
     end
 
     subgraph Src_Lib["src/lib/ (Protocols, Pure Logic & Utilities)"]
@@ -160,14 +161,13 @@ flowchart TD
     SameNetCard --> ConnDiag
 
     HotspotCard --> UseRTC
+    HotspotCard --> UseOfflineRTC
     HotspotCard --> UseLocalDisc
     HotspotCard --> DropzoneComp
     HotspotCard --> OpticalModal
     HotspotCard --> TransferMod
     HotspotCard --> WifiQr
-    HotspotCard --> QRGen
     HotspotCard --> EstimateBdg
-    HotspotCard --> ConnDiag
 
     NearbyCard --> UseNearby
     NearbyCard --> DropzoneComp

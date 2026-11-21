@@ -69,14 +69,13 @@ Immediately upon opening the app, users are presented with **5 upfront transfer 
 
 ---
 
-### Mode 3: Share via Wi-Fi + Hotspot (Live Hotspot Radar & Transfer Engine)
+### Mode 3: Share via Wi-Fi + Hotspot (Zero-Scroll Smart Online Auto-Beam & Offline Optical QR Hotspot)
 - **Primary Use Case:** Direct peer-to-peer transfer between devices sharing a mobile hotspot or portable Wi-Fi AP.
-- **Dual-Phase Architecture (Live Radar + Offline Backup):**
-  - **Step 1 (Connect):** Clean, compact 2-tab setup (`Host Hotspot` | `Join Hotspot`):
-    - *Host Hotspot:* 1-tap Android Hotspot Settings shortcut (`ANDROID_INTENTS.TETHER_SETTINGS`) + optional collapsible Wi-Fi QR Code generator (`WIFI:T:WPA;S:...`) for instant camera joining without forcing users to type passwords.
-    - *Join Hotspot:* 1-tap Android Wi-Fi Settings shortcut (`ANDROID_INTENTS.WIFI_SETTINGS`).
-  - **Step 2 (Instant Hotspot Radar — Primary Flow):** Powered directly by `useLocalDiscovery` + `useWebRTC("hotspot")`. Devices connected to the same phone hotspot (with mobile data on) discover each other automatically on the live Hotspot Radar and transfer with 1-tap beaming.
-  - **Offline Backup (Collapsible):** Seamlessly tucked inside `"No mobile data? Use Offline Direct PIN / QR Pairing"` for completely air-gapped field setups without cellular data. Users can pair via 6-digit session PIN or camera QR scanner.
+- **Smart Online vs. 100% Offline Architecture:**
+  - **Step 1 (Select & Send):** Select files or text via `Dropzone` with real-time transfer duration estimate (`EstimateBadge`).
+  - **Instant 1-Tap Auto-Beam (Online):** When mobile data/internet is active, if exactly 1 device is discovered on the hotspot, tapping "Send" immediately initiates WebRTC session establishment and beams files with zero extra steps. When multiple devices are connected, smoothly steps into the live `RadarPanel` with a "Change files" back button.
+  - **100% Offline Zero-Internet QR Pairing (`!isOnline`):** Automatically detects lack of cellular data / internet connectivity (`navigator.onLine === false`) and switches into direct optical QR pairing mode via `useOfflineHotspotRTC`. The sender displays an animated/compressed `OPTSDP:` offer QR code, while the receiver scans it using their camera to establish an isolated local LAN WebRTC DataChannel without needing any external signaling or STUN/TURN servers.
+  - **Zero-Friction UX:** Removed artificial SSID/password forms and complex PIN submenus, providing a clean 1-line helper bar with native Android Tethering and Wi-Fi settings shortcuts (`ANDROID_INTENTS.TETHER_SETTINGS`, `ANDROID_INTENTS.WIFI_SETTINGS`).
 
 ---
 

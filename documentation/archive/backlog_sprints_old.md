@@ -1033,3 +1033,16 @@
 - [x] Unit Testing & Verification (`src/hooks/__tests__/useOfflineHotspotRTC.test.ts`):
   - Added unit test suite covering `waitForIceGathering` resolution conditions, full optical SDP exchange round-trip, DataChannel acceptance/rejection flow, and clean teardown.
   - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 7/7 passing tests in `src/hooks/__tests__/useOfflineHotspotRTC.test.ts`.
+
+### Fix 25 (2026-11-21): Mode 3 Hotspot redesign with smart online auto-beam & zero-internet optical QR
+- [x] Zero-Scroll Step-by-Step Hotspot Card (`src/components/HotspotAssistantCard.tsx`):
+  - Completely removed artificial SSID/password forms, static Wi-Fi QR generators, and complex PIN submenus.
+  - Added clean header with role toggle (`Send | Receive`) and editable local device profile badge (`updateName`).
+  - Added compact 1-line helper bar with native Android Tethering and Wi-Fi settings shortcuts (`ANDROID_INTENTS.TETHER_SETTINGS`, `ANDROID_INTENTS.WIFI_SETTINGS`).
+- [x] Smart Online Auto-Beam & Offline Adaptation:
+  - Online Single Peer: If exactly 1 device is discovered on the hotspot, clicking "Send" immediately initiates WebRTC session and beams payload with zero extra clicks.
+  - Online Multi-Peer: When multiple devices are discovered, advances to Step 2 displaying `RadarPanel` with a "Change files" back button.
+  - 100% Offline Mode: When `!isOnline`, displays `"Offline Hotspot Mode • Direct QR Pair (No Internet Needed)"` banner, hides online radar, and enables direct optical QR pairing via `useOfflineHotspotRTC` and `OpticalHandshakeModal`.
+- [x] Unit Testing & Verification (`src/components/__tests__/HotspotAssistantCard.test.tsx`):
+  - Replaced legacy tests with unit tests asserting removal of fake SSID/password forms, online 1-peer auto-beam, online multi-peer Step 2 transition, offline mode adaptation, and device profile editing.
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 6/6 passing tests in `src/components/__tests__/HotspotAssistantCard.test.tsx`.
