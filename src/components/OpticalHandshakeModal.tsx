@@ -59,12 +59,31 @@ export function OpticalHandshakeModal({
     total: 0,
   });
   const collectorRef = useRef(new OpticalFrameCollector());
+  const hasAutoOpenedRef = useRef(false);
 
-  // Manual fallback state
+  // Manual fallback state (always false by default)
   const [showManualFallback, setShowManualFallback] = useState(false);
   const [manualCodeInput, setManualCodeInput] = useState("");
   const [copied, setCopied] = useState(false);
   const [manualError, setManualError] = useState<string | null>(null);
+
+  // Auto-open camera scanner on Receiver Step 1 & sync state on modal open
+  useEffect(() => {
+    if (!isOpen) {
+      hasAutoOpenedRef.current = false;
+      return;
+    }
+
+    if (role === "receiver" && !localPayloadQr) {
+      if (!hasAutoOpenedRef.current) {
+        hasAutoOpenedRef.current = true;
+        const timer = setTimeout(() => {
+          setIsScannerOpen(true);
+        }, 0);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isOpen, role, localPayloadQr]);
 
   // Split local payload into sequenced optical frames only if multi-frame needed
   const frames = useMemo(() => {
@@ -90,6 +109,14 @@ export function OpticalHandshakeModal({
 
   if (!isOpen) return null;
 
+  const handleModalClose = () => {
+    setIsScannerOpen(false);
+    setShowManualFallback(false);
+    setManualCodeInput("");
+    setManualError(null);
+    onClose();
+  };
+
   const handleCopyCode = async () => {
     if (localPayloadQr) {
       await navigator.clipboard.writeText(localPayloadQr);
@@ -108,12 +135,15 @@ export function OpticalHandshakeModal({
     try {
       setManualError(null);
       const decoded = decodeOpticalSdp(trimmed);
+      setShowManualFallback(false);
+      setManualCodeInput("");
+
       if (role === "receiver" && decoded.desc.type === "offer") {
         onOfferScanned?.(decoded);
         setStep("display");
       } else if (role === "sender" && decoded.desc.type === "answer") {
         onAnswerScanned?.(decoded);
-        onClose();
+        handleModalClose();
       } else {
         setManualError(`Unexpected payload type "${decoded.desc.type}" for ${role}`);
       }
@@ -132,13 +162,16 @@ export function OpticalHandshakeModal({
         collectorRef.current.reset();
         setScanProgress({ current: 0, total: 0 });
         setIsScannerOpen(false);
+        setShowManualFallback(false);
+        setManualCodeInput("");
+        setManualError(null);
 
         if (role === "receiver" && decoded.desc.type === "offer") {
           onOfferScanned?.(decoded);
           setStep("display");
         } else if (role === "sender" && decoded.desc.type === "answer") {
           onAnswerScanned?.(decoded);
-          onClose();
+          handleModalClose();
         }
       } catch (err) {
         alert(err instanceof Error ? err.message : "Failed to parse optical SDP payload");
@@ -166,7 +199,7 @@ export function OpticalHandshakeModal({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleModalClose}
             className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-subtle)] transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
@@ -259,12 +292,12 @@ export function OpticalHandshakeModal({
               <span className="text-xs font-semibold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                 {role === "sender"
                   ? "Step 1 of 2: Scan this QR on the receiving device"
-                  : "Step 2 of 2: Show this QR to Sender"}
+                  : "STEP 2 OF 2: FINAL STEP"}
               </span>
               <p className="text-xs text-[var(--text-muted)] max-w-xs leading-relaxed">
                 {role === "sender"
                   ? "Point the receiver's phone camera at this QR code. Once scanned, tap the button below to scan their response."
-                  : "Hold this Answer QR code in front of the sender's camera to establish the direct connection."}
+                  : "On the SENDER phone, tap 'Step 2: Scan Receiver's QR' and scan this code — your file will transfer over Wi-Fi right away."}
               </p>
             </div>
 

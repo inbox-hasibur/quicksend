@@ -1072,3 +1072,11 @@
 - [x] Unit Testing & Verification (`src/components/__tests__/HotspotAssistantCard.test.tsx` & `src/hooks/__tests__/useOfflineHotspotRTC.test.ts`):
   - Verified Send and Receive workflows, Dropzone button enablement, modal launching, and session cleanup.
   - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and all 11 tests passing across both test suites (4/4 in `HotspotAssistantCard.test.tsx` and 7/7 in `useOfflineHotspotRTC.test.ts`).
+
+### Fix 28 (2026-11-21): Receiver camera auto-launch & unmistakable Step 2 guidance in OpticalHandshakeModal
+- [x] Streamlined Receiver Flow & Guidance (`src/components/OpticalHandshakeModal.tsx`):
+  - Added auto-open behavior for camera scanner on Receiver Step 1 when modal opens, eliminating double-click ("Scan Sender's QR" -> "Launch Camera Scanner") while retaining fallback button if user dismisses camera.
+  - Reset manual copy/paste code input to empty string on modal open/close and step changes, ensuring the section remains collapsed by default and never prefills with local payload.
+  - Upgraded Receiver Step 2 guidance to crystal-clear instructions: "STEP 2 OF 2: FINAL STEP" with subtitle guiding user to scan code using the sender phone's Step 2 button.
+- [x] Unit Testing & Verification (`src/components/__tests__/HotspotAssistantCard.test.tsx`):
+  - Verified 0 TypeScript compilation errors (`npx tsc --noEmit`), 0 ESLint warnings/errors (`npm run lint`), and 4/4 passing tests in `HotspotAssistantCard.test.tsx`.
